@@ -261,14 +261,19 @@ impl AsyncFileLogJob {
 	}
 
 	fn fetch_log(repo_path: &RepoPath) -> Result<()> {
-		let mut entries = Vec::with_capacity(LIMIT_COUNT);
+		let mut all_entries: Vec<CommitId> = Vec::new();
+		let mut current_entries: Vec<CommitId> = Vec::with_capacity(LIMIT_COUNT);
 		let repo = repo(&repo_path)?;
 		let mut walker =
 			LogWalker::new(&repo, LIMIT_COUNT)?.filter(None);
 
 		loop {
-			entries.clear();
-			let _res_is_err = walker.read(&mut entries).is_err();
+			current_entries.clear();
+			let res_is_err = walker.read(&mut current_entries).is_err();
+
+			if !res_is_err {
+				all_entries.extend(current_entries.iter());
+			}
 
 			break;
 		}
