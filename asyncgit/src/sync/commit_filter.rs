@@ -13,27 +13,6 @@ pub type SharedCommitFilterFn = Arc<
 	Box<dyn Fn(&Repository, &CommitId) -> Result<bool> + Send + Sync>,
 >;
 
-///
-pub fn diff_contains_file(file_path: String) -> SharedCommitFilterFn {
-	Arc::new(Box::new(
-		move |repo: &Repository,
-		      commit_id: &CommitId|
-		      -> Result<bool> {
-			let diff = get_commit_diff(
-				repo,
-				*commit_id,
-				Some(file_path.clone()),
-				None,
-				None,
-			)?;
-
-			let contains_file = diff.deltas().len() > 0;
-
-			Ok(contains_file)
-		},
-	))
-}
-
 bitflags! {
 	///
 	#[derive(Debug, Clone, Copy)]

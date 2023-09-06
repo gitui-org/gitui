@@ -7,6 +7,7 @@ use crossbeam_channel::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
 /// Passed to `AsyncJob::run` allowing sending intermediate progress notifications
+#[derive(Clone)]
 pub struct RunParams<
 	T: Copy + Send,
 	P: Clone + Send + Sync + PartialEq,

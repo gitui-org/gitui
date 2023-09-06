@@ -3,10 +3,10 @@
 use super::{diff::DiffOptions, CommitId, RepoPath};
 use crate::{
 	error::Result,
-	sync::{get_stashes, repository::repo},
-	StatusItem, StatusItemType,
+	sync::{get_stashes, repository::repo, utils::bytes2string},
+	Error, StatusItem, StatusItemType,
 };
-use git2::{Diff, Repository};
+use git2::{Diff, DiffFindOptions, Repository};
 use scopetime::scope_time;
 use std::collections::HashSet;
 
@@ -179,14 +179,93 @@ pub(crate) fn get_commit_diff<'a>(
 	Ok(diff)
 }
 
+///
+pub(crate) fn commit_contains_file(
+	repo: &Repository,
+	id: CommitId,
+	pathspec: &str,
+) -> Result<Option<git2::Delta>> {
+	let commit = repo.find_commit(id.into())?;
+	let commit_tree = commit.tree()?;
+
+	let parent = if commit.parent_count() > 0 {
+		repo.find_commit(commit.parent_id(0)?)
+			.ok()
+			.and_then(|c| c.tree().ok())
+	} else {
+		None
+	};
+
+	let mut opts = git2::DiffOptions::new();
+	opts.pathspec(pathspec.to_string())
+		.skip_binary_check(true)
+		.context_lines(0);
+
+	let diff = repo.diff_tree_to_tree(
+		parent.as_ref(),
+		Some(&commit_tree),
+		Some(&mut opts),
+	)?;
+
+	if diff.stats()?.files_changed() == 0 {
+		return Ok(None);
+	}
+
+	Ok(diff.deltas().map(|delta| delta.status()).next())
+}
+
+///
+pub(crate) fn commit_detect_file_rename(
+	repo: &Repository,
+	id: CommitId,
+	pathspec: &str,
+) -> Result<Option<String>> {
+	scope_time!("commit_detect_file_rename");
+
+	let mut diff = get_commit_diff(repo, id, None, None, None)?;
+
+	diff.find_similar(Some(
+		DiffFindOptions::new()
+			.renames(true)
+			.renames_from_rewrites(true)
+			.rename_from_rewrite_threshold(100),
+	))?;
+
+	let current_path = std::path::Path::new(pathspec);
+
+	for delta in diff.deltas() {
+		let new_file_matches = delta
+			.new_file()
+			.path()
+			.is_some_and(|path| path == current_path);
+
+		if new_file_matches
+			&& matches!(delta.status(), git2::Delta::Renamed)
+		{
+			return Ok(Some(bytes2string(
+				delta.old_file().path_bytes().ok_or_else(|| {
+					Error::Generic(String::from("old_file error"))
+				})?,
+			)?));
+		}
+	}
+
+	Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
 	use super::get_commit_files;
 	use crate::{
 		error::Result,
 		sync::{
-			commit, stage_add_file, stash_save,
-			tests::{get_statuses, repo_init},
+			commit,
+			commit_files::commit_detect_file_rename,
+			stage_add_all, stage_add_file, stash_save,
+			tests::{
+				get_statuses, rename_file, repo_init,
+				repo_init_empty, write_commit_file,
+			},
 			RepoPath,
 		},
 		StatusItemType,
@@ -265,5 +344,29 @@ mod tests {
 		assert_eq!(diff[1].status, StatusItemType::New);
 
 		Ok(())
+	}
+
+	#[test]
+	fn test_rename_detection() {
+		let (td, repo) = repo_init_empty().unwrap();
+		let repo_path: RepoPath = td.path().into();
+
+		write_commit_file(&repo, "foo.txt", "foobar", "c1");
+		rename_file(&repo, "foo.txt", "bar.txt");
+		stage_add_all(
+			&repo_path,
+			"*",
+			Some(crate::sync::ShowUntrackedFilesConfig::All),
+		)
+		.unwrap();
+		let rename_commit = commit(&repo_path, "c2").unwrap();
+
+		let rename = commit_detect_file_rename(
+			&repo,
+			rename_commit,
+			"bar.txt",
+		)
+		.unwrap();
+		assert_eq!(rename, Some(String::from("foo.txt")));
 	}
 }
