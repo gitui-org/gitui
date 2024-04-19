@@ -1,7 +1,9 @@
 //! Sign commit data.
 
+use git2::Config;
 use ssh_key::{HashAlg, LineEnding, PrivateKey};
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
+use tempfile::NamedTempFile;
 
 /// Error type for [`SignBuilder`], used to create [`Sign`]'s
 #[derive(thiserror::Error, Debug)]
@@ -156,34 +158,78 @@ impl SignBuilder {
 				String::from("x509"),
 			)),
 			"ssh" => {
-				let ssh_signer = config
-					.get_string("user.signingKey")
-					.ok()
-					.and_then(|key_path| {
-						key_path.strip_prefix('~').map_or_else(
-							|| Some(PathBuf::from(&key_path)),
-							|ssh_key_path| {
-								dirs::home_dir().map(|home| {
-									home.join(
-										ssh_key_path
-											.strip_prefix('/')
-											.unwrap_or(ssh_key_path),
-									)
-								})
-							},
-						)
-					})
-					.ok_or_else(|| {
-						SignBuilderError::SSHSigningKey(String::from(
-							"ssh key setting absent",
-						))
-					})
-					.and_then(SSHSign::new)?;
-				let signer: Box<dyn Sign> = Box::new(ssh_signer);
-				Ok(signer)
+				let program = SSHProgram::new(config);
+				program.into_signer(config)
 			}
 			_ => Err(SignBuilderError::InvalidFormat(format)),
 		}
+	}
+}
+
+enum SSHProgram {
+	Default,
+	SystemBin(PathBuf),
+}
+
+impl SSHProgram {
+	pub fn new(config: &git2::Config) -> Self {
+		match config.get_string("gpg.ssh.program") {
+			Err(_) => Self::Default,
+			Ok(ssh_program) => {
+				if ssh_program.is_empty() {
+					return Self::Default;
+				}
+				Self::SystemBin(PathBuf::from(ssh_program))
+			}
+		}
+	}
+
+	fn into_signer(
+		self,
+		config: &git2::Config,
+	) -> Result<Box<dyn Sign>, SignBuilderError> {
+		match self {
+			SSHProgram::Default => {
+				let ssh_signer = ConfigAccess(config)
+					.signing_key()
+					.and_then(SSHSign::new)?;
+				Ok(Box::new(ssh_signer))
+			}
+			SSHProgram::SystemBin(exec_path) => {
+				let key = ConfigAccess(config).signing_key()?;
+				Ok(Box::new(ExternalBinSSHSign::new(exec_path, key)))
+			}
+		}
+	}
+}
+
+/// wrapper struct for convenience methods over [Config]
+struct ConfigAccess<'a>(&'a Config);
+
+impl<'a> ConfigAccess<'a> {
+	pub fn signing_key(&self) -> Result<PathBuf, SignBuilderError> {
+		self.0
+			.get_string("user.signingKey")
+			.ok()
+			.and_then(|key_path| {
+				key_path.strip_prefix('~').map_or_else(
+					|| Some(PathBuf::from(&key_path)),
+					|ssh_key_path| {
+						dirs::home_dir().map(|home| {
+							home.join(
+								ssh_key_path
+									.strip_prefix('/')
+									.unwrap_or(ssh_key_path),
+							)
+						})
+					},
+				)
+			})
+			.ok_or_else(|| {
+				SignBuilderError::SSHSigningKey(String::from(
+					"ssh key setting absent",
+				))
+			})
 	}
 }
 
@@ -280,6 +326,144 @@ pub struct SSHSign {
 	secret_key: PrivateKey,
 }
 
+enum KeyPathOrLiteral {
+	Literal(PathBuf),
+	KeyPath(PathBuf),
+}
+
+impl KeyPathOrLiteral {
+	fn new(buf: PathBuf) -> Self {
+		match buf.is_file() {
+			true => KeyPathOrLiteral::KeyPath(buf),
+			false => KeyPathOrLiteral::Literal(buf),
+		}
+	}
+}
+
+impl Display for KeyPathOrLiteral {
+	fn fmt(
+		&self,
+		f: &mut std::fmt::Formatter<'_>,
+	) -> std::fmt::Result {
+		let buf = match self {
+			Self::Literal(x) => x,
+			Self::KeyPath(x) => x,
+		};
+		f.write_fmt(format_args!("{}", buf.display()))
+	}
+}
+
+/// Struct which allows for signing via an external binary
+pub struct ExternalBinSSHSign {
+	program_path: PathBuf,
+	key_path: KeyPathOrLiteral,
+	#[cfg(test)]
+	program: String,
+	#[cfg(test)]
+	signing_key: String,
+}
+
+impl ExternalBinSSHSign {
+	/// constructs a new instance of the external ssh signer
+	pub fn new(program_path: PathBuf, key_path: PathBuf) -> Self {
+		#[cfg(test)]
+		let program: String = program_path
+			.file_name()
+			.unwrap_or_default()
+			.to_string_lossy()
+			.into_owned();
+
+		let key_path = KeyPathOrLiteral::new(key_path);
+
+		#[cfg(test)]
+		let signing_key = key_path.to_string();
+
+		ExternalBinSSHSign {
+			program_path,
+			key_path,
+			#[cfg(test)]
+			program,
+			#[cfg(test)]
+			signing_key,
+		}
+	}
+}
+
+impl Sign for ExternalBinSSHSign {
+	fn sign(
+		&self,
+		commit: &[u8],
+	) -> Result<(String, Option<String>), SignError> {
+		use std::io::Write;
+		use std::process::{Command, Stdio};
+
+		if cfg!(target_os = "windows") {
+			return Err(SignError::Spawn("External binary signing is only supported on Unix based systems".into()));
+		}
+
+		let mut file = NamedTempFile::new()
+			.map_err(|e| SignError::Spawn(e.to_string()))?;
+
+		let key = match &self.key_path {
+			KeyPathOrLiteral::Literal(x) => {
+				write!(file, "{}", x.display()).map_err(|e| {
+					SignError::WriteBuffer(e.to_string())
+				})?;
+				file.path()
+			}
+			KeyPathOrLiteral::KeyPath(x) => x.as_path(),
+		};
+
+		let mut c = Command::new(&self.program_path);
+		c.stdin(Stdio::piped())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.arg("-Y")
+			.arg("sign")
+			.arg("-n")
+			.arg("git")
+			.arg("-f")
+			.arg(key);
+
+		let mut child =
+			c.spawn().map_err(|e| SignError::Spawn(e.to_string()))?;
+
+		let mut stdin = child.stdin.take().ok_or(SignError::Stdin)?;
+
+		stdin
+			.write_all(commit)
+			.map_err(|e| SignError::WriteBuffer(e.to_string()))?;
+		drop(stdin);
+
+		let output = child
+			.wait_with_output()
+			.map_err(|e| SignError::Output(e.to_string()))?;
+
+		if !output.status.success() {
+			return Err(SignError::Shellout(format!(
+				"failed to sign data, program '{}' exited non-zero: {}",
+				&self.program_path.display(),
+				std::str::from_utf8(&output.stderr).unwrap_or("[error could not be read from stderr]")
+			)));
+		}
+
+		let signed_commit = std::str::from_utf8(&output.stdout)
+			.map_err(|e| SignError::Shellout(e.to_string()))?;
+
+		Ok((signed_commit.to_string(), None))
+	}
+
+	#[cfg(test)]
+	fn program(&self) -> &String {
+		&self.program
+	}
+
+	#[cfg(test)]
+	fn signing_key(&self) -> &String {
+		&self.signing_key
+	}
+}
+
 impl SSHSign {
 	/// Create new [`SSHDiskKeySign`] for sign.
 	pub fn new(mut key: PathBuf) -> Result<Self, SignBuilderError> {
@@ -306,7 +490,7 @@ impl SSHSign {
 				})
 		} else {
 			Err(SignBuilderError::SSHSigningKey(
-				String::from("Currently, we only support a pair of ssh key in disk."),
+				format!("Currently, we only support a pair of ssh key in disk. Found {:?}", key),
 			))
 		}
 	}
