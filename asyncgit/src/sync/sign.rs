@@ -173,7 +173,7 @@ enum SSHProgram {
 
 impl SSHProgram {
 	pub fn new(config: &git2::Config) -> Self {
-		match config.get_string("gpg.ssh.program") {
+		match dbg!(config.get_string("gpg.ssh.program")) {
 			Err(_) => Self::Default,
 			Ok(ssh_program) => {
 				if ssh_program.is_empty() {
@@ -189,13 +189,13 @@ impl SSHProgram {
 		config: &git2::Config,
 	) -> Result<Box<dyn Sign>, SignBuilderError> {
 		match self {
-			SSHProgram::Default => {
+			Self::Default => {
 				let ssh_signer = ConfigAccess(config)
 					.signing_key()
 					.and_then(SSHSign::new)?;
 				Ok(Box::new(ssh_signer))
 			}
-			SSHProgram::SystemBin(exec_path) => {
+			Self::SystemBin(exec_path) => {
 				let key = ConfigAccess(config).signing_key()?;
 				Ok(Box::new(ExternalBinSSHSign::new(exec_path, key)))
 			}
@@ -333,9 +333,10 @@ enum KeyPathOrLiteral {
 
 impl KeyPathOrLiteral {
 	fn new(buf: PathBuf) -> Self {
-		match buf.is_file() {
-			true => KeyPathOrLiteral::KeyPath(buf),
-			false => KeyPathOrLiteral::Literal(buf),
+		if buf.is_file() {
+			Self::KeyPath(buf)
+		} else {
+			Self::Literal(buf)
 		}
 	}
 }
@@ -346,8 +347,7 @@ impl Display for KeyPathOrLiteral {
 		f: &mut std::fmt::Formatter<'_>,
 	) -> std::fmt::Result {
 		let buf = match self {
-			Self::Literal(x) => x,
-			Self::KeyPath(x) => x,
+			Self::KeyPath(x) | Self::Literal(x) => x,
 		};
 		f.write_fmt(format_args!("{}", buf.display()))
 	}
@@ -378,7 +378,7 @@ impl ExternalBinSSHSign {
 		#[cfg(test)]
 		let signing_key = key_path.to_string();
 
-		ExternalBinSSHSign {
+		Self {
 			program_path,
 			key_path,
 			#[cfg(test)]
@@ -490,7 +490,7 @@ impl SSHSign {
 				})
 		} else {
 			Err(SignBuilderError::SSHSigningKey(
-				format!("Currently, we only support a pair of ssh key in disk. Found {:?}", key),
+				format!("Currently, we only support a pair of ssh key in disk. Found {key:?}"),
 			))
 		}
 	}
@@ -630,7 +630,7 @@ mod tests {
 
 		{
 			let mut config = repo.config()?;
-			config.set_str("gpg.program", "ssh")?;
+			config.set_str("gpg.format", "ssh")?;
 			config.set_str("user.signingKey", "/tmp/key.pub")?;
 			config.set_str("gpg.ssh.program", "/bin/cat")?;
 		}
@@ -638,7 +638,7 @@ mod tests {
 		let sign =
 			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
 
-		assert_eq!("/bin/cat", sign.program());
+		assert_eq!("cat", sign.program());
 		assert_eq!("/tmp/key.pub", sign.signing_key());
 
 		Ok(())
