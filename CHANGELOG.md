@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * support for `Copy Path` action in WSL [[@johnDeSilencio](https://github.com/johnDeSilencio)] ([#2413](https://github.com/extrawurst/gitui/pull/2413))
 * help popup scrollbar [[@wugeer](https://github.com/wugeer)] ([#2388](https://github.com/extrawurst/gitui/pull/2388))
 
+### Added
+* Support for ssh signing via external system binaries. See `gpg.ssh.program` configuration.
+
 ### Fixes
 * respect env vars like `GIT_CONFIG_GLOBAL` ([#2298](https://github.com/extrawurst/gitui/issues/2298))
 * Set `CREATE_NO_WINDOW` flag when executing Git hooks on Windows ([#2371](https://github.com/extrawurst/gitui/pull/2371))
