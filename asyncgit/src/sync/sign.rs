@@ -623,4 +623,24 @@ mod tests {
 
 		Ok(())
 	}
+
+	#[test]
+	fn test_external_ssh_binary() -> Result<()> {
+		let (_tmp_dir, repo) = repo_init_empty()?;
+
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.program", "ssh")?;
+			config.set_str("user.signingKey", "/tmp/key.pub")?;
+			config.set_str("gpg.ssh.program", "/bin/cat")?;
+		}
+
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+
+		assert_eq!("/bin/cat", sign.program());
+		assert_eq!("/tmp/key.pub", sign.signing_key());
+
+		Ok(())
+	}
 }
