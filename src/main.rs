@@ -305,7 +305,10 @@ fn shutdown_terminal() {
 	}
 }
 
-fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
+fn draw<B: ratatui::backend::Backend>(
+	terminal: &mut ratatui::Terminal<B>,
+	app: &App,
+) -> io::Result<()> {
 	if app.requires_redraw() {
 		terminal.clear()?;
 	}
@@ -407,4 +410,71 @@ fn set_panic_handler() -> Result<()> {
 		.build_global()?;
 
 	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use std::{cell::RefCell, path::PathBuf};
+
+	use asyncgit::sync::RepoPath;
+	use crossbeam_channel::unbounded;
+	use git2_testing::repo_init;
+	use insta::assert_snapshot;
+	use ratatui::{backend::TestBackend, Terminal};
+
+	use crate::{
+		app::App, draw, input::Input, keys::KeyConfig,
+		ui::style::Theme,
+	};
+
+	// Macro recommended by: https://insta.rs/docs/cmd/
+	macro_rules! apply_common_filters {
+		{} => {
+			let mut settings = insta::Settings::clone_current();
+			// MacOS Temp Folder
+			settings.add_filter(r"/var/folders/\S+?/T/\S+", "[TEMP_FILE]");
+			// Linux Temp Folder
+			settings.add_filter(r"/tmp/\.tmp\S+", "[TEMP_FILE]");
+			// Windows Temp folder
+			settings.add_filter(r"\b[A-Z]:\\.*\\Local\\Temp\\\S+", "[TEMP_FILE]");
+			// Convert Windows paths to Unix paths
+			settings.add_filter(r"\\\\?([\w\d.])", "/$1");
+			let _bound = settings.bind_to_scope();
+		}
+	}
+
+	#[test]
+	fn app_starts() {
+		apply_common_filters!();
+
+		let (temp_dir, _repo) = repo_init();
+		let path: RepoPath = temp_dir.path().to_str().unwrap().into();
+
+		let (tx_git, _rx_git) = unbounded();
+		let (tx_app, _rx_app) = unbounded();
+
+		let input = Input::new();
+
+		let theme = Theme::init(&PathBuf::new());
+		let key_config = KeyConfig::init()
+			.map_err(|e| eprintln!("KeyConfig loading error: {e}"))
+			.unwrap_or_default();
+
+		let app = App::new(
+			RefCell::new(path),
+			tx_git,
+			tx_app,
+			input.clone(),
+			theme,
+			key_config,
+		)
+		.unwrap();
+
+		let mut terminal =
+			Terminal::new(TestBackend::new(120, 40)).unwrap();
+
+		let _ = draw(&mut terminal, &app);
+
+		assert_snapshot!(terminal.backend());
+	}
 }
