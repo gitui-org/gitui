@@ -436,7 +436,7 @@ mod tests {
 			// Linux Temp Folder
 			settings.add_filter(r" */tmp/\.tmp\S+", "[TEMP_FILE]");
 			// Windows Temp folder
-			settings.add_filter(r" *\[…\].*\\Local\\Temp\\\S+", "[TEMP_FILE]");
+			settings.add_filter(r" *\[…\].*/Local/Temp/\S+", "[TEMP_FILE]");
 			let _bound = settings.bind_to_scope();
 		}
 	}
