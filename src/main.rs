@@ -447,8 +447,6 @@ mod tests {
 			settings.add_filter(r" */tmp/\.tmp\S+", "[TEMP_FILE]");
 			// Windows Temp folder
 			settings.add_filter(r" *\[…\].*\\Local\\Temp\\\S+", "[TEMP_FILE]");
-			// Convert Windows paths to Unix paths
-			settings.add_filter(r"\\\\?([\w\d.])", "/$1");
 			let _bound = settings.bind_to_scope();
 		}
 	}
