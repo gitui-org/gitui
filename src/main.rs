@@ -432,11 +432,11 @@ mod tests {
 		{} => {
 			let mut settings = insta::Settings::clone_current();
 			// MacOS Temp Folder
-			settings.add_filter(r"/var/folders/\S+?/T/\S+", "[TEMP_FILE]");
+			settings.add_filter(r" *\[…\]\S+?/T/\S+", "[TEMP_FILE]");
 			// Linux Temp Folder
-			settings.add_filter(r"/tmp/\.tmp\S+", "[TEMP_FILE]");
+			settings.add_filter(r" */tmp/\.tmp\S+", "[TEMP_FILE]");
 			// Windows Temp folder
-			settings.add_filter(r"\b[A-Z]:\\.*\\Local\\Temp\\\S+", "[TEMP_FILE]");
+			settings.add_filter(r" *\[…\].*\\Local\\Temp\\\S+", "[TEMP_FILE]");
 			// Convert Windows paths to Unix paths
 			settings.add_filter(r"\\\\?([\w\d.])", "/$1");
 			let _bound = settings.bind_to_scope();
