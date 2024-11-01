@@ -458,9 +458,7 @@ mod tests {
 		let input = Input::new();
 
 		let theme = Theme::init(&PathBuf::new());
-		let key_config = KeyConfig::init()
-			.map_err(|e| eprintln!("KeyConfig loading error: {e}"))
-			.unwrap_or_default();
+		let key_config = KeyConfig::default();
 
 		let mut app = App::new(
 			RefCell::new(path),

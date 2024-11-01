@@ -42,4 +42,4 @@ snapshot_kind: text
 "│                                                          ││                                                          │"
 "│                                                          ││                                                          │"
 "└──────────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────┘"
-"Branches [b] Push [p] Fetch [⇧F] Pull [f] Undo Commit [⇧U] Submodules [⇧S] Nav [kjlh] Diff [l] To stage [w]     more [.]"
+"Branches [b] Push [p] Fetch [⇧F] Pull [f] Undo Commit [⇧U] Submodules [⇧S] Nav [↑↓→←] Diff [→] To stage [w]     more [.]"
