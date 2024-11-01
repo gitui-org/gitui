@@ -414,9 +414,11 @@ fn set_panic_handler() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-	use std::{cell::RefCell, path::PathBuf};
+	use std::{
+		cell::RefCell, path::PathBuf, thread::sleep, time::Duration,
+	};
 
-	use asyncgit::sync::RepoPath;
+	use asyncgit::{sync::RepoPath, AsyncGitNotification};
 	use crossbeam_channel::unbounded;
 	use git2_testing::repo_init;
 	use insta::assert_snapshot;
@@ -424,10 +426,10 @@ mod tests {
 
 	use crate::{
 		app::App, draw, input::Input, keys::KeyConfig,
-		ui::style::Theme,
+		ui::style::Theme, AsyncNotification,
 	};
 
-	// Macro recommended by: https://insta.rs/docs/cmd/
+	// Macro adapted from: https://insta.rs/docs/cmd/
 	macro_rules! apply_common_filters {
 		{} => {
 			let mut settings = insta::Settings::clone_current();
@@ -437,6 +439,8 @@ mod tests {
 			settings.add_filter(r" */tmp/\.tmp\S+", "[TEMP_FILE]");
 			// Windows Temp folder
 			settings.add_filter(r" *\[…\].*/Local/Temp/\S+", "[TEMP_FILE]");
+			// Commit ids that follow a vertical bar
+			settings.add_filter(r"│[a-z0-9]{7} ", "│[AAAAA] ");
 			let _bound = settings.bind_to_scope();
 		}
 	}
@@ -458,21 +462,51 @@ mod tests {
 			.map_err(|e| eprintln!("KeyConfig loading error: {e}"))
 			.unwrap_or_default();
 
-		let app = App::new(
+		let mut app = App::new(
 			RefCell::new(path),
 			tx_git,
 			tx_app,
 			input.clone(),
 			theme,
-			key_config,
+			key_config.clone(),
 		)
 		.unwrap();
 
 		let mut terminal =
 			Terminal::new(TestBackend::new(120, 40)).unwrap();
 
-		let _ = draw(&mut terminal, &app);
+		draw(&mut terminal, &app).unwrap();
 
 		assert_snapshot!(terminal.backend());
+
+		let event =
+			AsyncNotification::Git(AsyncGitNotification::Status);
+		app.update_async(event).unwrap();
+
+		sleep(Duration::from_millis(5));
+
+		draw(&mut terminal, &app).unwrap();
+
+		assert_snapshot!("app_loading_finished", terminal.backend());
+
+		let event = crossterm::event::KeyEvent::new(
+			key_config.keys.tab_log.code,
+			key_config.keys.tab_log.modifiers,
+		);
+		app.event(crate::input::InputEvent::Input(
+			crossterm::event::Event::Key(event),
+		))
+		.unwrap();
+
+		sleep(Duration::from_millis(5));
+
+		app.update().unwrap();
+
+		draw(&mut terminal, &app).unwrap();
+
+		assert_snapshot!(
+			"app_log_tab_showing_one_commit",
+			terminal.backend()
+		);
 	}
 }
