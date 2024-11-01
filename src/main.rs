@@ -491,7 +491,7 @@ mod tests {
 			AsyncNotification::Git(AsyncGitNotification::Status);
 		app.update_async(event).unwrap();
 
-		sleep(Duration::from_millis(20));
+		sleep(Duration::from_millis(500));
 
 		draw(&mut terminal, &app).unwrap();
 
@@ -506,7 +506,7 @@ mod tests {
 		))
 		.unwrap();
 
-		sleep(Duration::from_millis(20));
+		sleep(Duration::from_millis(500));
 
 		app.update().unwrap();
 
