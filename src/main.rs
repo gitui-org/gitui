@@ -466,7 +466,7 @@ mod tests {
 
 		draw(&mut terminal, &app).unwrap();
 
-		assert_snapshot!(terminal.backend());
+		assert_snapshot!("app_loading", terminal.backend());
 
 		let event =
 			AsyncNotification::Git(AsyncGitNotification::Status);
