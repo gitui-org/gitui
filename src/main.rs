@@ -216,24 +216,20 @@ fn run_app(
 	)?;
 
 	let mut spinner = Spinner::default();
-	let mut first_update = true;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 
+	app.update()?;
+
 	loop {
-		let event = if first_update {
-			first_update = false;
-			QueueEvent::Notify
-		} else {
-			select_event(
-				&rx_input,
-				&rx_git,
-				&rx_app,
-				&rx_ticker,
-				&rx_watcher,
-				&spinner_ticker,
-			)?
-		};
+		let event = select_event(
+			&rx_input,
+			&rx_git,
+			&rx_app,
+			&rx_ticker,
+			&rx_watcher,
+			&spinner_ticker,
+		)?;
 
 		{
 			if matches!(event, QueueEvent::SpinnerUpdate) {
