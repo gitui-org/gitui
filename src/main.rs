@@ -50,12 +50,9 @@ mod watcher;
 use crate::{app::App, args::process_cmdline};
 use anyhow::{anyhow, bail, Result};
 use app::QuitState;
-use asyncgit::{
-	sync::{utils::repo_work_dir, RepoPath},
-	AsyncGitNotification,
-};
+use asyncgit::{sync::RepoPath, AsyncGitNotification};
 use backtrace::Backtrace;
-use crossbeam_channel::{never, tick, unbounded, Receiver, Select};
+use crossbeam_channel::{Receiver, Select};
 use crossterm::{
 	terminal::{
 		disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
@@ -63,21 +60,18 @@ use crossterm::{
 	},
 	ExecutableCommand,
 };
-use input::{Input, InputEvent, InputState};
+use gitui::Gitui;
+use input::InputEvent;
 use keys::KeyConfig;
 use ratatui::backend::CrosstermBackend;
 use scopeguard::defer;
-use scopetime::scope_time;
-use spinner::Spinner;
 use std::{
-	cell::RefCell,
 	io::{self, Stdout},
 	panic,
 	path::Path,
 	time::{Duration, Instant},
 };
 use ui::style::Theme;
-use watcher::RepoWatcher;
 
 type Terminal = ratatui::Terminal<CrosstermBackend<io::Stdout>>;
 
@@ -150,7 +144,6 @@ fn main() -> Result<()> {
 
 	let mut repo_path = cliargs.repo_path;
 	let mut terminal = start_terminal(io::stdout(), &repo_path)?;
-	let input = Input::new();
 
 	let updater = if cliargs.notify_watcher {
 		Updater::NotifyWatcher
@@ -164,7 +157,6 @@ fn main() -> Result<()> {
 			repo_path.clone(),
 			theme.clone(),
 			key_config.clone(),
-			&input,
 			updater,
 			&mut terminal,
 		)?;
@@ -185,100 +177,15 @@ fn run_app(
 	repo: RepoPath,
 	theme: Theme,
 	key_config: KeyConfig,
-	input: &Input,
 	updater: Updater,
 	terminal: &mut Terminal,
 ) -> Result<QuitState, anyhow::Error> {
-	let (tx_git, rx_git) = unbounded();
-	let (tx_app, rx_app) = unbounded();
-
-	let rx_input = input.receiver();
-
-	let (rx_ticker, rx_watcher) = match updater {
-		Updater::NotifyWatcher => {
-			let repo_watcher =
-				RepoWatcher::new(repo_work_dir(&repo)?.as_str());
-
-			(never(), repo_watcher.receiver())
-		}
-		Updater::Ticker => (tick(TICK_INTERVAL), never()),
-	};
-
-	let spinner_ticker = tick(SPINNER_INTERVAL);
-
-	let mut app = App::new(
-		RefCell::new(repo),
-		tx_git,
-		tx_app,
-		input.clone(),
-		theme,
-		key_config,
-	)?;
-
-	let mut spinner = Spinner::default();
+	let mut gitui =
+		Gitui::new(repo.clone(), theme, &key_config, updater)?;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 
-	app.update()?;
-
-	loop {
-		let event = select_event(
-			&rx_input,
-			&rx_git,
-			&rx_app,
-			&rx_ticker,
-			&rx_watcher,
-			&spinner_ticker,
-		)?;
-
-		{
-			if matches!(event, QueueEvent::SpinnerUpdate) {
-				spinner.update();
-				spinner.draw(terminal)?;
-				continue;
-			}
-
-			scope_time!("loop");
-
-			match event {
-				QueueEvent::InputEvent(ev) => {
-					if matches!(
-						ev,
-						InputEvent::State(InputState::Polling)
-					) {
-						//Note: external ed closed, we need to re-hide cursor
-						terminal.hide_cursor()?;
-					}
-					app.event(ev)?;
-				}
-				QueueEvent::Tick | QueueEvent::Notify => {
-					app.update()?;
-				}
-				QueueEvent::AsyncEvent(ev) => {
-					if !matches!(
-						ev,
-						AsyncNotification::Git(
-							AsyncGitNotification::FinishUnchanged
-						)
-					) {
-						app.update_async(ev)?;
-					}
-				}
-				QueueEvent::SpinnerUpdate => unreachable!(),
-			}
-
-			draw(terminal, &app)?;
-
-			spinner.set_state(app.any_work_pending());
-			spinner.draw(terminal)?;
-
-			if app.is_quit() {
-				break;
-			}
-		}
-	}
-
-	Ok(app.quit_state())
+	gitui.run_main_loop(terminal)
 }
 
 fn setup_terminal() -> Result<()> {
