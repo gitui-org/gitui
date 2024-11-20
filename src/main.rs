@@ -156,7 +156,7 @@ fn main() -> Result<()> {
 			app_start,
 			repo_path.clone(),
 			theme.clone(),
-			key_config.clone(),
+			&key_config,
 			updater,
 			&mut terminal,
 		)?;
@@ -176,12 +176,11 @@ fn run_app(
 	app_start: Instant,
 	repo: RepoPath,
 	theme: Theme,
-	key_config: KeyConfig,
+	key_config: &KeyConfig,
 	updater: Updater,
 	terminal: &mut Terminal,
 ) -> Result<QuitState, anyhow::Error> {
-	let mut gitui =
-		Gitui::new(repo.clone(), theme, &key_config, updater)?;
+	let mut gitui = Gitui::new(repo, theme, key_config, updater)?;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 

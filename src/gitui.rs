@@ -24,7 +24,7 @@ use crate::{
 	SPINNER_INTERVAL, TICK_INTERVAL,
 };
 
-pub(crate) struct Gitui {
+pub struct Gitui {
 	app: crate::app::App,
 	rx_input: Receiver<InputEvent>,
 	rx_git: Receiver<AsyncGitNotification>,
@@ -62,8 +62,7 @@ impl Gitui {
 			input.clone(),
 			theme,
 			key_config.clone(),
-		)
-		.unwrap();
+		)?;
 
 		Ok(Self {
 			app,
@@ -130,7 +129,7 @@ impl Gitui {
 					QueueEvent::SpinnerUpdate => unreachable!(),
 				}
 
-				self.draw(terminal);
+				self.draw(terminal)?;
 
 				spinner.set_state(self.app.any_work_pending());
 				spinner.draw(terminal)?;
@@ -145,10 +144,10 @@ impl Gitui {
 	}
 
 	fn draw<B: ratatui::backend::Backend>(
-		&mut self,
+		&self,
 		terminal: &mut ratatui::Terminal<B>,
-	) {
-		draw(terminal, &self.app).unwrap();
+	) -> std::io::Result<()> {
+		draw(terminal, &self.app)
 	}
 
 	#[cfg(test)]
@@ -224,7 +223,7 @@ mod tests {
 		let mut terminal =
 			Terminal::new(TestBackend::new(120, 40)).unwrap();
 
-		gitui.draw(&mut terminal);
+		gitui.draw(&mut terminal).unwrap();
 
 		sleep(Duration::from_millis(500));
 
@@ -236,7 +235,7 @@ mod tests {
 
 		sleep(Duration::from_millis(500));
 
-		gitui.draw(&mut terminal);
+		gitui.draw(&mut terminal).unwrap();
 
 		assert_snapshot!("app_loading_finished", terminal.backend());
 
@@ -250,7 +249,7 @@ mod tests {
 
 		gitui.update();
 
-		gitui.draw(&mut terminal);
+		gitui.draw(&mut terminal).unwrap();
 
 		assert_snapshot!(
 			"app_log_tab_showing_one_commit",
