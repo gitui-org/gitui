@@ -134,7 +134,9 @@ impl CommitList {
 
 	///
 	pub fn copy_commit_hash(&self) -> Result<()> {
-		let marked = self.marked.as_slice();
+		let marked = self.marked.iter().rev().cloned().collect_vec();
+		let marked = marked.as_slice();
+
 		let yank: Option<String> = match marked {
 			[] => self
 				.items
@@ -147,7 +149,7 @@ impl CommitList {
 			[(_idx, commit)] => Some(commit.to_string()),
 			[first, .., last] => {
 				let marked_consecutive =
-					marked.windows(2).all(|w| w[0].0 + 1 == w[1].0);
+					marked.windows(2).all(|w| w[0].0 - 1 == w[1].0);
 
 				let yank = if marked_consecutive {
 					format!("{}^..{}", first.1, last.1)
