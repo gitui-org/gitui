@@ -141,6 +141,14 @@ impl CommitList {
 						.saturating_sub(self.items.index_offset()),
 				)
 				.map(|e| e.id.to_string()),
+			[latest, .., earliest]
+				if self
+					.marked()
+					.windows(2)
+					.all(|w| w[0].0 + 1 == w[1].0) =>
+			{
+				Some(format!("{}^..{}", earliest.1, latest.1))
+			}
 			marked => Some(
 				marked
 					.iter()
@@ -1045,12 +1053,7 @@ mod tests {
 		};
 		assert_eq!(
 			cl.concat_selected_commit_ids(),
-			Some(String::from(concat!(
-				"0000000000000000000000000000000000000002 ",
-				"0000000000000000000000000000000000000003 ",
-				"0000000000000000000000000000000000000004 ",
-				"0000000000000000000000000000000000000005"
-			)))
+			Some(String::from("0000000000000000000000000000000000000005^..0000000000000000000000000000000000000002"))
 		);
 	}
 
