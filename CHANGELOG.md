@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **go to line in blame**
 ![blame-goto-line](assets/blame-goto-line.png)
 
+### Breaking Changes
+* reverse commit range before yanking marked commits, producing `<oldest>^..<newest>` for consecutive commit ranges. [[@Esgariot](https://github.com/Esgariot)] ([#2441](https://github.com/extrawurst/gitui/pull/2441))
+
 ### Added
 * support choosing checkout branch method when status is not empty [[@fatpandac](https://github.com/fatpandac)] ([#2404](https://github.com/extrawurst/gitui/issues/2404))
 * support pre-push hook [[@xlai89](https://github.com/xlai89)] ([#1933](https://github.com/extrawurst/gitui/issues/1933))
