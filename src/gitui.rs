@@ -170,6 +170,23 @@ impl Gitui {
 	}
 
 	#[cfg(test)]
+	fn wait_for_async_git_notification(
+		&self,
+		expected: AsyncGitNotification,
+	) {
+		loop {
+			let actual = self
+				.rx_git
+				.recv_timeout(std::time::Duration::from_millis(100))
+				.unwrap();
+
+			if actual == expected {
+				break;
+			}
+		}
+	}
+
+	#[cfg(test)]
 	fn update(&mut self) {
 		self.app.update().unwrap();
 	}
@@ -177,7 +194,7 @@ impl Gitui {
 
 #[cfg(test)]
 mod tests {
-	use std::{path::PathBuf, thread::sleep, time::Duration};
+	use std::path::PathBuf;
 
 	use asyncgit::{sync::RepoPath, AsyncGitNotification};
 	use crossterm::event::{KeyCode, KeyModifiers};
@@ -225,15 +242,11 @@ mod tests {
 
 		gitui.draw(&mut terminal).unwrap();
 
-		sleep(Duration::from_millis(500));
-
 		assert_snapshot!("app_loading", terminal.backend());
 
 		let event =
 			AsyncNotification::Git(AsyncGitNotification::Status);
 		gitui.update_async(event);
-
-		sleep(Duration::from_millis(500));
 
 		gitui.draw(&mut terminal).unwrap();
 
@@ -245,7 +258,9 @@ mod tests {
 			key_config.keys.tab_log.modifiers,
 		);
 
-		sleep(Duration::from_millis(500));
+		gitui.wait_for_async_git_notification(
+			AsyncGitNotification::Log,
+		);
 
 		gitui.update();
 
