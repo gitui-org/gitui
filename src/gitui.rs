@@ -152,6 +152,7 @@ impl Gitui {
 
 	#[cfg(test)]
 	fn update_async(&mut self, event: crate::AsyncNotification) {
+		dbg!(event);
 		self.app.update_async(event).unwrap();
 	}
 
@@ -238,7 +239,7 @@ mod tests {
 				.unwrap();
 
 		let mut terminal =
-			Terminal::new(TestBackend::new(120, 40)).unwrap();
+			Terminal::new(TestBackend::new(100, 12)).unwrap();
 
 		gitui.draw(&mut terminal).unwrap();
 
