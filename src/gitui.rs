@@ -239,7 +239,7 @@ mod tests {
 				.unwrap();
 
 		let mut terminal =
-			Terminal::new(TestBackend::new(100, 12)).unwrap();
+			Terminal::new(TestBackend::new(120, 12)).unwrap();
 
 		gitui.draw(&mut terminal).unwrap();
 
