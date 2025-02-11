@@ -49,3 +49,16 @@ Note that if you want to turn it off, you should use a blank string:
     line_break: Some(""),
 )
 ```
+## Customizing selection
+
+By default the `selection_fg` color is used to color the text of the selected line.
+Diff line, filename, commit hashes, time and author are re-colored with `selection_fg` color.
+This can be changed by specifying the `use_selection_fg` boolean in your `theme.ron`:
+
+```
+(
+    use_selection_fg: Some(false),
+)
+```
+
+By default, `use_selection_fg` is set to `true`.
