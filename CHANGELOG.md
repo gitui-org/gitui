@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
+
 ### Changed
 * improve syntax highlighting file detection [[@acuteenvy](https://github.com/acuteenvy)] ([#2524](https://github.com/extrawurst/gitui/pull/2524))
 * After commit: jump back to unstaged area [[@tommady](https://github.com/tommady)] ([#2476](https://github.com/extrawurst/gitui/issues/2476))
