@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Select syntax highlighting theme out of the defaults from syntect [[@vasilismanol](https://github.com/vasilismanol)] ([#1931](https://github.com/extrawurst/gitui/issues/1931))
 * new command-line option to override the default log file path (`--logfile`) [[@acuteenvy](https://github.com/acuteenvy)] ([#2539](https://github.com/gitui-org/gitui/pull/2539))
 * dx: `make check` checks Cargo.toml dependency ordering using `cargo sort` [[@naseschwarz](https://github.com/naseschwarz)]
+* add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
 
 ### Changed
 * improve syntax highlighting file detection [[@acuteenvy](https://github.com/acuteenvy)] ([#2524](https://github.com/extrawurst/gitui/pull/2524))
