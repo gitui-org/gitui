@@ -614,7 +614,7 @@ see `vim_style_key_config.ron` for their default vim binding
 
 ## [0.13.0] - 2021-03-15 - Happy Birthday GitUI 🥳
 
-Thanks for your interest and support over this year! Read more about the 1 year anniversary reflections of this project on my [blog](https://blog.gitui-org.org/general/programming/rust/2021/03/15/gitui-a-year-in-opensource.html).
+Thanks for your interest and support over this year! Read more about the 1 year anniversary reflections of this project on my [blog](https://blog.extrawurst.org/general/programming/rust/2021/03/15/gitui-a-year-in-opensource.html).
 
 **stage/unstage/discard by line**
 
