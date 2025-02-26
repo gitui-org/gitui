@@ -66,7 +66,7 @@ GitUI provides you with the user experience and comfort of a git GUI but right i
 
 ## 3. <a name="bench"></a> Benchmarks <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
-For a [RustBerlin meetup presentation](https://youtu.be/rpilJV-eIVw?t=5334) ([slides](https://github.com/gitui-org/gitui-presentation)) I compared `lazygit`,`tig` and `gitui` by parsing the entire Linux git repository (which contains over 900k commits):
+For a [RustBerlin meetup presentation](https://youtu.be/rpilJV-eIVw?t=5334) ([slides](https://github.com/extrawurst/gitui-presentation)) I compared `lazygit`,`tig` and `gitui` by parsing the entire Linux git repository (which contains over 900k commits):
 
 |           | Time       | Memory (GB) | Binary (MB) | Freezes   | Crashes   |
 | --------- | ---------- | ----------- | ----------- | --------- | --------- |
