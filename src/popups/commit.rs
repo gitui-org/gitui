@@ -90,6 +90,11 @@ impl CommitPopup {
 		}
 	}
 
+	pub fn set_msg(&mut self, msg: String) {
+		self.input.set_text(msg);
+		self.input.move_cursor_to_end();
+	}
+
 	///
 	pub fn update(&mut self) {
 		self.git_branch_name.lookup().ok();
