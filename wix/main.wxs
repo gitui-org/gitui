@@ -35,7 +35,7 @@
         Id='*'
         Name='gitui'
         UpgradeCode='C1CADE63-A601-4E02-96CC-FB921D5B174E'
-        Manufacturer='extrawurst'
+        Manufacturer='gitui-org'
         Language='1033'
         Codepage='1252'
         Version='$(var.Version)'>
@@ -43,7 +43,7 @@
         <Package Id='*'
             Keywords='Installer'
             Description='blazing fast terminal-ui for git'
-            Manufacturer='extrawurst'
+            Manufacturer='gitui-org'
             InstallerVersion='450'
             Languages='1033'
             Compressed='yes'
@@ -151,7 +151,7 @@
         <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
         <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
 
-        <Property Id='ARPHELPLINK' Value='https://github.com/extrawurst/gitui'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/gitui-org/gitui'/>
         
         <UI>
             <UIRef Id='WixUI_FeatureTree'/>
