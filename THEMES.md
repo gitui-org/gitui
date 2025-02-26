@@ -49,3 +49,14 @@ Note that if you want to turn it off, you should use a blank string:
     line_break: Some(""),
 )
 ```
+## Customizing selection
+
+If you don't want to use the `selection_fg` color, you can also specify `use_selection_fg` in your `theme.ron`:
+
+```
+(
+    use_selection_fg: Some(false),
+)
+```
+
+By default, `use_selection_fg` is set to `true`.
