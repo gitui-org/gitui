@@ -282,7 +282,7 @@ exit 0
 
 		let hook = br#"#!/bin/sh
 COMMIT_MSG="$(cat "$1")"
-printf "$COMMIT_MSG" | sed 's/sth/shell_command/g' >"$1"
+printf "$COMMIT_MSG" | sed 's/sth/shell_command/g' > "$1"
 exit 0
         "#;
 
@@ -499,7 +499,7 @@ sys.exit(1)
 		let (_td, repo) = repo_init();
 
 		let hook = b"#!/bin/sh
-echo 'msg' > $1
+echo 'msg' > \"$1\"
 echo 'rejected'
 exit 1
         ";
@@ -525,7 +525,7 @@ exit 1
 		let (_td, repo) = repo_init();
 
 		let hook = b"#!/bin/sh
-echo 'msg' > $1
+echo 'msg' > \"$1\"
 exit 0
         ";
 
@@ -565,7 +565,7 @@ exit 0
 		let (_td, repo) = repo_init();
 
 		let hook = b"#!/bin/sh
-echo msg:$2 > $1
+echo \"msg:$2\" > \"$1\"
 exit 0
         ";
 
@@ -589,7 +589,7 @@ exit 0
 		let (_td, repo) = repo_init();
 
 		let hook = b"#!/bin/sh
-echo $2,$3 > $1
+echo \"$2,$3\" > \"$1\"
 echo 'rejected'
 exit 2
         ";
