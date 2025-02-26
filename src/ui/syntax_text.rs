@@ -76,9 +76,7 @@ impl SyntaxText {
 			scope_time!("syntax_highlighting.0");
 			let plain_text = || SYNTAX_SET.find_syntax_plain_text();
 			let syntax = SYNTAX_SET
-				.find_syntax_for_file(
-					file_path.to_str().unwrap_or_default(),
-				)
+				.find_syntax_for_file(file_path)
 				.unwrap_or_else(|e| {
 					log::error!("Could not read the file to detect its syntax: {e}");
 					Some(plain_text())
