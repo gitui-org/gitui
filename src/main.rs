@@ -381,7 +381,7 @@ fn set_panic_handlers() -> Result<()> {
 	panic::set_hook(Box::new(|e| {
 		let backtrace = Backtrace::new();
 		shutdown_terminal();
-		log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/extrawurst/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
+		log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/gitui-org/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
 	}));
 
 	// global threadpool
@@ -389,7 +389,7 @@ fn set_panic_handlers() -> Result<()> {
 		.panic_handler(|e| {
 			let backtrace = Backtrace::new();
 			shutdown_terminal();
-			log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/extrawurst/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
+			log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/gitui-org/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
 			process::abort();
 		})
 		.num_threads(4)
