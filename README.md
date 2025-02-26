@@ -45,7 +45,7 @@
 
 - Fast and intuitive **keyboard only** control
 - Context based help (**no need to memorize** tons of hot-keys)
-- Inspect, commit, and amend changes (incl. hooks: _pre-commit_,_commit-msg_,_post-commit_,_prepare-commit-msg_)
+- Inspect, commit, and amend changes (incl. hooks: *pre-commit*,*commit-msg*,*post-commit*,*prepare-commit-msg*)
 - Stage, unstage, revert and reset files, hunks and lines
 - Stashing (save, pop, apply, drop, and inspect)
 - Push / Fetch to / from remote
