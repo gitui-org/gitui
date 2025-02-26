@@ -45,7 +45,7 @@
 
 - Fast and intuitive **keyboard only** control
 - Context based help (**no need to memorize** tons of hot-keys)
-- Inspect, commit, and amend changes (incl. hooks: _pre-commit_,_commit-msg_,_post-commit_,_prepare-commit-msg_)
+- Inspect, commit, and amend changes (incl. hooks: *pre-commit*,*commit-msg*,*post-commit*,*prepare-commit-msg*)
 - Stage, unstage, revert and reset files, hunks and lines
 - Stashing (save, pop, apply, drop, and inspect)
 - Push / Fetch to / from remote
@@ -68,24 +68,24 @@ GitUI provides you with the user experience and comfort of a git GUI but right i
 
 For a [RustBerlin meetup presentation](https://youtu.be/rpilJV-eIVw?t=5334) ([slides](https://github.com/extrawurst/gitui-presentation)) I compared `lazygit`,`tig` and `gitui` by parsing the entire Linux git repository (which contains over 900k commits):
 
-|           | Time        | Memory (GB) | Binary (MB) | Freezes   | Crashes   |
-| --------- | ----------- | ----------- | ----------- | --------- | --------- |
-| `gitui`   | **24 s** ✅ | **0.17** ✅ | 10          | **No** ✅ | **No** ✅ |
-| `lazygit` | 57 s        | 2.6         | 25          | Yes       | Sometimes |
-| `tig`     | 4 m 20 s    | 1.3         | **0.6** ✅  | Sometimes | **No** ✅ |
+|           | Time       | Memory (GB) | Binary (MB) | Freezes   | Crashes   |
+| --------- | ---------- | ----------- | ----------- | --------- | --------- |
+| `gitui`   | **24 s** ✅ | **0.17** ✅  | 10         | **No** ✅  | **No** ✅  |
+| `lazygit` | 57 s       | 2.6         | 25          | Yes       | Sometimes |
+| `tig`     | 4 m 20 s   | 1.3         | **0.6** ✅   | Sometimes | **No** ✅  |
 
 ## 4. <a name="roadmap"></a> Road(map) to 1.0 <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 These are the high level goals before calling out `1.0`:
 
-- visualize branching structure in log tab ([#81](https://github.com/gitui-org/gitui/issues/81))
-- interactive rebase ([#32](https://github.com/gitui-org/gitui/issues/32))
+* visualize branching structure in log tab ([#81](https://github.com/gitui-org/gitui/issues/81))
+* interactive rebase ([#32](https://github.com/gitui-org/gitui/issues/32))
 
 ## 5. <a name="limitations"></a> Known Limitations <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 - no sparse repo support (see [#1226](https://github.com/gitui-org/gitui/issues/1226))
 - no git-lfs support (see [#1089](https://github.com/gitui-org/gitui/discussions/1089))
-- _credential.helper_ for https needs to be **explicitly** configured (see [#800](https://github.com/gitui-org/gitui/issues/800))
+- *credential.helper* for https needs to be **explicitly** configured (see [#800](https://github.com/gitui-org/gitui/issues/800))
 
 Currently, this tool does not fully substitute the _git shell_, however both tools work well in tandem.
 
@@ -119,7 +119,6 @@ sudo dnf install gitui
 ```
 
 ##### Gentoo
-
 Available in [dm9pZCAq overlay](https://github.com/gentoo-mirror/dm9pZCAq)
 
 ```sh
@@ -167,13 +166,10 @@ choco install gitui
 ##### [Nix](https://search.nixos.org/packages?channel=unstable&show=gitui&from=0&size=50&sort=relevance&query=gitui) (Nix/NixOS)
 
 Nixpkg
-
 ```
 nix-env -iA nixpkgs.gitui
 ```
-
 NixOS
-
 ```
 nix-env -iA nixos.gitui
 ```
@@ -185,7 +181,6 @@ pkg install gitui
 ```
 
 ##### [Anaconda](https://anaconda.org/conda-forge/gitui)
-
 ```
 conda install -c conda-forge gitui
 ```
@@ -226,11 +221,9 @@ see [NIGHTLIES.md](./NIGHTLIES.md)
 ### Requirements
 
 - Minimum supported `rust`/`cargo` version: `1.70`
-
   - See [Install Rust](https://www.rust-lang.org/tools/install)
 
 - To build openssl dependency (see https://docs.rs/openssl/latest/openssl/)
-
   - perl >= 5.12 (strawberry perl works for windows https://strawberryperl.com/)
   - a c compiler (msvc, gcc or clang, cargo will find it)
 
@@ -241,9 +234,7 @@ see [NIGHTLIES.md](./NIGHTLIES.md)
 The simplest way to start playing around with `gitui` is to have `cargo` build and install it with `cargo install gitui --locked`. If you are not familiar with rust and cargo: [Getting Started with Rust](https://doc.rust-lang.org/book/ch01-00-getting-started.html)
 
 ### Cargo Features
-
 #### trace-libgit
-
 enable `libgit2` tracing
 
 works if `libgit2` built with `-DENABLE_TRACE=ON`
