@@ -1,3 +1,5 @@
+use crate::args::get_app_config_path;
+
 use anyhow::Result;
 use asyncgit::sync::{
 	diff::DiffOptions, repo_dir, RepoPathRef,
@@ -25,6 +27,8 @@ struct OptionsData {
 }
 
 const COMMIT_MSG_HISTORY_LENGTH: usize = 20;
+
+const OPTIONS_FILENAME: &str = "gitui.ron";
 
 #[derive(Clone)]
 pub struct Options {
@@ -144,11 +148,19 @@ impl Options {
 	}
 
 	fn read(repo: &RepoPathRef) -> Result<OptionsData> {
-		let dir = Self::options_file(repo)?;
+		let local_file = Self::options_file(repo)?;
 
-		let mut f = File::open(dir)?;
+		let app_home = get_app_config_path()?;
+		let config_file = app_home.join(OPTIONS_FILENAME);
+
+		let mut f = match File::open(local_file) {
+			Ok(file) => file,
+			Err(_) => File::open(config_file)?,
+		};
+
 		let mut buffer = Vec::new();
 		f.read_to_end(&mut buffer)?;
+
 		Ok(from_bytes(&buffer)?)
 	}
 
@@ -167,7 +179,7 @@ impl Options {
 
 	fn options_file(repo: &RepoPathRef) -> Result<PathBuf> {
 		let dir = repo_dir(&repo.borrow())?;
-		let dir = dir.join("gitui");
+		let dir = dir.join(OPTIONS_FILENAME);
 		Ok(dir)
 	}
 }

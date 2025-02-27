@@ -84,6 +84,7 @@ this release has no changes to `0.26.0` but provides windows binaries that were 
 * support `core.commitChar` filtering [[@concelare](https://github.com/concelare)] ([#2136](https://github.com/extrawurst/gitui/issues/2136))
 * allow reset in branch popup ([#2170](https://github.com/extrawurst/gitui/issues/2170))
 * respect configuration for remote when pushing [[@cruessler](https://github.com/cruessler)] ([#2156](https://github.com/extrawurst/gitui/issues/2156))
+* support global options [[@remique](https://github.com/remique)] ([#2140](https://github.com/extrawurst/gitui/issues/2140))
 
 ### Changed
 * Make info and error message popups scrollable [[@MichaelAug](https://github.com/MichaelAug)] ([#1138](https://github.com/extrawurst/gitui/issues/1138))

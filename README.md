@@ -268,11 +268,17 @@ However, you can customize everything to your liking: See [Themes](THEMES.md).
 
 The key bindings can be customized: See [Key Config](KEY_CONFIG.md) on how to set them to `vim`-like bindings.
 
-## 12. <a name="sponsoring"></a> Sponsoring <small><sup>[Top ▲](#table-of-contents)</sup></small>
+## 12. <a name="options"></a> Global options <small><sup>[Top ▲](#table-of-contents)</sup></small>
+
+The key bindings can be customized: See [Key Config](KEY_CONFIG.md) on how to set them to `vim`-like bindings.
+
+You can set Global Options: See [Global Options](GLOBAL_OPTIONS.md) on how to set it up.
+
+## 13. <a name="sponsoring"></a> Sponsoring <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 [![github](https://img.shields.io/badge/-GitHub%20Sponsors-fafbfc?logo=GitHub%20Sponsors)](https://github.com/sponsors/extrawurst)
 
-## 13. <a name="inspiration"></a> Inspiration <small><sup>[Top ▲](#table-of-contents)</sup></small>
+## 14. <a name="inspiration"></a> Inspiration <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 - [lazygit](https://github.com/jesseduffield/lazygit)
 - [tig](https://github.com/jonas/tig)
@@ -280,11 +286,11 @@ The key bindings can be customized: See [Key Config](KEY_CONFIG.md) on how to se
   - It would be nice to come up with a way to have the map view available in a terminal tool
 - [git-brunch](https://github.com/andys8/git-brunch)
 
-## 14. <a name="contributing"></a> Contributing <small><sup>[Top ▲](#table-of-contents)</sup></small>
+## 15. <a name="contributing"></a> Contributing <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## 15. <a name="contributors"></a> Contributors <small><sup>[Top ▲](#table-of-contents)</sup></small>
+## 16. <a name="contributors"></a> Contributors <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 Thanks goes to all the contributors that help make GitUI amazing! ❤️
 
