@@ -568,11 +568,21 @@ mod tests_branches {
 		);
 	}
 
+	fn branch_set_upstream(repo_path: &RepoPath, branch_ref: &str, upstream: Option<&str>) -> Result<()> {
+		let repo = repo(repo_path)?;
+		let branch_as_ref = repo.find_reference(branch_ref)?;
+		let mut branch = git2::Branch::wrap(branch_as_ref);
+		branch.set_upstream(upstream)?;
+
+		Ok(())
+	}
+
 	fn clone_branch_commit_push(target: &str, branch_name: &str) {
 		let (dir, repo) = repo_clone(target).unwrap();
 		let dir = dir.path().to_str().unwrap();
 
 		write_commit_file(&repo, "f1.txt", "foo", "c1");
+		branch_set_upstream(&dir.into(), "refs/heads/master", None).unwrap();
 		rename_branch(&dir.into(), "refs/heads/master", branch_name)
 			.unwrap();
 		push_branch(
