@@ -245,7 +245,7 @@ pub fn get_branch_remote(
 
 /// Retrieve the upstream merge of a local `branch`,
 /// configured in "branch.*.merge"
-/// 
+///
 /// For details check git2 `branch_upstream_merge`
 pub fn get_branch_upstream_merge(
 	repo_path: &RepoPath,
