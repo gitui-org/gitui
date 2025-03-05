@@ -846,6 +846,7 @@ impl App {
 					| AppOption::DiffInterhunkLines => {
 						self.status_tab.update_diff()?;
 					}
+					AppOption::HookTimeout => {}
 				}
 
 				flags.insert(NeedsUpdate::ALL);
