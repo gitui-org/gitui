@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use base64::prelude::{Engine, BASE64_STANDARD};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -63,10 +64,27 @@ fn is_wsl() -> bool {
 	false
 }
 
+// Copy text using escape sequence Ps = 5 2.
+// This enables copying even if there is no Wayland or X socket available,
+// e.g. via SSH, as long as it supported by the terminal.
+// See https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
+fn copy_string_osc52(text: &str, out: &mut impl Write) -> Result<()> {
+	const OSC52_DESTINATION_CLIPBOARD: char = 'c';
+	write!(
+		out,
+		"\x1b]52;{destination};{encoded_text}\x07",
+		destination = OSC52_DESTINATION_CLIPBOARD,
+		encoded_text = BASE64_STANDARD.encode(text)
+	)?;
+	Ok(())
+}
+
 #[cfg(all(target_family = "unix", not(target_os = "macos")))]
 pub fn copy_string(text: &str) -> Result<()> {
 	if std::env::var("WAYLAND_DISPLAY").is_ok() {
-		return exec_copy_with_args("wl-copy", &[], text, false);
+		if exec_copy_with_args("wl-copy", &[], text, false).is_err() {
+			copy_string_osc52(text, &mut std::io::stdout())?;
+		}
 	}
 
 	if is_wsl() {
@@ -81,12 +99,11 @@ pub fn copy_string(text: &str) -> Result<()> {
 	)
 	.is_err()
 	{
-		return exec_copy_with_args(
-			"xsel",
-			&["--clipboard"],
-			text,
-			true,
-		);
+		if exec_copy_with_args("xsel", &["--clipboard"], text, true)
+			.is_err()
+		{
+			copy_string_osc52(text, &mut std::io::stdout())?;
+		}
 	}
 
 	Ok(())
@@ -105,4 +122,18 @@ pub fn copy_string(text: &str) -> Result<()> {
 #[cfg(windows)]
 pub fn copy_string(text: &str) -> Result<()> {
 	exec_copy("clip", text)
+}
+
+#[cfg(test)]
+mod tests {
+	#[test]
+	fn test_copy_string_osc52() {
+		let mut buffer = Vec::<u8>::new();
+		{
+			let mut cursor = std::io::Cursor::new(&mut buffer);
+			super::copy_string_osc52("foo", &mut cursor).unwrap();
+		}
+		let output = String::from_utf8(buffer).unwrap();
+		assert_eq!(output, "\x1b]52;c;Zm9v\x07");
+	}
 }
