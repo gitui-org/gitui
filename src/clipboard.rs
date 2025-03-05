@@ -79,34 +79,46 @@ fn copy_string_osc52(text: &str, out: &mut impl Write) -> Result<()> {
 	Ok(())
 }
 
-#[cfg(all(target_family = "unix", not(target_os = "macos")))]
-pub fn copy_string(text: &str) -> Result<()> {
-	if std::env::var("WAYLAND_DISPLAY").is_ok() {
-		if exec_copy_with_args("wl-copy", &[], text, false).is_err() {
-			copy_string_osc52(text, &mut std::io::stdout())?;
-		}
+fn copy_string_wayland(text: &str) -> Result<()> {
+	if exec_copy_with_args("wl-copy", &[], text, false).is_ok() {
+		return Ok(());
 	}
 
-	if is_wsl() {
-		return exec_copy_with_args("clip.exe", &[], text, false);
-	}
+	copy_string_osc52(text, &mut std::io::stdout())
+}
 
+fn copy_string_x(text: &str) -> Result<()> {
 	if exec_copy_with_args(
 		"xclip",
 		&["-selection", "clipboard"],
 		text,
 		false,
 	)
-	.is_err()
+	.is_ok()
 	{
-		if exec_copy_with_args("xsel", &["--clipboard"], text, true)
-			.is_err()
-		{
-			copy_string_osc52(text, &mut std::io::stdout())?;
-		}
+		return Ok(());
 	}
 
-	Ok(())
+	if exec_copy_with_args("xsel", &["--clipboard"], text, true)
+		.is_ok()
+	{
+		return Ok(());
+	}
+
+	copy_string_osc52(text, &mut std::io::stdout())
+}
+
+#[cfg(all(target_family = "unix", not(target_os = "macos")))]
+pub fn copy_string(text: &str) -> Result<()> {
+	if std::env::var("WAYLAND_DISPLAY").is_ok() {
+		return copy_string_wayland(text);
+	}
+
+	if is_wsl() {
+		return exec_copy_with_args("clip.exe", &[], text, false);
+	}
+
+	copy_string_x(text)
 }
 
 #[cfg(any(target_os = "macos", windows))]
