@@ -28,6 +28,7 @@ use ratatui::{
 	Frame,
 };
 
+use std::time::Duration;
 use std::{
 	fmt::Write as _,
 	fs::{read_to_string, File},
@@ -237,9 +238,10 @@ impl CommitPopup {
 
 		if verify {
 			// run pre commit hook - can reject commit
-			if let HookResult::NotOk(e) =
-				sync::hooks_pre_commit(&self.repo.borrow())?
-			{
+			if let HookResult::NotOk(e) = sync::hooks_pre_commit(
+				&self.repo.borrow(),
+				Duration::ZERO,
+			)? {
 				log::error!("pre-commit hook error: {}", e);
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("pre-commit hook error:\n{e}"),
@@ -253,9 +255,11 @@ impl CommitPopup {
 
 		if verify {
 			// run commit message check hook - can reject commit
-			if let HookResult::NotOk(e) =
-				sync::hooks_commit_msg(&self.repo.borrow(), &mut msg)?
-			{
+			if let HookResult::NotOk(e) = sync::hooks_commit_msg(
+				&self.repo.borrow(),
+				&mut msg,
+				Duration::ZERO,
+			)? {
 				log::error!("commit-msg hook error: {}", e);
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("commit-msg hook error:\n{e}"),
@@ -265,9 +269,10 @@ impl CommitPopup {
 		}
 		self.do_commit(&msg)?;
 
-		if let HookResult::NotOk(e) =
-			sync::hooks_post_commit(&self.repo.borrow())?
-		{
+		if let HookResult::NotOk(e) = sync::hooks_post_commit(
+			&self.repo.borrow(),
+			Duration::ZERO,
+		)? {
 			log::error!("post-commit hook error: {}", e);
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"post-commit hook error:\n{e}"
@@ -445,6 +450,7 @@ impl CommitPopup {
 			&self.repo.borrow(),
 			msg_source,
 			&mut msg,
+			Duration::ZERO,
 		)? {
 			log::error!("prepare-commit-msg hook rejection: {e}",);
 		}
