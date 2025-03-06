@@ -173,7 +173,7 @@ enum SSHProgram {
 
 impl SSHProgram {
 	pub fn new(config: &git2::Config) -> Self {
-		match dbg!(config.get_string("gpg.ssh.program")) {
+		match config.get_string("gpg.ssh.program") {
 			Err(_) => Self::Default,
 			Ok(ssh_program) => {
 				if ssh_program.is_empty() {
