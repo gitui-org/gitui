@@ -1193,6 +1193,7 @@ dependencies = [
  "shellexpand",
  "simplelog",
  "struct-patch",
+ "strum",
  "syntect",
  "tempfile",
  "tui-textarea",

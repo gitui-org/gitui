@@ -98,6 +98,10 @@ pub enum InternalEvent {
 	/// open commit msg input
 	OpenCommit,
 	///
+	AddCommitMessage(String),
+	/// open conventional commit
+	OpenConventionalCommit,
+	///
 	PopupStashing(StashingOptions),
 	///
 	TabSwitchStatus,
