@@ -23,4 +23,4 @@ too much context so that people not familiar with the codebase yet can still
 make a contribution.
 
 [discord-server]: https://discord.gg/rZv4uxSQx3
-[good-first-issues]: https://github.com/extrawurst/gitui/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
+[good-first-issues]: https://github.com/gitui-org/gitui/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
