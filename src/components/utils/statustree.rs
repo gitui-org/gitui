@@ -3,7 +3,7 @@ use super::filetree::{
 };
 use anyhow::Result;
 use asyncgit::StatusItem;
-use std::{cmp, collections::BTreeSet};
+use std::{cell::Cell, cmp, collections::BTreeSet};
 
 //TODO: use new `filetreelist` crate
 
@@ -16,6 +16,8 @@ pub struct StatusTree {
 	// some folders may be folded up, this allows jumping
 	// over folders which are folded into their parent
 	pub available_selections: Vec<usize>,
+
+	pub window_height: Cell<Option<usize>>,
 }
 
 ///
@@ -27,6 +29,8 @@ pub enum MoveSelection {
 	Right,
 	Home,
 	End,
+	PageDown,
+	PageUp,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -143,6 +147,12 @@ impl StatusTree {
 				}
 				MoveSelection::Home => SelectionChange::new(0, false),
 				MoveSelection::End => self.selection_end(),
+				MoveSelection::PageUp => {
+					self.selection_page_updown(selection, true)
+				}
+				MoveSelection::PageDown => {
+					self.selection_page_updown(selection, false)
+				}
 			};
 
 			let changed_index =
@@ -278,6 +288,37 @@ impl StatusTree {
 
 			new_index = new_index.saturating_sub(1);
 			new_index = cmp::min(new_index, items_max);
+		}
+
+		SelectionChange::new(new_index, false)
+	}
+
+	fn selection_page_updown(
+		&self,
+		current_index: usize,
+		up: bool,
+	) -> SelectionChange {
+		let mut new_index = current_index;
+		let mut count = 0;
+
+		loop {
+			if up {
+				new_index = new_index.saturating_sub(1);
+			} else {
+				new_index = new_index.saturating_add(1);
+			}
+
+			if self.is_visible_index(new_index) {
+				count += 1;
+			}
+
+			if count == self.window_height.get().unwrap_or(0) {
+				break;
+			}
+
+			if new_index == 0 || new_index == self.tree.len() - 1 {
+				break;
+			}
 		}
 
 		SelectionChange::new(new_index, false)
