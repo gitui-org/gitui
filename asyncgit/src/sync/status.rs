@@ -195,3 +195,46 @@ pub fn get_status(
 
 	Ok(res)
 }
+
+/// discard all changes in the working directory
+pub fn discard_status(repo_path: &RepoPath) -> Result<bool> {
+	let repo = repo(repo_path)?;
+	let commit = repo.head()?.peel_to_commit()?;
+
+	repo.reset(commit.as_object(), git2::ResetType::Hard, None)?;
+
+	Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::sync::tests::repo_init;
+	use std::{fs::File, io::Write, path::Path};
+
+	#[test]
+	fn test_discard_status() {
+		let file_path = Path::new("foo");
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		File::create(root.join(file_path))
+			.unwrap()
+			.write_all(b"test\nfoo")
+			.unwrap();
+
+		let statuses =
+			get_status(repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+		assert_eq!(statuses.len(), 1);
+
+		discard_status(repo_path).unwrap();
+
+		let statuses =
+			get_status(repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+		assert_eq!(statuses.len(), 0);
+	}
+}
