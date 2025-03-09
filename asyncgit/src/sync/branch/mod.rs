@@ -243,6 +243,25 @@ pub fn get_branch_remote(
 	}
 }
 
+/// Retrieve the upstream merge of a local `branch`,
+/// configured in "branch.*.merge"
+/// 
+/// For details check git2 `branch_upstream_merge`
+pub fn get_branch_upstream_merge(
+	repo_path: &RepoPath,
+	branch: &str,
+) -> Result<Option<String>> {
+	let repo = repo(repo_path)?;
+	let branch = repo.find_branch(branch, BranchType::Local)?;
+	let reference = bytes2string(branch.get().name_bytes())?;
+	let remote_name = repo.branch_upstream_merge(&reference).ok();
+	if let Some(remote_name) = remote_name {
+		Ok(Some(bytes2string(remote_name.as_ref())?))
+	} else {
+		Ok(None)
+	}
+}
+
 /// returns whether the pull merge strategy is set to rebase
 pub fn config_is_pull_rebase(repo_path: &RepoPath) -> Result<bool> {
 	let repo = repo(repo_path)?;
@@ -549,11 +568,21 @@ mod tests_branches {
 		);
 	}
 
+	fn branch_set_upstream(repo_path: &RepoPath, branch_ref: &str, upstream: Option<&str>) -> Result<()> {
+		let repo = repo(repo_path)?;
+		let branch_as_ref = repo.find_reference(branch_ref)?;
+		let mut branch = git2::Branch::wrap(branch_as_ref);
+		branch.set_upstream(upstream)?;
+
+		Ok(())
+	}
+
 	fn clone_branch_commit_push(target: &str, branch_name: &str) {
 		let (dir, repo) = repo_clone(target).unwrap();
 		let dir = dir.path().to_str().unwrap();
 
 		write_commit_file(&repo, "f1.txt", "foo", "c1");
+		branch_set_upstream(&dir.into(), "refs/heads/master", None).unwrap();
 		rename_branch(&dir.into(), "refs/heads/master", branch_name)
 			.unwrap();
 		push_branch(
