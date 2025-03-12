@@ -96,7 +96,6 @@ fn app() -> ClapApp {
 		)
         .arg(Arg::new("logfile")
             .help("Store logging output into the specified file (implies --logging)")
-            .short('f')
             .long("logfile")
             .value_name("LOG_FILE"))
 		.arg(
