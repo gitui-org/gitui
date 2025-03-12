@@ -16,7 +16,6 @@ pub struct Theme {
 	selection_bg: Color,
 	selection_fg: Color,
 	cmdbar_bg: Color,
-	cmdbar_extra_lines_bg: Color,
 	disabled_fg: Color,
 	diff_line_add: Color,
 	diff_line_delete: Color,
@@ -204,17 +203,13 @@ impl Theme {
 		self.line_break.clone()
 	}
 
-	pub fn commandbar(&self, enabled: bool, line: usize) -> Style {
+	pub fn commandbar(&self, enabled: bool) -> Style {
 		if enabled {
 			Style::default().fg(self.command_fg)
 		} else {
 			Style::default().fg(self.disabled_fg)
 		}
-		.bg(if line == 0 {
-			self.cmdbar_bg
-		} else {
-			self.cmdbar_extra_lines_bg
-		})
+		.bg(self.cmdbar_bg)
 	}
 
 	pub fn commit_hash(&self, selected: bool) -> Style {
@@ -335,7 +330,6 @@ impl Default for Theme {
 			selection_bg: Color::Blue,
 			selection_fg: Color::White,
 			cmdbar_bg: Color::Blue,
-			cmdbar_extra_lines_bg: Color::Blue,
 			disabled_fg: Color::DarkGray,
 			diff_line_add: Color::Green,
 			diff_line_delete: Color::Red,
