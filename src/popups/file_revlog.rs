@@ -610,6 +610,14 @@ impl Component for FileRevlogPopup {
 				)
 				.order(1),
 			);
+			out.push(
+				CommandInfo::new(
+					strings::commands::blame_file_back(&self.key_config),
+					true,
+					self.selected_commit().is_some(),
+				)
+				.order(1),
+			);
 
 			out.push(CommandInfo::new(
 				strings::commands::diff_focus_right(&self.key_config),
