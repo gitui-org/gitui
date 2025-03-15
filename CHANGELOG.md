@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* new command-line option to override the default log file path (`--logfile`) [[@acuteenvy](https://github.com/acuteenvy)] ([#2539](https://github.com/gitui-org/gitui/pull/2539))
+
 ### Changed
 * improve syntax highlighting file detection [[@acuteenvy](https://github.com/acuteenvy)] ([#2524](https://github.com/extrawurst/gitui/pull/2524))
 * After commit: jump back to unstaged area [[@tommady](https://github.com/tommady)] ([#2476](https://github.com/extrawurst/gitui/issues/2476))
