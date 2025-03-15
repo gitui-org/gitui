@@ -114,7 +114,7 @@ impl Component for MsgPopup {
 		_force_all: bool,
 	) -> CommandBlocking {
 		out.push(CommandInfo::new(
-			strings::commands::close_msg(&self.key_config),
+			strings::commands::close_popup(&self.key_config),
 			true,
 			self.visible,
 		));
@@ -135,7 +135,7 @@ impl Component for MsgPopup {
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.visible {
 			if let Event::Key(e) = ev {
-				if key_match(e, self.key_config.keys.enter) {
+				if key_match(e, self.key_config.keys.exit_popup) {
 					self.hide();
 				} else if key_match(
 					e,
