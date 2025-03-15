@@ -63,33 +63,68 @@ fn is_wsl() -> bool {
 	false
 }
 
+// Copy text using escape sequence Ps = 5 2.
+// This enables copying even if there is no Wayland or X socket available,
+// e.g. via SSH, as long as it supported by the terminal.
+// See https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
+#[cfg(any(
+	all(target_family = "unix", not(target_os = "macos")),
+	test
+))]
+fn copy_string_osc52(text: &str, out: &mut impl Write) -> Result<()> {
+	use base64::prelude::{Engine, BASE64_STANDARD};
+	const OSC52_DESTINATION_CLIPBOARD: char = 'c';
+	write!(
+		out,
+		"\x1b]52;{destination};{encoded_text}\x07",
+		destination = OSC52_DESTINATION_CLIPBOARD,
+		encoded_text = BASE64_STANDARD.encode(text)
+	)?;
+	Ok(())
+}
+
 #[cfg(all(target_family = "unix", not(target_os = "macos")))]
-pub fn copy_string(text: &str) -> Result<()> {
-	if std::env::var("WAYLAND_DISPLAY").is_ok() {
-		return exec_copy_with_args("wl-copy", &[], text, false);
+fn copy_string_wayland(text: &str) -> Result<()> {
+	if exec_copy_with_args("wl-copy", &[], text, false).is_ok() {
+		return Ok(());
 	}
 
-	if is_wsl() {
-		return exec_copy_with_args("clip.exe", &[], text, false);
-	}
+	copy_string_osc52(text, &mut std::io::stdout())
+}
 
+#[cfg(all(target_family = "unix", not(target_os = "macos")))]
+fn copy_string_x(text: &str) -> Result<()> {
 	if exec_copy_with_args(
 		"xclip",
 		&["-selection", "clipboard"],
 		text,
 		false,
 	)
-	.is_err()
+	.is_ok()
 	{
-		return exec_copy_with_args(
-			"xsel",
-			&["--clipboard"],
-			text,
-			true,
-		);
+		return Ok(());
 	}
 
-	Ok(())
+	if exec_copy_with_args("xsel", &["--clipboard"], text, true)
+		.is_ok()
+	{
+		return Ok(());
+	}
+
+	copy_string_osc52(text, &mut std::io::stdout())
+}
+
+#[cfg(all(target_family = "unix", not(target_os = "macos")))]
+pub fn copy_string(text: &str) -> Result<()> {
+	if std::env::var("WAYLAND_DISPLAY").is_ok() {
+		return copy_string_wayland(text);
+	}
+
+	if is_wsl() {
+		return exec_copy_with_args("clip.exe", &[], text, false);
+	}
+
+	copy_string_x(text)
 }
 
 #[cfg(any(target_os = "macos", windows))]
@@ -105,4 +140,18 @@ pub fn copy_string(text: &str) -> Result<()> {
 #[cfg(windows)]
 pub fn copy_string(text: &str) -> Result<()> {
 	exec_copy("clip", text)
+}
+
+#[cfg(test)]
+mod tests {
+	#[test]
+	fn test_copy_string_osc52() {
+		let mut buffer = Vec::<u8>::new();
+		{
+			let mut cursor = std::io::Cursor::new(&mut buffer);
+			super::copy_string_osc52("foo", &mut cursor).unwrap();
+		}
+		let output = String::from_utf8(buffer).unwrap();
+		assert_eq!(output, "\x1b]52;c;Zm9v\x07");
+	}
 }
