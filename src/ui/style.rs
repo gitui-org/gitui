@@ -1,3 +1,4 @@
+use crate::ui::syntax_text::DEFAULT_SYNTAX_THEME;
 use anyhow::Result;
 use asyncgit::{DiffLineType, StatusItemType};
 use ratatui::style::{Color, Modifier, Style};
@@ -360,7 +361,7 @@ impl Default for Theme {
 			block_title_focused: Color::Reset,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
-			syntax: "base16-eighties.dark".to_string(),
+			syntax: DEFAULT_SYNTAX_THEME.to_string(),
 		}
 	}
 }
