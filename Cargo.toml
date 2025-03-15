@@ -19,7 +19,7 @@ anyhow = "1.0"
 asyncgit = { path = "./asyncgit", version = "0.27.0", default-features = false }
 backtrace = "0.3"
 base64 = "0.21"
-bitflags = "2.8"
+bitflags = "2.9"
 bugreport = "0.5.1"
 bwrap = { version = "1.3", features = ["use_std"] }
 bytesize = { version = "2.0", default-features = false }
