@@ -30,7 +30,7 @@ Notes:
 * rgb colors might not be supported in every terminal.
 * using a color like `yellow` might appear in whatever your terminal/theme defines for `yellow`
 * valid colors can be found in ratatui's [Color](https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html) struct.
-* all customizable theme elements can be found in [`style.rs` in the `impl Default for Theme` block](https://github.com/extrawurst/gitui/blob/master/src/ui/style.rs#L305)
+* all customizable theme elements can be found in [`style.rs` in the `impl Default for Theme` block](https://github.com/gitui-org/gitui/blob/master/src/ui/style.rs#L305)
 
 ## Customizing line breaks
 
