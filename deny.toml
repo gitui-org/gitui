@@ -13,9 +13,15 @@ allow = [
 
 [advisories]
 version = 2
-# No fix for RSA, and this is a dependency from ssh_key crate to handle rsa ssh key.
-# https://rustsec.org/advisories/RUSTSEC-2023-0071
-ignore = ["RUSTSEC-2023-0071"]
+ignore = [
+    # No fix for RSA, and this is a dependency from ssh_key crate to handle rsa ssh key.
+    # https://rustsec.org/advisories/RUSTSEC-2023-0071
+    "RUSTSEC-2023-0071",
+    # Crate paste is unmaintained. The dependency is already removed in
+    # ratatui:master. Until a new release is available, ignore this in
+    # order to pass CI. (https://github.com/gitui-org/gitui/issues/2554)
+    { id = "RUSTSEC-2024-0436", reason = "The paste dependency is already removed from ratatui." }
+]
 
 [bans]
 multiple-versions = "deny"

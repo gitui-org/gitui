@@ -6,7 +6,6 @@ use once_cell::sync::Lazy;
 use ratatui::text::{Line, Span};
 use scopetime::scope_time;
 use std::{
-	ffi::OsStr,
 	ops::Range,
 	path::{Path, PathBuf},
 	sync::{Arc, Mutex},
@@ -73,24 +72,18 @@ impl SyntaxText {
 		params: &RunParams<AsyncAppNotification, ProgressPercent>,
 	) -> asyncgit::Result<Self> {
 		scope_time!("syntax_highlighting");
-
 		let mut state = {
 			scope_time!("syntax_highlighting.0");
-			let syntax = file_path
-				.extension()
-				.and_then(OsStr::to_str)
-				.map_or_else(
-					|| {
-						SYNTAX_SET.find_syntax_by_path(
-							file_path.to_str().unwrap_or_default(),
-						)
-					},
-					|ext| SYNTAX_SET.find_syntax_by_extension(ext),
-				);
+			let plain_text = || SYNTAX_SET.find_syntax_plain_text();
+			let syntax = SYNTAX_SET
+				.find_syntax_for_file(file_path)
+				.unwrap_or_else(|e| {
+					log::error!("Could not read the file to detect its syntax: {e}");
+					Some(plain_text())
+				})
+				.unwrap_or_else(plain_text);
 
-			ParseState::new(syntax.unwrap_or_else(|| {
-				SYNTAX_SET.find_syntax_plain_text()
-			}))
+			ParseState::new(syntax)
 		};
 
 		let highlighter = Highlighter::new(
