@@ -236,10 +236,11 @@ impl CommitPopup {
 
 		if verify {
 			// run pre commit hook - can reject commit
-			if let HookResult::NotOk(e) = sync::hooks_pre_commit(
-				&self.repo.borrow(),
-				Duration::ZERO,
-			)? {
+			if let HookResult::NotOk(e) =
+				sync::hooks_pre_commit_with_timeout(
+					&self.repo.borrow(),
+					self.get_hook_timeout(),
+				)? {
 				log::error!("pre-commit hook error: {}", e);
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("pre-commit hook error:\n{e}"),
@@ -253,11 +254,12 @@ impl CommitPopup {
 
 		if verify {
 			// run commit message check hook - can reject commit
-			if let HookResult::NotOk(e) = sync::hooks_commit_msg(
-				&self.repo.borrow(),
-				&mut msg,
-				Duration::ZERO,
-			)? {
+			if let HookResult::NotOk(e) =
+				sync::hooks_commit_msg_with_timeout(
+					&self.repo.borrow(),
+					&mut msg,
+					self.get_hook_timeout(),
+				)? {
 				log::error!("commit-msg hook error: {}", e);
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("commit-msg hook error:\n{e}"),
@@ -267,10 +269,11 @@ impl CommitPopup {
 		}
 		self.do_commit(&msg)?;
 
-		if let HookResult::NotOk(e) = sync::hooks_post_commit(
-			&self.repo.borrow(),
-			Duration::ZERO,
-		)? {
+		if let HookResult::NotOk(e) =
+			sync::hooks_post_commit_with_timeout(
+				&self.repo.borrow(),
+				self.get_hook_timeout(),
+			)? {
 			log::error!("post-commit hook error: {}", e);
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"post-commit hook error:\n{e}"
@@ -444,12 +447,13 @@ impl CommitPopup {
 		self.mode = mode;
 
 		let mut msg = self.input.get_text().to_string();
-		if let HookResult::NotOk(e) = sync::hooks_prepare_commit_msg(
-			&self.repo.borrow(),
-			msg_source,
-			&mut msg,
-			Duration::ZERO,
-		)? {
+		if let HookResult::NotOk(e) =
+			sync::hooks_prepare_commit_msg_with_timeout(
+				&self.repo.borrow(),
+				msg_source,
+				&mut msg,
+				self.get_hook_timeout(),
+			)? {
 			log::error!("prepare-commit-msg hook rejection: {e}",);
 		}
 		self.input.set_text(msg);
@@ -482,6 +486,12 @@ impl CommitPopup {
 		}
 
 		Ok(msg)
+	}
+
+	// TODO - Configurable timeout
+	#[allow(clippy::unused_self, clippy::missing_const_for_fn)]
+	fn get_hook_timeout(&self) -> Duration {
+		Duration::from_secs(5)
 	}
 }
 
