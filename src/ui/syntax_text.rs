@@ -6,7 +6,6 @@ use once_cell::sync::Lazy;
 use ratatui::text::{Line, Span};
 use scopetime::scope_time;
 use std::{
-	ffi::OsStr,
 	ops::Range,
 	path::{Path, PathBuf},
 	sync::{Arc, Mutex},
@@ -21,6 +20,8 @@ use syntect::{
 };
 
 use crate::{AsyncAppNotification, SyntaxHighlightProgress};
+
+pub const DEFAULT_SYNTAX_THEME: &str = "base16-eighties.dark";
 
 struct SyntaxLine {
 	items: Vec<(Style, usize, Range<usize>)>,
@@ -71,31 +72,29 @@ impl SyntaxText {
 		text: String,
 		file_path: &Path,
 		params: &RunParams<AsyncAppNotification, ProgressPercent>,
+		syntax: &str,
 	) -> asyncgit::Result<Self> {
 		scope_time!("syntax_highlighting");
-
 		let mut state = {
 			scope_time!("syntax_highlighting.0");
-			let syntax = file_path
-				.extension()
-				.and_then(OsStr::to_str)
-				.map_or_else(
-					|| {
-						SYNTAX_SET.find_syntax_by_path(
-							file_path.to_str().unwrap_or_default(),
-						)
-					},
-					|ext| SYNTAX_SET.find_syntax_by_extension(ext),
-				);
+			let plain_text = || SYNTAX_SET.find_syntax_plain_text();
+			let syntax = SYNTAX_SET
+				.find_syntax_for_file(file_path)
+				.unwrap_or_else(|e| {
+					log::error!("Could not read the file to detect its syntax: {e}");
+					Some(plain_text())
+				})
+				.unwrap_or_else(plain_text);
 
-			ParseState::new(syntax.unwrap_or_else(|| {
-				SYNTAX_SET.find_syntax_plain_text()
-			}))
+			ParseState::new(syntax)
 		};
 
-		let highlighter = Highlighter::new(
-			&THEME_SET.themes["base16-eighties.dark"],
-		);
+		let theme =
+			THEME_SET.themes.get(syntax).unwrap_or_else(|| {
+				log::error!("The syntax theme:\"{}\" cannot be found. Using default theme:\"{}\" instead.", syntax, DEFAULT_SYNTAX_THEME);
+				&THEME_SET.themes[DEFAULT_SYNTAX_THEME]
+			});
+		let highlighter = Highlighter::new(theme);
 
 		let mut syntax_lines: Vec<SyntaxLine> = Vec::new();
 
@@ -219,14 +218,20 @@ enum JobState {
 #[derive(Clone, Default)]
 pub struct AsyncSyntaxJob {
 	state: Arc<Mutex<Option<JobState>>>,
+	syntax: String,
 }
 
 impl AsyncSyntaxJob {
-	pub fn new(content: String, path: String) -> Self {
+	pub fn new(
+		content: String,
+		path: String,
+		syntax: String,
+	) -> Self {
 		Self {
 			state: Arc::new(Mutex::new(Some(JobState::Request((
 				content, path,
 			))))),
+			syntax,
 		}
 	}
 
@@ -262,6 +267,7 @@ impl AsyncJob for AsyncSyntaxJob {
 						content,
 						Path::new(&path),
 						&params,
+						&self.syntax,
 					)?;
 					JobState::Response(syntax)
 				}

@@ -26,7 +26,11 @@ The location of the file depends on your OS:
 * `$HOME/.config/gitui/key_bindings.ron` (linux)
 * `%APPDATA%/gitui/key_bindings.ron` (Windows)
 
-See all possible keys to overwrite in code: [here](https://github.com/extrawurst/gitui/blob/master/src/keys/key_list.rs#L83)
+See all possible keys to overwrite in gitui: [here](https://github.com/gitui-org/gitui/blob/master/src/keys/key_list.rs#L83)
+
+Possible values for:
+* `code` are defined by the type `KeyCode` in crossterm: [here](https://docs.rs/crossterm/latest/crossterm/event/enum.KeyCode.html)
+* `modifiers` are defined by the type `KeyModifiers` in crossterm: [here](https://docs.rs/crossterm/latest/crossterm/event/struct.KeyModifiers.html)
 
 Here is a [vim style key config](vim_style_key_config.ron) with `h`, `j`, `k`, `l` to navigate. Use it to copy the content into `key_bindings.ron` to get vim style key bindings.
 
@@ -44,4 +48,4 @@ Example content of this file looks like:
     shift: Some("shift-")
 )
 ```
-This example will only overwrite two symbols. Find all possible symbols to overwrite in `symbols.rs` in the type `KeySymbolsFile` ([src/keys/symbols.rs](https://github.com/extrawurst/gitui/blob/master/src/keys/symbols.rs))
+This example will only overwrite two symbols. Find all possible symbols to overwrite in `symbols.rs` in the type `KeySymbolsFile` ([src/keys/symbols.rs](https://github.com/gitui-org/gitui/blob/master/src/keys/symbols.rs))
