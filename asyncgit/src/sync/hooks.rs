@@ -337,18 +337,45 @@ mod tests {
 		let root = repo.path().parent().unwrap();
 
 		let hook = b"#!/usr/bin/env sh
-    sleep 1
+    sleep 0.21
         ";
 
 		git2_hooks::create_hook(
 			&repo,
-			git2_hooks::HOOK_COMMIT_MSG,
+			git2_hooks::HOOK_PRE_COMMIT,
 			hook,
 		);
 
 		let res = hooks_pre_commit(
 			&root.to_str().unwrap().into(),
-			Duration::ZERO,
+			Duration::from_millis(200),
+		)
+		.unwrap();
+
+		assert_eq!(
+			res,
+			HookResult::NotOk("hook timed out".to_string())
+		);
+	}
+
+	#[test]
+	fn test_hooks_faster_than_timeout() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+
+		let hook = b"#!/usr/bin/env sh
+    sleep 0.1
+        ";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_COMMIT,
+			hook,
+		);
+
+		let res = hooks_pre_commit(
+			&root.to_str().unwrap().into(),
+			Duration::from_millis(110),
 		)
 		.unwrap();
 
@@ -366,13 +393,12 @@ mod tests {
 
 		git2_hooks::create_hook(
 			&repo,
-			git2_hooks::HOOK_COMMIT_MSG,
+			git2_hooks::HOOK_POST_COMMIT,
 			hook,
 		);
 
-		let res = hooks_commit_msg(
+		let res = hooks_post_commit(
 			&root.to_str().unwrap().into(),
-			&mut String::new(),
 			Duration::ZERO,
 		)
 		.unwrap();
