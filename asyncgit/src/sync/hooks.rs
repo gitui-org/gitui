@@ -303,7 +303,7 @@ mod tests {
 		let root = repo.path().parent().unwrap();
 
 		let hook = b"#!/usr/bin/env sh
-    sleep 0.21
+    sleep 0.250
         ";
 
 		git2_hooks::create_hook(
@@ -338,7 +338,7 @@ mod tests {
 
 		let res = hooks_pre_commit_with_timeout(
 			&root.to_str().unwrap().into(),
-			Duration::from_millis(110),
+			Duration::from_millis(150),
 		)
 		.unwrap();
 
