@@ -1,12 +1,14 @@
 use git2::Repository;
+use log::debug;
 
 use crate::{error::Result, HookResult, HooksError};
 
 use std::{
 	env,
 	path::{Path, PathBuf},
-	process::Command,
+	process::{Command, Stdio},
 	str::FromStr,
+	time::Duration,
 };
 
 pub struct HookPaths {
@@ -133,7 +135,11 @@ impl HookPaths {
 
 	/// this function calls hook scripts based on conventions documented here
 	/// see <https://git-scm.com/docs/githooks>
-	pub fn run_hook(&self, args: &[&str]) -> Result<HookResult> {
+	pub fn run_hook(
+		&self,
+		args: &[&str],
+		timeout: Duration,
+	) -> Result<HookResult> {
 		let hook = self.hook.clone();
 
 		let arg_str = format!("{:?} {}", hook, args.join(" "));
@@ -146,7 +152,7 @@ impl HookPaths {
 		let git_shell = find_bash_executable()
 			.or_else(find_default_unix_shell)
 			.unwrap_or_else(|| "bash".into());
-		let output = Command::new(git_shell)
+		let mut child = Command::new(git_shell)
 			.args(bash_args)
 			.with_no_window()
 			.current_dir(&self.pwd)
@@ -157,7 +163,28 @@ impl HookPaths {
 				"DUMMY_ENV_TO_FIX_WINDOWS_CMD_RUNS",
 				"FixPathHandlingOnWindows",
 			)
-			.output()?;
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.stdin(Stdio::piped())
+			.spawn()?;
+
+		let output = if timeout.is_zero() {
+			child.wait_with_output()?
+		} else {
+			let timer = std::time::Instant::now();
+			while child.try_wait()?.is_none() {
+				if timer.elapsed() > timeout {
+					debug!("killing hook process");
+					child.kill()?;
+					return Ok(HookResult::TimedOut { hook });
+				}
+
+				std::thread::yield_now();
+				std::thread::sleep(Duration::from_millis(10));
+			}
+
+			child.wait_with_output()?
+		};
 
 		if output.status.success() {
 			Ok(HookResult::Ok { hook })
