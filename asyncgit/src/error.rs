@@ -54,6 +54,10 @@ pub enum Error {
 	Git(#[from] git2::Error),
 
 	///
+	#[error("git config error: {0}")]
+	GitConfig(String),
+
+	///
 	#[error("strip prefix error: {0}")]
 	StripPrefix(#[from] StripPrefixError),
 

@@ -2,9 +2,8 @@ use super::apply_selection;
 use crate::{
 	error::{Error, Result},
 	sync::{
-		diff::DiffLinePosition,
-		patches::get_file_diff_patch_and_hunklines, repository::repo,
-		RepoPath,
+		diff::DiffLinePosition, patches::get_file_diff_patch,
+		patches::patch_get_hunklines, repository::repo, RepoPath,
 	},
 };
 use easy_cast::Conv;
@@ -39,9 +38,9 @@ pub fn stage_lines(
 	let indexed_content = String::from_utf8(blob.content().into())?;
 
 	let new_content = {
-		let (_patch, hunks) = get_file_diff_patch_and_hunklines(
-			&repo, file_path, is_stage, false,
-		)?;
+		let patch =
+			get_file_diff_patch(&repo, file_path, is_stage, false)?;
+		let hunks = patch_get_hunklines(&patch)?;
 
 		let old_lines = indexed_content.lines().collect::<Vec<_>>();
 
