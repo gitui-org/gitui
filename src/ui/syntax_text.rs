@@ -35,7 +35,6 @@ pub struct SyntaxText {
 
 static SYNTAX_SET: Lazy<SyntaxSet> =
 	Lazy::new(two_face::syntax::extra_no_newlines);
-static THEME_SET: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
 static THEME: OnceCell<Theme> = OnceCell::new();
 
 pub struct AsyncProgressBuffer {
@@ -104,12 +103,13 @@ impl SyntaxText {
 					    theme_path.display()
 				    );
 
-				    let t = THEME_SET.themes.get(syntax).unwrap_or_else(|| {
+					let mut default_set = ThemeSet::load_defaults();
+				    let t = default_set.themes.remove(syntax).unwrap_or_else(|| {
 				        log::error!("The syntax theme '{syntax}' cannot be found. Using default theme ('{DEFAULT_SYNTAX_THEME}') instead.");
-				        &THEME_SET.themes[DEFAULT_SYNTAX_THEME]
+				        default_set.themes.remove(DEFAULT_SYNTAX_THEME).expect("the default theme should be there")
 			        });
 
-                    Ok(t.clone())
+                    Ok(t)
                 }
 			}
 		})?;
