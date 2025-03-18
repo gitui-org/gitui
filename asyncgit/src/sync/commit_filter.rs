@@ -203,20 +203,15 @@ pub fn filter_commit_by_search(
 				.fields
 				.contains(SearchFields::AUTHORS)
 				.then(|| {
-					let name_match =
-						get_author_of_commit(&commit, &mailmap)
-							.name()
-							.is_some_and(|name| {
-								filter.match_text(name)
-							});
-					let mail_match =
-						get_author_of_commit(&commit, &mailmap)
-							.email()
-							.is_some_and(|name| {
-								filter.match_text(name)
-							});
-
-					name_match || mail_match
+					let author =
+						get_author_of_commit(&commit, &mailmap);
+					[author.email(), author.name()].iter().any(
+						|opt_haystack| {
+							opt_haystack.is_some_and(|haystack| {
+								filter.match_text(haystack)
+							})
+						},
+					)
 				})
 				.unwrap_or_default();
 
