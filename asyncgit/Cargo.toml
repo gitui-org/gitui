@@ -14,7 +14,7 @@ keywords = ["git"]
 [dependencies]
 bitflags = "2"
 crossbeam-channel = "0.5"
-dirs = "5.0"
+dirs = "6.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
 git2 = "0.20"
