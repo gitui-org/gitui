@@ -97,7 +97,7 @@ impl SyntaxText {
 				Ok(t) => return Ok(t),
 			    Err(e) => log::info!("could not load '{}': {e}, trying from the set of default themes", theme_path.display()),
 			}
-			
+
 			let mut theme_set = ThemeSet::load_defaults();
 			if let Some(t) = theme_set.themes.remove(syntax) {
 			    return Ok(t);
