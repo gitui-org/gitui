@@ -1,3 +1,4 @@
+use crate::ui::syntax_text::DEFAULT_SYNTAX_THEME;
 use anyhow::Result;
 use asyncgit::{DiffLineType, StatusItemType};
 use ratatui::style::{Color, Modifier, Style};
@@ -34,6 +35,7 @@ pub struct Theme {
 	branch_fg: Color,
 	line_break: String,
 	block_title_focused: Color,
+	syntax: String,
 }
 
 impl Theme {
@@ -298,6 +300,10 @@ impl Theme {
 		Ok(())
 	}
 
+	pub fn get_syntax(&self) -> String {
+		self.syntax.clone()
+	}
+
 	pub fn init(theme_path: &PathBuf) -> Self {
 		let mut theme = Self::default();
 
@@ -353,6 +359,9 @@ impl Default for Theme {
 			branch_fg: Color::LightYellow,
 			line_break: "¶".to_string(),
 			block_title_focused: Color::Reset,
+			// Available themes can be found in:
+			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
+			syntax: DEFAULT_SYNTAX_THEME.to_string(),
 		}
 	}
 }
@@ -378,6 +387,7 @@ mod tests {
 (
 	selection_bg: Some("Black"),
 	selection_fg: Some("#ffffff"),
+	syntax: Some("InspiredGitHub")
 )
 "##
 		)
@@ -388,7 +398,9 @@ mod tests {
 		assert_eq!(theme.selected_tab, Theme::default().selected_tab);
 
 		assert_ne!(theme.selection_bg, Theme::default().selection_bg);
+		assert_ne!(theme.syntax, Theme::default().syntax);
 		assert_eq!(theme.selection_bg, Color::Black);
 		assert_eq!(theme.selection_fg, Color::Rgb(255, 255, 255));
+		assert_eq!(theme.syntax, "InspiredGitHub");
 	}
 }

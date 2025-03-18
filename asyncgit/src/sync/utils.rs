@@ -399,7 +399,7 @@ mod tests {
 		assert_eq!(status_count(StatusType::Stage), 1);
 	}
 
-	// see https://github.com/extrawurst/gitui/issues/108
+	// see https://github.com/gitui-org/gitui/issues/108
 	#[test]
 	fn test_staging_sub_git_folder() -> Result<()> {
 		let (_td, repo) = repo_init().unwrap();

@@ -21,6 +21,8 @@ use syntect::{
 
 use crate::{AsyncAppNotification, SyntaxHighlightProgress};
 
+pub const DEFAULT_SYNTAX_THEME: &str = "base16-eighties.dark";
+
 struct SyntaxLine {
 	items: Vec<(Style, usize, Range<usize>)>,
 }
@@ -70,6 +72,7 @@ impl SyntaxText {
 		text: String,
 		file_path: &Path,
 		params: &RunParams<AsyncAppNotification, ProgressPercent>,
+		syntax: &str,
 	) -> asyncgit::Result<Self> {
 		scope_time!("syntax_highlighting");
 		let mut state = {
@@ -86,9 +89,12 @@ impl SyntaxText {
 			ParseState::new(syntax)
 		};
 
-		let highlighter = Highlighter::new(
-			&THEME_SET.themes["base16-eighties.dark"],
-		);
+		let theme =
+			THEME_SET.themes.get(syntax).unwrap_or_else(|| {
+				log::error!("The syntax theme:\"{}\" cannot be found. Using default theme:\"{}\" instead.", syntax, DEFAULT_SYNTAX_THEME);
+				&THEME_SET.themes[DEFAULT_SYNTAX_THEME]
+			});
+		let highlighter = Highlighter::new(theme);
 
 		let mut syntax_lines: Vec<SyntaxLine> = Vec::new();
 
@@ -212,14 +218,20 @@ enum JobState {
 #[derive(Clone, Default)]
 pub struct AsyncSyntaxJob {
 	state: Arc<Mutex<Option<JobState>>>,
+	syntax: String,
 }
 
 impl AsyncSyntaxJob {
-	pub fn new(content: String, path: String) -> Self {
+	pub fn new(
+		content: String,
+		path: String,
+		syntax: String,
+	) -> Self {
 		Self {
 			state: Arc::new(Mutex::new(Some(JobState::Request((
 				content, path,
 			))))),
+			syntax,
 		}
 	}
 
@@ -255,6 +267,7 @@ impl AsyncJob for AsyncSyntaxJob {
 						content,
 						Path::new(&path),
 						&params,
+						&self.syntax,
 					)?;
 					JobState::Response(syntax)
 				}

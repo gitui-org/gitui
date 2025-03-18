@@ -576,6 +576,7 @@ impl BlameFilePopup {
 		job.spawn(AsyncSyntaxJob::new(
 			text,
 			params.file_path.clone(),
+			self.theme.get_syntax(),
 		));
 	}
 
