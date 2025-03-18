@@ -87,20 +87,38 @@ impl CommitDetails {
 	}
 }
 
-/// Get the author of a commit
+/// Get the author of a commit.
 pub fn get_author_of_commit<'a>(
 	commit: &'a git2::Commit<'a>,
 	mailmap: &git2::Mailmap,
 ) -> git2::Signature<'a> {
 	match commit.author_with_mailmap(mailmap) {
 		Ok(author) => author,
-		Err(err) => {
+		Err(e) => {
 			log::error!(
-				"Couldn't get author with mailmap for {} {:?}: {err}",
+				"Couldn't get author with mailmap for {} (message: {:?}): {e}",
 				commit.id(),
 				commit.message(),
 			);
 			commit.author()
+		}
+	}
+}
+
+/// Get the committer of a commit.
+pub fn get_committer_of_commit<'a>(
+	commit: &'a git2::Commit<'a>,
+	mailmap: &git2::Mailmap,
+) -> git2::Signature<'a> {
+	match commit.committer_with_mailmap(mailmap) {
+		Ok(committer) => committer,
+		Err(e) => {
+			log::error!(
+				"Couldn't get committer with mailmap for {} (message: {:?}): {e}",
+				commit.id(),
+				commit.message(),
+			);
+			commit.committer()
 		}
 	}
 }
@@ -120,18 +138,10 @@ pub fn get_commit_details(
 	let author = CommitSignature::from(&get_author_of_commit(
 		&commit, &mailmap,
 	));
-	let committer = match commit.committer_with_mailmap(&mailmap) {
-		Ok(committer) => committer,
-		Err(err) => {
-			log::error!(
-				"Couldn't get committer with mailmap for {} {:?}: {err}",
-				commit.id(),
-				commit.message(),
-			);
-			commit.committer()
-		}
-	};
-	let committer = CommitSignature::from(&committer);
+	let committer = CommitSignature::from(&get_committer_of_commit(
+		&commit, &mailmap,
+	));
+
 	let committer = if author == committer {
 		None
 	} else {
