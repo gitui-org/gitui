@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * The default key to close the commit error message popup is now the Escape key [[@wessamfathi](https://github.com/wessamfathi)] ([#2552](https://github.com/extrawurst/gitui/issues/2552))
 * use OSC52 copying in case other methods fail [[@naseschwarz](https://github.com/naseschwarz)] ([#2366](https://github.com/gitui-org/gitui/issues/2366))
 * push: respect `branch.*.merge` when push default is upstream [[@vlad-anger](https://github.com/vlad-anger)] ([#2542](https://github.com/gitui-org/gitui/pull/2542))
+* set the terminal title to `gitui ({repo_path})` [[@acuteenvy](https://github.com/acuteenvy)] ([#2462](https://github.com/gitui-org/gitui/issues/2462))
 * respect `.mailmap` [[@acuteenvy](https://github.com/acuteenvy)] ([#2406](https://github.com/gitui-org/gitui/issues/2406))
 
 ## [0.27.0] - 2024-01-14
