@@ -90,28 +90,20 @@ impl SyntaxText {
 		};
 
 		let theme = THEME.get_or_try_init(|| -> Result<Theme, asyncgit::Error> {
+			let mut theme_set = ThemeSet::load_defaults();
 			let theme_path = crate::args::get_app_config_path()
-				.map_err(|e| asyncgit::Error::Generic(e.to_string()))?
-				.join(syntax);
-		    let loaded_theme = ThemeSet::get_theme(&theme_path);
+				.map_err(|e| asyncgit::Error::Generic(e.to_string()))?;
 
-		    match loaded_theme {
-			    Ok(t) => Ok(t),
-			    Err(e) => {
-				    log::info!(
-					    "failed to load the theme from '{}': {e}, trying from the set of default themes",
-					    theme_path.display()
-				    );
-
-					let mut default_set = ThemeSet::load_defaults();
-				    let t = default_set.themes.remove(syntax).unwrap_or_else(|| {
-				        log::error!("The syntax theme '{syntax}' cannot be found. Using default theme ('{DEFAULT_SYNTAX_THEME}') instead.");
-				        default_set.themes.remove(DEFAULT_SYNTAX_THEME).expect("the default theme should be there")
-			        });
-
-                    Ok(t)
-                }
+			if let Err(e) = theme_set.add_from_folder(&theme_path) {
+			    log::error!("could not load themes from the config directory: {e}. Only the default set is available");
 			}
+			
+			if let Some(t) = theme_set.themes.remove(syntax) {
+			    return Ok(t);
+			}
+
+			log::error!("the syntax theme '{syntax}' cannot be found. Using default theme ('{DEFAULT_SYNTAX_THEME}') instead");
+			Ok(theme_set.themes.remove(DEFAULT_SYNTAX_THEME).expect("the default theme should be there"))
 		})?;
 
 		let highlighter = Highlighter::new(theme);
