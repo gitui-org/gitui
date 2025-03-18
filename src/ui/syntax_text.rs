@@ -90,14 +90,15 @@ impl SyntaxText {
 		};
 
 		let theme = THEME.get_or_try_init(|| -> Result<Theme, asyncgit::Error> {
-			let mut theme_set = ThemeSet::load_defaults();
 			let theme_path = crate::args::get_app_config_path()
-				.map_err(|e| asyncgit::Error::Generic(e.to_string()))?;
+				.map_err(|e| asyncgit::Error::Generic(e.to_string()))?.join(format!("{syntax}.tmTheme"));
 
-			if let Err(e) = theme_set.add_from_folder(&theme_path) {
-			    log::error!("could not load themes from the config directory: {e}. Only the default set is available");
+			match ThemeSet::get_theme(&theme_path) {
+				Ok(t) => return Ok(t),
+			    Err(e) => log::info!("could not load '{}': {e}, trying from the set of default themes", theme_path.display()),
 			}
 			
+			let mut theme_set = ThemeSet::load_defaults();
 			if let Some(t) = theme_set.themes.remove(syntax) {
 			    return Ok(t);
 			}
