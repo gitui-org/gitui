@@ -49,3 +49,5 @@ Note that if you want to turn it off, you should use a blank string:
     line_break: Some(""),
 )
 ```
+## Preset Themes:
+You can find preset themes by Catppuccin [here](https://github.com/catppuccin/gitui.git)
