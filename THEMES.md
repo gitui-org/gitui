@@ -31,12 +31,12 @@ Notes:
 * using a color like `yellow` might appear in whatever your terminal/theme defines for `yellow`
 * valid colors can be found in ratatui's [Color](https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html) struct.
 * all customizable theme elements can be found in [`style.rs` in the `impl Default for Theme` block](https://github.com/gitui-org/gitui/blob/master/src/ui/style.rs#L305)
-* the syntax highlighting theme can be defined using the element `syntax`. Currently, only default themes of the syntect library are supported, [available themes](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
+* the syntax highlighting theme can be defined using the element `syntax`. Currently, only [default themes of the syntect library are supported](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 
 Example syntax theme:
 ```
 (
-    syntax : Some("InspiredGitHub"),
+    syntax: Some("InspiredGitHub"),
 )
 ```
 ## Customizing line breaks
