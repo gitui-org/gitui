@@ -1,4 +1,7 @@
-use super::{commit_files::get_commit_diff, CommitId};
+use super::{
+	commit_details::get_author_of_commit,
+	commit_files::get_commit_diff, CommitId,
+};
 use crate::error::Result;
 use bitflags::bitflags;
 use fuzzy_matcher::FuzzyMatcher;
@@ -159,6 +162,7 @@ pub fn filter_commit_by_search(
 		move |repo: &Repository,
 		      commit_id: &CommitId|
 		      -> Result<bool> {
+			let mailmap = repo.mailmap()?;
 			let commit = repo.find_commit((*commit_id).into())?;
 
 			let msg_summary_match = filter
@@ -199,16 +203,15 @@ pub fn filter_commit_by_search(
 				.fields
 				.contains(SearchFields::AUTHORS)
 				.then(|| {
-					let name_match = commit
-						.author()
-						.name()
-						.is_some_and(|name| filter.match_text(name));
-					let mail_match = commit
-						.author()
-						.email()
-						.is_some_and(|name| filter.match_text(name));
-
-					name_match || mail_match
+					let author =
+						get_author_of_commit(&commit, &mailmap);
+					[author.email(), author.name()].iter().any(
+						|opt_haystack| {
+							opt_haystack.is_some_and(|haystack| {
+								filter.match_text(haystack)
+							})
+						},
+					)
 				})
 				.unwrap_or_default();
 

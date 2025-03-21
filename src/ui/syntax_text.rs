@@ -2,7 +2,7 @@ use asyncgit::{
 	asyncjob::{AsyncJob, RunParams},
 	ProgressPercent,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use ratatui::text::{Line, Span};
 use scopetime::scope_time;
 use std::{
@@ -14,12 +14,14 @@ use std::{
 use syntect::{
 	highlighting::{
 		FontStyle, HighlightState, Highlighter,
-		RangedHighlightIterator, Style, ThemeSet,
+		RangedHighlightIterator, Style, Theme, ThemeSet,
 	},
 	parsing::{ParseState, ScopeStack, SyntaxSet},
 };
 
 use crate::{AsyncAppNotification, SyntaxHighlightProgress};
+
+pub const DEFAULT_SYNTAX_THEME: &str = "base16-eighties.dark";
 
 struct SyntaxLine {
 	items: Vec<(Style, usize, Range<usize>)>,
@@ -33,7 +35,7 @@ pub struct SyntaxText {
 
 static SYNTAX_SET: Lazy<SyntaxSet> =
 	Lazy::new(two_face::syntax::extra_no_newlines);
-static THEME_SET: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
+static THEME: OnceCell<Theme> = OnceCell::new();
 
 pub struct AsyncProgressBuffer {
 	current: usize,
@@ -70,6 +72,7 @@ impl SyntaxText {
 		text: String,
 		file_path: &Path,
 		params: &RunParams<AsyncAppNotification, ProgressPercent>,
+		syntax: &str,
 	) -> asyncgit::Result<Self> {
 		scope_time!("syntax_highlighting");
 		let mut state = {
@@ -86,10 +89,25 @@ impl SyntaxText {
 			ParseState::new(syntax)
 		};
 
-		let highlighter = Highlighter::new(
-			&THEME_SET.themes["base16-eighties.dark"],
-		);
+		let theme = THEME.get_or_try_init(|| -> Result<Theme, asyncgit::Error> {
+			let theme_path = crate::args::get_app_config_path()
+				.map_err(|e| asyncgit::Error::Generic(e.to_string()))?.join(format!("{syntax}.tmTheme"));
 
+			match ThemeSet::get_theme(&theme_path) {
+				Ok(t) => return Ok(t),
+			    Err(e) => log::info!("could not load '{}': {e}, trying from the set of default themes", theme_path.display()),
+			}
+
+			let mut theme_set = ThemeSet::load_defaults();
+			if let Some(t) = theme_set.themes.remove(syntax) {
+			    return Ok(t);
+			}
+
+			log::error!("the syntax theme '{syntax}' cannot be found. Using default theme ('{DEFAULT_SYNTAX_THEME}') instead");
+			Ok(theme_set.themes.remove(DEFAULT_SYNTAX_THEME).expect("the default theme should be there"))
+		})?;
+
+		let highlighter = Highlighter::new(theme);
 		let mut syntax_lines: Vec<SyntaxLine> = Vec::new();
 
 		let mut highlight_state =
@@ -212,14 +230,20 @@ enum JobState {
 #[derive(Clone, Default)]
 pub struct AsyncSyntaxJob {
 	state: Arc<Mutex<Option<JobState>>>,
+	syntax: String,
 }
 
 impl AsyncSyntaxJob {
-	pub fn new(content: String, path: String) -> Self {
+	pub fn new(
+		content: String,
+		path: String,
+		syntax: String,
+	) -> Self {
 		Self {
 			state: Arc::new(Mutex::new(Some(JobState::Request((
 				content, path,
 			))))),
+			syntax,
 		}
 	}
 
@@ -255,6 +279,7 @@ impl AsyncJob for AsyncSyntaxJob {
 						content,
 						Path::new(&path),
 						&params,
+						&self.syntax,
 					)?;
 					JobState::Response(syntax)
 				}
