@@ -79,6 +79,12 @@ impl TextInputComponent {
 		}
 	}
 
+	pub fn move_cursor_to_end(&mut self) {
+		if let Some(ta) = &mut self.textarea {
+			ta.move_cursor(CursorMove::End);
+		}
+	}
+
 	///
 	pub const fn with_input_type(
 		mut self,

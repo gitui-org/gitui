@@ -52,6 +52,7 @@ serde = "1.0"
 shellexpand = "3.1"
 simplelog = { version = "0.12", default-features = false }
 struct-patch = "0.8"
+strum = "0.26.3"
 syntect = { version = "5.2", default-features = false, features = [
     "parsing",
     "default-syntaxes",
@@ -78,8 +79,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
+default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl", "gitmoji"]
 ghemoji = ["gh-emoji"]
+gitmoji = []
 # regex-* features are mutually exclusive.
 regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
 regex-onig = ["syntect/regex-onig", "two-face/syntect-onig"]
