@@ -2,7 +2,7 @@ use crate::{
 	components::FuzzyFinderTarget,
 	popups::{
 		AppOption, BlameFileOpen, FileRevOpen, FileTreeOpen,
-		InspectCommitOpen,
+		GotoLineOpen, InspectCommitOpen,
 	},
 	tabs::StashingOptions,
 };
@@ -71,6 +71,8 @@ pub enum StackablePopupOpen {
 	InspectCommit(InspectCommitOpen),
 	///
 	CompareCommits(InspectCommitOpen),
+	///
+	GotoLine(GotoLineOpen),
 }
 
 pub enum AppTabs {
@@ -157,6 +159,8 @@ pub enum InternalEvent {
 	RewordCommit(CommitId),
 	///
 	CommitSearch(LogFilterSearchOptions),
+	///
+	GotoLine(usize),
 }
 
 /// single threaded simple queue for components to communicate with each other

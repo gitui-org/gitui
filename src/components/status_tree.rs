@@ -9,7 +9,7 @@ use crate::{
 	app::Environment,
 	components::{CommandInfo, Component, EventState},
 	keys::{key_match, SharedKeyConfig},
-	popups::{BlameFileOpen, FileRevOpen},
+	popups::{BlameFileOpen, BlameRequest, FileRevOpen},
 	queue::{InternalEvent, NeedsUpdate, Queue, StackablePopupOpen},
 	strings::{self, order},
 	ui::{self, style::SharedTheme},
@@ -456,6 +456,7 @@ impl Component for StatusTreeComponent {
 									file_path: status_item.path,
 									commit_id: self.revision,
 									selection: None,
+									blame: BlameRequest::StartNew,
 								},
 							),
 						));
