@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.26.3] - 2024-06-02
 
+### Added
+* add recursive git blame (do `SHIFT+B` in the revlog to go forward, and `b` to go back).
+
+## [0.26.3] - 2024-06-02
+
 ### Breaking Changes
 
 #### Theme file format
