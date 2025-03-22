@@ -74,8 +74,15 @@ pub fn hooks_prepare_commit_msg(
 
 #[cfg(test)]
 mod tests {
+	use git2::Repository;
+	use tempfile::TempDir;
+
 	use super::*;
-	use crate::sync::tests::repo_init;
+	use crate::sync::tests::repo_init_with_prefix;
+
+	fn repo_init() -> Result<(TempDir, Repository)> {
+		repo_init_with_prefix("gitui $#  ")
+	}
 
 	#[test]
 	fn test_post_commit_hook_reject_in_subfolder() {
@@ -120,7 +127,7 @@ mod tests {
 			crate::sync::utils::repo_work_dir(repo_path).unwrap();
 
 		let hook = b"#!/bin/sh
-	echo $(pwd)
+	echo \"$(pwd)\"
 	exit 1
 	        ";
 
@@ -146,7 +153,7 @@ mod tests {
 		let root = repo.path().parent().unwrap();
 
 		let hook = b"#!/bin/sh
-	echo 'msg' > $1
+	echo 'msg' > \"$1\"
 	echo 'rejected'
 	exit 1
 	        ";
