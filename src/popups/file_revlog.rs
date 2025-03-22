@@ -124,10 +124,7 @@ impl FileRevlogPopup {
 	///
 	pub fn any_work_pending(&self) -> bool {
 		self.git_diff.is_pending()
-			|| self
-				.git_log
-				.as_ref()
-				.map_or(false, AsyncLog::is_pending)
+			|| self.git_log.as_ref().is_some_and(AsyncLog::is_pending)
 	}
 
 	///
@@ -213,7 +210,7 @@ impl FileRevlogPopup {
 			);
 
 			if let Ok(commits) = commits {
-				self.items.set_items(new_offset, commits, &None);
+				self.items.set_items(new_offset, commits, None);
 			}
 
 			self.count_total = git_log.count()?;

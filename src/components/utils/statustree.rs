@@ -129,7 +129,7 @@ impl StatusTree {
 
 	///
 	pub fn move_selection(&mut self, dir: MoveSelection) -> bool {
-		self.selection.map_or(false, |selection| {
+		self.selection.is_some_and(|selection| {
 			let selection_change = match dir {
 				MoveSelection::Up => {
 					self.selection_updown(selection, true)

@@ -102,11 +102,11 @@ impl DetailsComponent {
 	}
 
 	fn get_wrapped_lines(
-		data: &Option<CommitDetails>,
+		data: Option<&CommitDetails>,
 		width: usize,
 	) -> WrappedCommitMessage<'_> {
-		if let Some(ref data) = data {
-			if let Some(ref message) = data.message {
+		if let Some(data) = data {
+			if let Some(message) = &data.message {
 				return Self::wrap_commit_details(message, width);
 			}
 		}
@@ -115,7 +115,7 @@ impl DetailsComponent {
 	}
 
 	fn get_number_of_lines(
-		details: &Option<CommitDetails>,
+		details: Option<&CommitDetails>,
 		width: usize,
 	) -> usize {
 		let (wrapped_title, wrapped_message) =
@@ -138,7 +138,7 @@ impl DetailsComponent {
 		height: usize,
 	) -> Vec<Line> {
 		let (wrapped_title, wrapped_message) =
-			Self::get_wrapped_lines(&self.data, width);
+			Self::get_wrapped_lines(self.data.as_ref(), width);
 
 		[&wrapped_title[..], &wrapped_message[..]]
 			.concat()
@@ -286,8 +286,10 @@ impl DrawableComponent for DetailsComponent {
 
 		self.current_width.set(width);
 
-		let number_of_lines =
-			Self::get_number_of_lines(&self.data, usize::from(width));
+		let number_of_lines = Self::get_number_of_lines(
+			self.data.as_ref(),
+			usize::from(width),
+		);
 
 		self.scroll.update_no_selection(
 			number_of_lines,
@@ -340,7 +342,7 @@ impl Component for DetailsComponent {
 	) -> CommandBlocking {
 		let width = usize::from(self.current_width.get());
 		let number_of_lines =
-			Self::get_number_of_lines(&self.data, width);
+			Self::get_number_of_lines(self.data.as_ref(), width);
 
 		out.push(
 			CommandInfo::new(
@@ -488,13 +490,15 @@ mod test_line_count {
 			..CommitDetails::default()
 		};
 		let lines = DetailsComponent::get_number_of_lines(
-			&Some(commit.clone()),
+			Some(commit.clone()).as_ref(),
 			50,
 		);
 		assert_eq!(lines, 2);
 
-		let lines =
-			DetailsComponent::get_number_of_lines(&Some(commit), 8);
+		let lines = DetailsComponent::get_number_of_lines(
+			Some(commit).as_ref(),
+			8,
+		);
 		assert_eq!(lines, 4);
 	}
 }

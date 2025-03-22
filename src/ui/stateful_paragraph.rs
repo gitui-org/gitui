@@ -100,7 +100,7 @@ impl<'a> StatefulParagraph<'a> {
 	}
 }
 
-impl<'a> StatefulWidget for StatefulParagraph<'a> {
+impl StatefulWidget for StatefulParagraph<'_> {
 	type State = ParagraphState;
 
 	fn render(

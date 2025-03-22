@@ -1,11 +1,11 @@
 [package]
 name = "asyncgit"
-version = "0.26.3"
+version = "0.27.0"
 authors = ["extrawurst <mail@rusticorn.com>"]
 edition = "2021"
 description = "allow using git2 in a asynchronous context"
-homepage = "https://github.com/extrawurst/gitui"
-repository = "https://github.com/extrawurst/gitui"
+homepage = "https://github.com/gitui-org/gitui"
+repository = "https://github.com/gitui-org/gitui"
 readme = "README.md"
 license = "MIT"
 categories = ["concurrency", "asynchronous"]
@@ -17,9 +17,9 @@ crossbeam-channel = "0.5"
 dirs = "5.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
-git2 = "0.19"
+git2 = "0.20"
 git2-hooks = { path = "../git2-hooks", version = ">=0.4" }
-gix = { version = "0.67", default-features = false, features = [
+gix = { version = "0.70.0", default-features = false, features = [
     "max-performance",
     "revision",
 ] }
@@ -33,8 +33,8 @@ rayon-core = "1.12"
 scopetime = { path = "../scopetime", version = "0.1" }
 serde = { version = "1.0", features = ["derive"] }
 ssh-key = { version = "0.6.7", features = ["crypto", "encryption"] }
-thiserror = "1.0"
-unicode-truncate = "1.0"
+thiserror = "2.0"
+unicode-truncate = "2.0"
 url = "2.5"
 
 [dev-dependencies]

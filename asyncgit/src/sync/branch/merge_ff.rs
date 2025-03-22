@@ -50,7 +50,7 @@ pub fn branch_merge_upstream_fastforward(
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
 	use super::*;
 	use crate::sync::{
 		remotes::{fetch, push::push_branch},

@@ -190,7 +190,7 @@ impl FuzzyFindPopup {
 				.map(|(idx, indices)| {
 					let selected = self
 						.selected_index
-						.map_or(false, |index| index == *idx);
+						.is_some_and(|index| index == *idx);
 					let full_text =
 						trim_length_left(&self.contents[*idx], width);
 					let trim_length =

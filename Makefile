@@ -1,5 +1,5 @@
 
-.PHONY: debug build-release release-linux-musl test clippy clippy-pedantic install install-debug
+.PHONY: debug build-release release-linux-musl test clippy clippy-pedantic install install-debug sort
 
 ARGS=-l
 # ARGS=-l -d ~/code/extern/kubernetes
@@ -94,7 +94,7 @@ clippy:
 clippy-nightly:
 	cargo +nightly clippy --workspace --all-features
 
-check: fmt clippy test deny
+check: fmt clippy test deny sort
 
 check-nightly:
 	cargo +nightly c
@@ -103,6 +103,9 @@ check-nightly:
 
 deny:
 	cargo deny check
+
+sort:
+	cargo sort -c -w "."
 
 install:
 	cargo install --path "." --offline --locked

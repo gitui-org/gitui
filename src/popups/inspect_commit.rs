@@ -302,7 +302,7 @@ impl InspectCommitPopup {
 		if let Some(request) = &self.open_request {
 			self.details.set_commits(
 				Some(request.commit_id.into()),
-				&request.tags,
+				request.tags.as_ref(),
 			)?;
 			self.update_diff()?;
 		}

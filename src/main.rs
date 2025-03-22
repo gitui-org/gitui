@@ -47,7 +47,7 @@ mod ui;
 mod watcher;
 
 use crate::{app::App, args::process_cmdline};
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use app::QuitState;
 use asyncgit::{
 	sync::{utils::repo_work_dir, RepoPath},
@@ -71,7 +71,9 @@ use spinner::Spinner;
 use std::{
 	cell::RefCell,
 	io::{self, Stdout},
-	panic, process,
+	panic,
+	path::Path,
+	process,
 	time::{Duration, Instant},
 };
 use ui::style::Theme;
@@ -142,8 +144,8 @@ fn main() -> Result<()> {
 
 	set_panic_handlers()?;
 
-	let mut terminal = start_terminal(io::stdout())?;
 	let mut repo_path = cliargs.repo_path;
+	let mut terminal = start_terminal(io::stdout(), &repo_path)?;
 	let input = Input::new();
 
 	let updater = if cliargs.notify_watcher {
@@ -359,8 +361,27 @@ fn select_event(
 	Ok(ev)
 }
 
-fn start_terminal(buf: Stdout) -> io::Result<Terminal> {
-	let backend = CrosstermBackend::new(buf);
+fn start_terminal(
+	buf: Stdout,
+	repo_path: &RepoPath,
+) -> Result<Terminal> {
+	let mut path = repo_path.gitpath().canonicalize()?;
+	let home = dirs::home_dir().ok_or_else(|| {
+		anyhow!("failed to find the home directory")
+	})?;
+	if path.starts_with(&home) {
+		let relative_part = path
+			.strip_prefix(&home)
+			.expect("can't fail because of the if statement");
+		path = Path::new("~").join(relative_part);
+	}
+
+	let mut backend = CrosstermBackend::new(buf);
+	backend.execute(crossterm::terminal::SetTitle(format!(
+		"gitui ({})",
+		path.display()
+	)))?;
+
 	let mut terminal = Terminal::new(backend)?;
 	terminal.hide_cursor()?;
 	terminal.clear()?;
@@ -381,7 +402,7 @@ fn set_panic_handlers() -> Result<()> {
 	panic::set_hook(Box::new(|e| {
 		let backtrace = Backtrace::new();
 		shutdown_terminal();
-		log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/extrawurst/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
+		log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/gitui-org/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
 	}));
 
 	// global threadpool
@@ -389,7 +410,7 @@ fn set_panic_handlers() -> Result<()> {
 		.panic_handler(|e| {
 			let backtrace = Backtrace::new();
 			shutdown_terminal();
-			log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/extrawurst/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
+			log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/gitui-org/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
 			process::abort();
 		})
 		.num_threads(4)

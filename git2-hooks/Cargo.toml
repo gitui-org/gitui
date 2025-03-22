@@ -4,8 +4,8 @@ version = "0.4.0"
 authors = ["extrawurst <mail@rusticorn.com>"]
 edition = "2021"
 description = "adds git hooks support based on git2-rs"
-homepage = "https://github.com/extrawurst/gitui"
-repository = "https://github.com/extrawurst/gitui"
+homepage = "https://github.com/gitui-org/gitui"
+repository = "https://github.com/gitui-org/gitui"
 documentation = "https://docs.rs/git2-hooks/"
 readme = "README.md"
 license = "MIT"
@@ -16,7 +16,7 @@ keywords = ["git"]
 git2 = ">=0.17"
 log = "0.4"
 shellexpand = "3.1"
-thiserror = "1.0"
+thiserror = "2.0"
 
 [dev-dependencies]
 git2-testing = { path = "../git2-testing" }

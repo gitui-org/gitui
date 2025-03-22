@@ -138,11 +138,11 @@ impl Revlog {
 
 			if self.commit_details.is_visible() {
 				let commit = self.selected_commit();
-				let tags = self.selected_commit_tags(&commit);
+				let tags = self.selected_commit_tags(commit.as_ref());
 
 				self.commit_details.set_commits(
 					commit.map(CommitFilesParams::from),
-					&tags,
+					tags.as_ref(),
 				)?;
 			}
 		}
@@ -206,12 +206,12 @@ impl Revlog {
 
 	fn selected_commit_tags(
 		&self,
-		commit: &Option<CommitId>,
+		commit: Option<&CommitId>,
 	) -> Option<CommitTags> {
 		let tags = self.list.tags();
 
 		commit.and_then(|commit| {
-			tags.and_then(|tags| tags.get(&commit).cloned())
+			tags.and_then(|tags| tags.get(commit).cloned())
 		})
 	}
 
@@ -231,7 +231,8 @@ impl Revlog {
 
 	fn inspect_commit(&self) {
 		if let Some(commit_id) = self.selected_commit() {
-			let tags = self.selected_commit_tags(&Some(commit_id));
+			let tags =
+				self.selected_commit_tags(Some(commit_id).as_ref());
 			self.queue.push(InternalEvent::OpenPopup(
 				StackablePopupOpen::InspectCommit(
 					InspectCommitOpen::new_with_tags(commit_id, tags),

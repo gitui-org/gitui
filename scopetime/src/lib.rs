@@ -32,7 +32,7 @@ impl<'a> ScopeTimeLog<'a> {
 	}
 }
 
-impl<'a> Drop for ScopeTimeLog<'a> {
+impl Drop for ScopeTimeLog<'_> {
 	fn drop(&mut self) {
 		log::trace!(
 			"scopetime: {:?} ms [{}::{}] @{}:{}",

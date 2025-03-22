@@ -70,9 +70,11 @@ pub trait Sign {
 		commit: &[u8],
 	) -> Result<(String, Option<String>), SignError>;
 
+	/// only available in `#[cfg(test)]` helping to diagnose issues
 	#[cfg(test)]
 	fn program(&self) -> &String;
 
+	/// only available in `#[cfg(test)]` helping to diagnose issues
 	#[cfg(test)]
 	fn signing_key(&self) -> &String;
 }

@@ -182,7 +182,7 @@ impl FileTreeItems {
 			}
 
 			self.update_visibility(
-				&Some(full_path),
+				Some(full_path).as_ref(),
 				index + 1,
 				false,
 			);
@@ -275,7 +275,7 @@ impl FileTreeItems {
 
 	fn update_visibility(
 		&mut self,
-		prefix: &Option<PathBuf>,
+		prefix: Option<&PathBuf>,
 		start_idx: usize,
 		set_defaults: bool,
 	) {

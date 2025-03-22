@@ -39,7 +39,7 @@ pub use blame::{blame_file, BlameHunk, FileBlame};
 pub use branch::{
 	branch_compare_upstream, checkout_branch, checkout_commit,
 	config_is_pull_rebase, create_branch, delete_branch,
-	get_branch_remote, get_branches_info,
+	get_branch_remote, get_branch_upstream_merge, get_branches_info,
 	merge_commit::merge_upstream_commit,
 	merge_ff::branch_merge_upstream_fastforward,
 	merge_rebase::merge_upstream_rebase, rename::rename_branch,
@@ -110,6 +110,7 @@ pub use utils::{
 
 pub use git2::ResetType;
 
+/// test utils
 #[cfg(test)]
 pub mod tests {
 	use super::{
@@ -124,104 +125,6 @@ pub mod tests {
 	use git2::Repository;
 	use std::{path::Path, process::Command};
 	use tempfile::TempDir;
-
-	/// Calling `set_search_path` with an empty directory makes sure that there
-	/// is no git config interfering with our tests (for example user-local
-	/// `.gitconfig`).
-	#[allow(unsafe_code)]
-	fn sandbox_config_files() {
-		use git2::{opts::set_search_path, ConfigLevel};
-		use std::sync::Once;
-
-		static INIT: Once = Once::new();
-
-		// Adapted from https://github.com/rust-lang/cargo/pull/9035
-		INIT.call_once(|| unsafe {
-			let temp_dir = TempDir::new().unwrap();
-			let path = temp_dir.path();
-
-			set_search_path(ConfigLevel::System, path).unwrap();
-			set_search_path(ConfigLevel::Global, path).unwrap();
-			set_search_path(ConfigLevel::XDG, path).unwrap();
-			set_search_path(ConfigLevel::ProgramData, path).unwrap();
-		});
-	}
-
-	/// write, stage and commit a file
-	pub fn write_commit_file(
-		repo: &Repository,
-		file: &str,
-		content: &str,
-		commit_name: &str,
-	) -> CommitId {
-		repo_write_file(repo, file, content).unwrap();
-
-		stage_add_file(
-			&repo.workdir().unwrap().to_str().unwrap().into(),
-			Path::new(file),
-		)
-		.unwrap();
-
-		commit(
-			&repo.workdir().unwrap().to_str().unwrap().into(),
-			commit_name,
-		)
-		.unwrap()
-	}
-
-	/// write, stage and commit a file giving the commit a specific timestamp
-	pub fn write_commit_file_at(
-		repo: &Repository,
-		file: &str,
-		content: &str,
-		commit_name: &str,
-		time: git2::Time,
-	) -> CommitId {
-		repo_write_file(repo, file, content).unwrap();
-
-		let path: &RepoPath =
-			&repo.workdir().unwrap().to_str().unwrap().into();
-
-		stage_add_file(path, Path::new(file)).unwrap();
-
-		commit_at(path, commit_name, time)
-	}
-
-	fn commit_at(
-		repo_path: &RepoPath,
-		msg: &str,
-		time: git2::Time,
-	) -> CommitId {
-		let repo = repo(repo_path).unwrap();
-
-		let signature =
-			git2::Signature::new("name", "email", &time).unwrap();
-		let mut index = repo.index().unwrap();
-		let tree_id = index.write_tree().unwrap();
-		let tree = repo.find_tree(tree_id).unwrap();
-
-		let parents = if let Ok(id) = get_head_repo(&repo) {
-			vec![repo.find_commit(id.into()).unwrap()]
-		} else {
-			Vec::new()
-		};
-
-		let parents = parents.iter().collect::<Vec<_>>();
-
-		let commit = repo
-			.commit(
-				Some("HEAD"),
-				&signature,
-				&signature,
-				msg,
-				&tree,
-				parents.as_slice(),
-			)
-			.unwrap()
-			.into();
-
-		commit
-	}
 
 	///
 	pub fn repo_init_empty() -> Result<(TempDir, Repository)> {
@@ -286,21 +189,44 @@ pub mod tests {
 		Ok((td, repo))
 	}
 
-	// init log
-	fn init_log() {
-		let _ = env_logger::builder()
-			.is_test(true)
-			.filter_level(log::LevelFilter::Trace)
-			.try_init();
+	/// write, stage and commit a file
+	pub fn write_commit_file(
+		repo: &Repository,
+		file: &str,
+		content: &str,
+		commit_name: &str,
+	) -> CommitId {
+		repo_write_file(repo, file, content).unwrap();
+
+		stage_add_file(
+			&repo.workdir().unwrap().to_str().unwrap().into(),
+			Path::new(file),
+		)
+		.unwrap();
+
+		commit(
+			&repo.workdir().unwrap().to_str().unwrap().into(),
+			commit_name,
+		)
+		.unwrap()
 	}
 
-	/// Same as `repo_init`, but the repo is a bare repo (--bare)
-	pub fn repo_init_bare() -> Result<(TempDir, Repository)> {
-		init_log();
+	/// write, stage and commit a file giving the commit a specific timestamp
+	pub fn write_commit_file_at(
+		repo: &Repository,
+		file: &str,
+		content: &str,
+		commit_name: &str,
+		time: git2::Time,
+	) -> CommitId {
+		repo_write_file(repo, file, content).unwrap();
 
-		let tmp_repo_dir = TempDir::new()?;
-		let bare_repo = Repository::init_bare(tmp_repo_dir.path())?;
-		Ok((tmp_repo_dir, bare_repo))
+		let path: &RepoPath =
+			&repo.workdir().unwrap().to_str().unwrap().into();
+
+		stage_add_file(path, Path::new(file)).unwrap();
+
+		commit_at(path, commit_name, time)
 	}
 
 	/// helper returning amount of files with changes in the (wd,stage)
@@ -333,6 +259,81 @@ pub mod tests {
 			.unwrap();
 
 		commit_ids
+	}
+
+	/// Same as `repo_init`, but the repo is a bare repo (--bare)
+	pub fn repo_init_bare() -> Result<(TempDir, Repository)> {
+		init_log();
+
+		let tmp_repo_dir = TempDir::new()?;
+		let bare_repo = Repository::init_bare(tmp_repo_dir.path())?;
+		Ok((tmp_repo_dir, bare_repo))
+	}
+
+	/// Calling `set_search_path` with an empty directory makes sure that there
+	/// is no git config interfering with our tests (for example user-local
+	/// `.gitconfig`).
+	#[allow(unsafe_code)]
+	fn sandbox_config_files() {
+		use git2::{opts::set_search_path, ConfigLevel};
+		use std::sync::Once;
+
+		static INIT: Once = Once::new();
+
+		// Adapted from https://github.com/rust-lang/cargo/pull/9035
+		INIT.call_once(|| unsafe {
+			let temp_dir = TempDir::new().unwrap();
+			let path = temp_dir.path();
+
+			set_search_path(ConfigLevel::System, path).unwrap();
+			set_search_path(ConfigLevel::Global, path).unwrap();
+			set_search_path(ConfigLevel::XDG, path).unwrap();
+			set_search_path(ConfigLevel::ProgramData, path).unwrap();
+		});
+	}
+
+	fn commit_at(
+		repo_path: &RepoPath,
+		msg: &str,
+		time: git2::Time,
+	) -> CommitId {
+		let repo = repo(repo_path).unwrap();
+
+		let signature =
+			git2::Signature::new("name", "email", &time).unwrap();
+		let mut index = repo.index().unwrap();
+		let tree_id = index.write_tree().unwrap();
+		let tree = repo.find_tree(tree_id).unwrap();
+
+		let parents = if let Ok(id) = get_head_repo(&repo) {
+			vec![repo.find_commit(id.into()).unwrap()]
+		} else {
+			Vec::new()
+		};
+
+		let parents = parents.iter().collect::<Vec<_>>();
+
+		let commit = repo
+			.commit(
+				Some("HEAD"),
+				&signature,
+				&signature,
+				msg,
+				&tree,
+				parents.as_slice(),
+			)
+			.unwrap()
+			.into();
+
+		commit
+	}
+
+	// init log
+	fn init_log() {
+		let _ = env_logger::builder()
+			.is_test(true)
+			.filter_level(log::LevelFilter::Trace)
+			.try_init();
 	}
 
 	fn debug_cmd(path: &RepoPath, cmd: &str) -> String {

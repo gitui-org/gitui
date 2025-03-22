@@ -117,6 +117,7 @@ impl SyntaxTextComponent {
 						AsyncSyntaxJob::new(
 							content.clone(),
 							path.clone(),
+							self.theme.get_syntax(),
 						),
 					);
 

@@ -10,21 +10,21 @@ use std::{
 
 struct TimeOrderedCommit<'a>(Commit<'a>);
 
-impl<'a> Eq for TimeOrderedCommit<'a> {}
+impl Eq for TimeOrderedCommit<'_> {}
 
-impl<'a> PartialEq for TimeOrderedCommit<'a> {
+impl PartialEq for TimeOrderedCommit<'_> {
 	fn eq(&self, other: &Self) -> bool {
 		self.0.time().eq(&other.0.time())
 	}
 }
 
-impl<'a> PartialOrd for TimeOrderedCommit<'a> {
+impl PartialOrd for TimeOrderedCommit<'_> {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl<'a> Ord for TimeOrderedCommit<'a> {
+impl Ord for TimeOrderedCommit<'_> {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.0.time().cmp(&other.0.time())
 	}

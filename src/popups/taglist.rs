@@ -448,7 +448,7 @@ impl TagListPopup {
 		let is_tag_missing_on_remote = self
 			.missing_remote_tags
 			.as_ref()
-			.map_or(false, |missing_remote_tags| {
+			.is_some_and(|missing_remote_tags| {
 				let remote_tag = format!("refs/tags/{}", tag.name);
 
 				missing_remote_tags.contains(&remote_tag)

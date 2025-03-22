@@ -29,8 +29,8 @@ Notes:
 
 * rgb colors might not be supported in every terminal.
 * using a color like `yellow` might appear in whatever your terminal/theme defines for `yellow`
-* valid colors can be found in tui-rs' [Color](https://docs.rs/tui/0.12.0/tui/style/enum.Color.html) struct.
-* all customizable theme elements can be found in [`style.rs` in the `impl Default for Theme` block](https://github.com/extrawurst/gitui/blob/master/src/ui/style.rs#L305)
+* valid colors can be found in ratatui's [Color](https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html) struct.
+* all customizable theme elements can be found in [`style.rs` in the `impl Default for Theme` block](https://github.com/gitui-org/gitui/blob/master/src/ui/style.rs#L305)
 
 ## Customizing line breaks
 
@@ -49,3 +49,16 @@ Note that if you want to turn it off, you should use a blank string:
     line_break: Some(""),
 )
 ```
+## Customizing selection
+
+By default the `selection_fg` color is used to color the text of the selected line.
+Diff line, filename, commit hashes, time and author are re-colored with `selection_fg` color.
+This can be changed by specifying the `use_selection_fg` boolean in your `theme.ron`:
+
+```
+(
+    use_selection_fg: Some(false),
+)
+```
+
+By default, `use_selection_fg` is set to `true`.

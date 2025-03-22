@@ -123,7 +123,7 @@ impl ItemBatch {
 		&mut self,
 		start_index: usize,
 		commits: Vec<CommitInfo>,
-		highlighted: &Option<Rc<IndexSet<CommitId>>>,
+		highlighted: Option<&Rc<IndexSet<CommitId>>>,
 	) {
 		self.clear();
 
