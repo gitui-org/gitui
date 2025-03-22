@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Breaking Changes
+* reverse commit range before yanking marked commits, producing `<oldest>^..<newest>` for consecutive commit ranges. [[@Esgariot](https://github.com/Esgariot)] ([#2441](https://github.com/extrawurst/gitui/pull/2441))
+
 ### Added
 * support loading custom syntax highlighting themes from a file [[@acuteenvy](https://github.com/acuteenvy)] ([#2565](https://github.com/gitui-org/gitui/pull/2565))
 * Select syntax highlighting theme out of the defaults from syntect [[@vasilismanol](https://github.com/vasilismanol)] ([#1931](https://github.com/extrawurst/gitui/issues/1931))
