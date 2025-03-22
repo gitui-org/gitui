@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * set the terminal title to `gitui ({repo_path})` [[@acuteenvy](https://github.com/acuteenvy)] ([#2462](https://github.com/gitui-org/gitui/issues/2462))
 * respect `.mailmap` [[@acuteenvy](https://github.com/acuteenvy)] ([#2406](https://github.com/gitui-org/gitui/issues/2406))
 
+### Fixes
+*  Resolve `core.hooksPath` relative to `GIT_WORK_TREE` [[@naseschwarz](https://github.com/naseschwarz)] ([#2571](https://github.com/gitui-org/gitui/issues/2571))
+
 ## [0.27.0] - 2024-01-14
 
 **new: manage remotes**

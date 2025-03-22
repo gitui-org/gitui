@@ -12,8 +12,15 @@ license = "MIT"
 categories = ["development-tools"]
 keywords = ["git"]
 
+[features]
+default = []
+
+# test-utils publishes fns that are useful for testing. These may panic on common errors.
+test-utils = ["git2-testing"]
+
 [dependencies]
 git2 = ">=0.17"
+git2-testing = { path = "../git2-testing", optional = true }
 log = "0.4"
 shellexpand = "3.1"
 thiserror = "2.0"

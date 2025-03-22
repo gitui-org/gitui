@@ -30,7 +30,7 @@ mod hookspath;
 use std::{
 	fs::File,
 	io::{Read, Write},
-	path::{Path, PathBuf},
+	path::PathBuf,
 };
 
 pub use error::HooksError;
@@ -77,38 +77,6 @@ impl HookResult {
 	/// helper to check if result was run and not rejected
 	pub const fn is_not_successful(&self) -> bool {
 		matches!(self, Self::RunNotSuccessful { .. })
-	}
-}
-
-/// helper method to create git hooks programmatically (heavy used in unittests)
-///
-/// # Panics
-/// Panics if hook could not be created
-pub fn create_hook(
-	r: &Repository,
-	hook: &str,
-	hook_script: &[u8],
-) -> PathBuf {
-	let hook = HookPaths::new(r, None, hook).unwrap();
-
-	let path = hook.hook.clone();
-
-	create_hook_in_path(&hook.hook, hook_script);
-
-	path
-}
-
-fn create_hook_in_path(path: &Path, hook_script: &[u8]) {
-	File::create(path).unwrap().write_all(hook_script).unwrap();
-
-	#[cfg(unix)]
-	{
-		std::process::Command::new("chmod")
-			.arg("+x")
-			.arg(path)
-			// .current_dir(path)
-			.output()
-			.unwrap();
 	}
 }
 
@@ -231,10 +199,43 @@ pub fn hooks_prepare_commit_msg(
 	Ok(res)
 }
 
+#[cfg(any(feature = "test-utils", test))]
+mod test_utils_priv {
+	use crate::hookspath::HookPaths;
+	use git2::Repository;
+	use std::path::PathBuf;
+
+	/// helper method to create git hooks programmatically (heavy used in unittests)
+	///
+	/// # Panics
+	/// Panics if hook could not be created
+	pub fn create_hook(
+		r: &Repository,
+		hook: &str,
+		hook_script: &[u8],
+	) -> PathBuf {
+		let hook = HookPaths::new(r, None, hook).unwrap();
+
+		let path = hook.hook.clone();
+
+		git2_testing::create_hook_in_path(&hook.hook, hook_script);
+
+		path
+	}
+}
+
+#[cfg(feature = "test-utils")]
+pub mod test_utils {
+	pub use crate::test_utils_priv::create_hook;
+}
+
 #[cfg(test)]
 mod tests {
+	use super::test_utils_priv::*;
 	use super::*;
-	use git2_testing::{repo_init, repo_init_bare};
+	use git2_testing::{
+		create_hook_in_path, repo_init, repo_init_bare,
+	};
 	use pretty_assertions::assert_eq;
 	use tempfile::TempDir;
 

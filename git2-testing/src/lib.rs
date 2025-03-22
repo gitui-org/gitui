@@ -1,4 +1,7 @@
 use git2::Repository;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 use tempfile::TempDir;
 
 /// initialize test repo in temp path
@@ -82,4 +85,22 @@ fn sandbox_config_files() {
 		set_search_path(ConfigLevel::XDG, path).unwrap();
 		set_search_path(ConfigLevel::ProgramData, path).unwrap();
 	});
+}
+
+/// helper method to create a git hook in a custom path (used in unittests)
+///
+/// # Panics
+/// Panics if hook could not be created
+pub fn create_hook_in_path(path: &Path, hook_script: &[u8]) {
+	File::create(path).unwrap().write_all(hook_script).unwrap();
+
+	#[cfg(unix)]
+	{
+		std::process::Command::new("chmod")
+			.arg("+x")
+			.arg(path)
+			// .current_dir(path)
+			.output()
+			.unwrap();
+	}
 }

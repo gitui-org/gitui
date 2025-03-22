@@ -76,6 +76,8 @@ pub fn hooks_prepare_commit_msg(
 mod tests {
 	use super::*;
 	use crate::sync::tests::repo_init;
+	use git2_hooks::test_utils::create_hook;
+	use git2_testing::*;
 
 	#[test]
 	fn test_post_commit_hook_reject_in_subfolder() {
@@ -87,11 +89,7 @@ mod tests {
 	exit 1
 	        ";
 
-		git2_hooks::create_hook(
-			&repo,
-			git2_hooks::HOOK_POST_COMMIT,
-			hook,
-		);
+		create_hook(&repo, git2_hooks::HOOK_POST_COMMIT, hook);
 
 		let subfolder = root.join("foo/");
 		std::fs::create_dir_all(&subfolder).unwrap();
@@ -124,11 +122,7 @@ mod tests {
 	exit 1
 	        ";
 
-		git2_hooks::create_hook(
-			&repo,
-			git2_hooks::HOOK_PRE_COMMIT,
-			hook,
-		);
+		create_hook(&repo, git2_hooks::HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(repo_path).unwrap();
 		if let HookResult::NotOk(res) = res {
 			assert_eq!(
@@ -151,11 +145,7 @@ mod tests {
 	exit 1
 	        ";
 
-		git2_hooks::create_hook(
-			&repo,
-			git2_hooks::HOOK_COMMIT_MSG,
-			hook,
-		);
+		create_hook(&repo, git2_hooks::HOOK_COMMIT_MSG, hook);
 
 		let subfolder = root.join("foo/");
 		std::fs::create_dir_all(&subfolder).unwrap();
@@ -167,6 +157,39 @@ mod tests {
 		)
 		.unwrap();
 
+		assert_eq!(
+			res,
+			HookResult::NotOk(String::from("rejected\n"))
+		);
+
+		assert_eq!(msg, String::from("msg\n"));
+	}
+
+	#[test]
+	fn test_hooks_commit_msg_reject_in_hooks_folder_githooks_moved_absolute(
+	) {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let mut config = repo.config().unwrap();
+
+		const HOOKS_DIR: &'static str = "my_hooks";
+		config.set_str("core.hooksPath", HOOKS_DIR).unwrap();
+
+		let hook = b"#!/bin/sh
+	echo 'msg' > $1
+	echo 'rejected'
+	exit 1
+	        ";
+		let hooks_folder = root.join(HOOKS_DIR);
+		std::fs::create_dir_all(&hooks_folder).unwrap();
+		create_hook_in_path(&hooks_folder.join("commit-msg"), hook);
+
+		let mut msg = String::from("test");
+		let res = hooks_commit_msg(
+			&hooks_folder.to_str().unwrap().into(),
+			&mut msg,
+		)
+		.unwrap();
 		assert_eq!(
 			res,
 			HookResult::NotOk(String::from("rejected\n"))

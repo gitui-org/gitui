@@ -41,16 +41,8 @@ impl HookPaths {
 		if let Some(config_path) = Self::config_hook_path(repo)? {
 			let hooks_path = PathBuf::from(config_path);
 
-			let hook = hooks_path.join(hook);
-
-			let hook = shellexpand::full(
-				hook.as_os_str()
-					.to_str()
-					.ok_or(HooksError::PathToString)?,
-			)?;
-
-			let hook = PathBuf::from_str(hook.as_ref())
-				.map_err(|_| HooksError::PathToString)?;
+			let hook =
+				Self::expand_path(&hooks_path.join(hook), &pwd)?;
 
 			return Ok(Self {
 				git: git_dir,
@@ -63,6 +55,41 @@ impl HookPaths {
 			git: git_dir,
 			hook: Self::find_hook(repo, other_paths, hook),
 			pwd,
+		})
+	}
+
+	/// Expand path according to the rule of githooks and config
+	/// core.hooksPath
+	fn expand_path(path: &Path, pwd: &Path) -> Result<PathBuf> {
+		let hook_expanded = shellexpand::full(
+			path.as_os_str()
+				.to_str()
+				.ok_or(HooksError::PathToString)?,
+		)?;
+		let hook_expanded = PathBuf::from_str(hook_expanded.as_ref())
+			.map_err(|_| HooksError::PathToString)?;
+
+		// `man git-config`:
+		//
+		// > A relative path is taken as relative to the
+		// > directory where the hooks are run (see the
+		// > "DESCRIPTION" section of githooks[5]).
+		//
+		// `man githooks`:
+		//
+		// > Before Git invokes a hook, it changes its
+		// > working directory to either $GIT_DIR in a bare
+		// > repository or the root of the working tree in a
+		// > non-bare repository.
+		//
+		// I.e. relative paths in core.hooksPath in non-bare
+		// repositories are always relative to GIT_WORK_TREE.
+		Ok({
+			if hook_expanded.is_absolute() {
+				hook_expanded
+			} else {
+				pwd.join(hook_expanded)
+			}
 		})
 	}
 
@@ -230,5 +257,37 @@ impl CommandExt for Command {
 		}
 
 		self
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::HookPaths;
+	use std::path::Path;
+
+	#[test]
+	fn test_hookspath_relative() {
+		assert_eq!(
+			HookPaths::expand_path(
+				&Path::new("pre-commit"),
+				&Path::new("example_git_root"),
+			)
+			.unwrap(),
+			Path::new("example_git_root").join("pre-commit")
+		);
+	}
+
+	#[test]
+	fn test_hookspath_absolute() {
+		let absolute_hook =
+			std::env::current_dir().unwrap().join("pre-commit");
+		assert_eq!(
+			HookPaths::expand_path(
+				&absolute_hook,
+				&Path::new("example_git_root"),
+			)
+			.unwrap(),
+			absolute_hook
+		);
 	}
 }

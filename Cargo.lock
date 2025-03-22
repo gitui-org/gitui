@@ -173,6 +173,7 @@ dependencies = [
  "fuzzy-matcher",
  "git2",
  "git2-hooks",
+ "git2-testing",
  "gix",
  "invalidstring",
  "log",

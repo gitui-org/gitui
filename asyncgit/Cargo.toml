@@ -18,7 +18,7 @@ dirs = "5.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
 git2 = "0.20"
-git2-hooks = { path = "../git2-hooks", version = ">=0.4" }
+git2-hooks = { path = "../git2-hooks", version = ">=0.4", features = ["test-utils"] }
 gix = { version = "0.70.0", default-features = false, features = [
     "max-performance",
     "revision",
@@ -39,6 +39,7 @@ url = "2.5"
 
 [dev-dependencies]
 env_logger = "0.11"
+git2-testing = { path = "../git2-testing" }
 invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
 serial_test = "3.2"
