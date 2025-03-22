@@ -6,6 +6,7 @@ use crate::{
 	},
 	keys::{key_match, SharedKeyConfig},
 	queue::{InternalEvent, Queue},
+	strings,
 	ui::{self, style::SharedTheme},
 };
 
@@ -65,9 +66,28 @@ impl Component for GotoLinePopup {
 	///
 	fn commands(
 		&self,
-		_out: &mut Vec<CommandInfo>,
-		_force_all: bool,
+		out: &mut Vec<CommandInfo>,
+		force_all: bool,
 	) -> CommandBlocking {
+		if self.is_visible() || force_all {
+			out.push(
+				CommandInfo::new(
+					strings::commands::close_popup(&self.key_config),
+					true,
+					true,
+				)
+				.order(1),
+			);
+			out.push(
+				CommandInfo::new(
+					strings::commands::goto_line(&self.key_config),
+					true,
+					true,
+				)
+				.order(1),
+			);
+		}
+
 		visibility_blocking(self)
 	}
 

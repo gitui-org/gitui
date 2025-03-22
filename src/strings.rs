@@ -1882,4 +1882,15 @@ pub mod commands {
 			CMD_GROUP_LOG,
 		)
 	}
+
+	pub fn goto_line(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Go To Line [{}]",
+				key_config.get_hint(key_config.keys.enter),
+			),
+			"Go to the given line",
+			CMD_GROUP_GENERAL,
+		)
+	}
 }
