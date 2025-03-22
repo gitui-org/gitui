@@ -145,18 +145,11 @@ impl CommitList {
 				)
 				.map(|e| e.id.to_string()),
 			[(_idx, commit)] => Some(commit.to_string()),
-			[first, .., last] => {
-				let marked_consecutive =
-					marked.windows(2).all(|w| w[0].0 + 1 == w[1].0);
-
-				let yank = if marked_consecutive {
-					format!("{}^..{}", first.1, last.1)
-				} else {
-					marked
-						.iter()
-						.map(|(_idx, commit)| commit.to_string())
-						.join(" ")
-				};
+			[..] => {
+				let yank = marked
+					.iter()
+					.map(|(_idx, commit)| commit.to_string())
+					.join(" ");
 				Some(yank)
 			}
 		};
