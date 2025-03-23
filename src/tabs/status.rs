@@ -804,6 +804,14 @@ impl Component for Status {
 				true,
 				true,
 			));
+
+			out.push(CommandInfo::new(
+				strings::commands::conventional_commit_open(
+					&self.key_config,
+				),
+				true,
+				self.can_commit() || force_all,
+			));
 		}
 
 		self.commands_nav(out, force_all);
@@ -831,6 +839,14 @@ impl Component for Status {
 				) && self.can_commit()
 				{
 					self.queue.push(InternalEvent::OpenCommit);
+					Ok(EventState::Consumed)
+				} else if key_match(
+					k,
+					self.key_config.keys.open_conventional_commit,
+				) && self.can_commit()
+				{
+					self.queue
+						.push(InternalEvent::OpenConventionalCommit);
 					Ok(EventState::Consumed)
 				} else if key_match(
 					k,

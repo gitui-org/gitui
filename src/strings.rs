@@ -23,6 +23,9 @@ pub static PUSH_POPUP_STATES_DELTAS: &str = "deltas (2/3)";
 pub static PUSH_POPUP_STATES_PUSHING: &str = "pushing (3/3)";
 pub static PUSH_POPUP_STATES_TRANSFER: &str = "transfer";
 pub static PUSH_POPUP_STATES_DONE: &str = "done";
+pub const POPUP_TITLE_CONVENTIONAL_COMMIT: &str = "Type of Commit";
+#[cfg(feature = "gitmoji")]
+pub const POPUP_TITLE_GITMOJI: &str = "Emoji of Commit";
 
 pub static PUSH_TAGS_POPUP_MSG: &str = "Push Tags";
 pub static PUSH_TAGS_STATES_FETCHING: &str = "fetching";
@@ -1087,6 +1090,20 @@ pub mod commands {
 			CMD_GROUP_GENERAL,
 		)
 	}
+	pub fn conventional_commit_open(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Conventional commit [{}]",
+				key_config.get_hint(
+					key_config.keys.open_conventional_commit
+				)
+			),
+			"open conventional commit popup (available in non-empty stage)",
+			CMD_GROUP_GENERAL,
+		)
+	}
 	pub fn commit_open_editor(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {
@@ -1867,6 +1884,28 @@ pub mod commands {
 				key_config.get_hint(key_config.keys.find_commit_sha),
 			),
 			"find commit from sha",
+			CMD_GROUP_LOG,
+		)
+	}
+
+	pub fn insert(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Insert [{}]",
+				key_config.get_hint(key_config.keys.insert),
+			),
+			"enter in insert mode",
+			CMD_GROUP_LOG,
+		)
+	}
+
+	pub fn exit_insert(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Exit Insert [{}]",
+				key_config.get_hint(key_config.keys.exit_popup),
+			),
+			"exit of insert mode",
 			CMD_GROUP_LOG,
 		)
 	}

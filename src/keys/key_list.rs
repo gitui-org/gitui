@@ -49,7 +49,9 @@ pub struct KeysList {
 	pub quit: GituiKeyEvent,
 	pub exit_popup: GituiKeyEvent,
 	pub open_commit: GituiKeyEvent,
+	pub open_conventional_commit: GituiKeyEvent,
 	pub open_commit_editor: GituiKeyEvent,
+	pub breaking: GituiKeyEvent,
 	pub open_help: GituiKeyEvent,
 	pub open_options: GituiKeyEvent,
 	pub move_left: GituiKeyEvent,
@@ -128,6 +130,7 @@ pub struct KeysList {
 	pub commit_history_next: GituiKeyEvent,
 	pub commit: GituiKeyEvent,
 	pub newline: GituiKeyEvent,
+	pub insert: GituiKeyEvent,
 }
 
 #[rustfmt::skip]
@@ -146,7 +149,9 @@ impl Default for KeysList {
 			quit: GituiKeyEvent::new(KeyCode::Char('q'),  KeyModifiers::empty()),
 			exit_popup: GituiKeyEvent::new(KeyCode::Esc,  KeyModifiers::empty()),
 			open_commit: GituiKeyEvent::new(KeyCode::Char('c'),  KeyModifiers::empty()),
+			open_conventional_commit: GituiKeyEvent::new(KeyCode::Char('C'),  KeyModifiers::SHIFT),
 			open_commit_editor: GituiKeyEvent::new(KeyCode::Char('e'), KeyModifiers::CONTROL),
+            breaking: GituiKeyEvent::new(KeyCode::Char('b'),  KeyModifiers::empty()),
 			open_help: GituiKeyEvent::new(KeyCode::Char('h'),  KeyModifiers::empty()),
 			open_options: GituiKeyEvent::new(KeyCode::Char('o'),  KeyModifiers::empty()),
 			move_left: GituiKeyEvent::new(KeyCode::Left,  KeyModifiers::empty()),
@@ -175,6 +180,7 @@ impl Default for KeysList {
 			stashing_save: GituiKeyEvent::new(KeyCode::Char('s'),  KeyModifiers::empty()),
 			stashing_toggle_untracked: GituiKeyEvent::new(KeyCode::Char('u'),  KeyModifiers::empty()),
 			stashing_toggle_index: GituiKeyEvent::new(KeyCode::Char('i'),  KeyModifiers::empty()),
+			insert: GituiKeyEvent::new(KeyCode::Char('i'),  KeyModifiers::empty()),
 			stash_apply: GituiKeyEvent::new(KeyCode::Char('a'),  KeyModifiers::empty()),
 			stash_open: GituiKeyEvent::new(KeyCode::Right,  KeyModifiers::empty()),
 			stash_drop: GituiKeyEvent::new(KeyCode::Char('D'),  KeyModifiers::SHIFT),
