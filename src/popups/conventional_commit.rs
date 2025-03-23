@@ -416,33 +416,39 @@ impl ConventionalCommitPopup {
 			}
 		};
 
-		let title = format!("Results: {results}",);
+		let block = Block::default()
+			.title(Span::styled(
+				format!("Results: {results}"),
+				self.theme.title(true),
+			))
+			.borders(Borders::TOP);
 
-		let iter_over = if self.seleted_commit_type.is_some() {
-			#[cfg(feature = "gitmoji")]
-			{
-				self.query_results_more_info
-					.iter()
-					.enumerate()
-					.take(height)
-					.map(|(idx, more_info)| {
-						let (emoji, _, long_name) =
-							more_info.strings();
-						let text_string =
-							format!("{emoji} {long_name}");
-						let text =
-							trim_length_left(&text_string, width);
-						(
-							self.selected_index == idx,
-							format!("{text}{:width$}", " "),
-						)
-					})
-					.collect_vec()
-			}
-			#[cfg(not(feature = "gitmoji"))]
-			{
-				vec![]
-			}
+		if self.seleted_commit_type.is_some() {
+			ui::draw_list_block(f, area, block, {
+				#[cfg(feature = "gitmoji")]
+				{
+					self.query_results_more_info
+						.iter()
+						.enumerate()
+						.take(height)
+						.map(|(idx, more_info)| {
+							let (emoji, _, long_name) =
+								more_info.strings();
+							let text_string =
+								format!("{emoji} {long_name}");
+							let text =
+								trim_length_left(&text_string, width);
+							self.line_from_text(
+								self.selected_index == idx,
+								&format!("{text}{:width$}", " "),
+							)
+						})
+				}
+				#[cfg(not(feature = "gitmoji"))]
+				{
+					std::iter::empty::<String>()
+				}
+			});
 		} else {
 			let max_len = self
 				.query_results_type
@@ -450,48 +456,44 @@ impl ConventionalCommitPopup {
 				.map(|s| s.to_string().len())
 				.max();
 
-			self.query_results_type
-				.iter()
-				.enumerate()
-				.take(height)
-				.map(|(idx, commit_type)| {
-					let text_string = format!(
-						"{:w$} [{}]",
-						commit_type,
-						quick_shortcuts[idx],
-						w = max_len.unwrap_or_default(),
-					);
-					let text = trim_length_left(&text_string, width);
+			ui::draw_list_block(
+				f,
+				area,
+				block,
+				self.query_results_type
+					.iter()
+					.enumerate()
+					.take(height)
+					.map(|(idx, commit_type)| {
+						let text_string = format!(
+							"{:w$} [{}]",
+							commit_type,
+							quick_shortcuts[idx],
+							w = max_len.unwrap_or_default(),
+						);
+						let text =
+							trim_length_left(&text_string, width);
 
-					(
-						self.selected_index == idx,
-						format!("{text}{:width$}", " "),
+						self.line_from_text(
+							self.selected_index == idx,
+							&format!("{text}{:width$}", " "),
+						)
+					}),
+			);
+		}
+	}
+
+	fn line_from_text(&self, is_selected: bool, text: &str) -> Line {
+		Line::from(
+			text.graphemes(true)
+				.map(|c| {
+					Span::styled(
+						Cow::from(c.to_string()),
+						self.theme.text(is_selected, is_selected),
 					)
 				})
-				.collect_vec()
-		};
-
-		let items = iter_over.into_iter().map(|(selected, text)| {
-			Line::from(
-				text.graphemes(true)
-					.map(|c| {
-						Span::styled(
-							Cow::from(c.to_string()),
-							self.theme.text(selected, selected),
-						)
-					})
-					.collect::<Vec<_>>(),
-			)
-		});
-
-		ui::draw_list_block(
-			f,
-			area,
-			Block::default()
-				.title(Span::styled(title, self.theme.title(true)))
-				.borders(Borders::TOP),
-			items,
-		);
+				.collect_vec(),
+		)
 	}
 
 	pub fn quick_shortcuts(&self) -> Vec<char> {
