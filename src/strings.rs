@@ -24,6 +24,7 @@ pub static PUSH_POPUP_STATES_PUSHING: &str = "pushing (3/3)";
 pub static PUSH_POPUP_STATES_TRANSFER: &str = "transfer";
 pub static PUSH_POPUP_STATES_DONE: &str = "done";
 pub const POPUP_TITLE_CONVENTIONAL_COMMIT: &str = "Type of Commit";
+#[cfg(feature = "gitmoji")]
 pub const POPUP_TITLE_GITMOJI: &str = "Emoji of Commit";
 
 pub static PUSH_TAGS_POPUP_MSG: &str = "Push Tags";

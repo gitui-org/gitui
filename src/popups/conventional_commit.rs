@@ -50,6 +50,7 @@ enum CommitType {
 	CI,
 }
 
+#[cfg(feature = "gitmoji")]
 #[derive(Copy, Clone)]
 enum MoreInfoCommit {
 	/// 🎨
@@ -150,6 +151,7 @@ enum MoreInfoCommit {
 	Validation,
 }
 
+#[cfg(feature = "gitmoji")]
 impl MoreInfoCommit {
 	const fn strings(
 		self,
@@ -237,6 +239,7 @@ impl MoreInfoCommit {
 	}
 }
 
+#[cfg(feature = "gitmoji")]
 impl CommitType {
 	#[allow(clippy::pedantic)]
 	fn more_info(&self) -> Vec<MoreInfoCommit> {
@@ -358,6 +361,7 @@ pub struct ConventionalCommitPopup {
 	selected_index: usize,
 	options: Vec<CommitType>,
 	query_results_type: Vec<CommitType>,
+	#[cfg(feature = "gitmoji")]
 	query_results_more_info: Vec<MoreInfoCommit>,
 	input: TextInputComponent,
 	theme: SharedTheme,
@@ -377,6 +381,7 @@ impl ConventionalCommitPopup {
 			input,
 			options: CommitType::iter().collect_vec(),
 			query_results_type: CommitType::iter().collect_vec(),
+			#[cfg(feature = "gitmoji")]
 			query_results_more_info: Vec::new(),
 			is_insert: false,
 			is_breaking: false,
@@ -396,30 +401,48 @@ impl ConventionalCommitPopup {
 
 		let quick_shortcuts = self.quick_shortcuts();
 
-		let title = format!(
-			"Results: {}",
-			if self.seleted_commit_type.is_some() {
-				self.query_results_more_info.len()
-			} else {
+		let results = {
+			#[cfg(feature = "gitmoji")]
+			{
+				if self.seleted_commit_type.is_some() {
+					self.query_results_more_info.len()
+				} else {
+					self.query_results_type.len()
+				}
+			}
+			#[cfg(not(feature = "gitmoji"))]
+			{
 				self.query_results_type.len()
 			}
-		);
+		};
+
+		let title = format!("Results: {results}",);
 
 		let iter_over = if self.seleted_commit_type.is_some() {
-			self.query_results_more_info
-				.iter()
-				.enumerate()
-				.take(height)
-				.map(|(idx, more_info)| {
-					let (emoji, _, long_name) = more_info.strings();
-					let text_string = format!("{emoji} {long_name}");
-					let text = trim_length_left(&text_string, width);
-					(
-						self.selected_index == idx,
-						format!("{text}{:width$}", " "),
-					)
-				})
-				.collect_vec()
+			#[cfg(feature = "gitmoji")]
+			{
+				self.query_results_more_info
+					.iter()
+					.enumerate()
+					.take(height)
+					.map(|(idx, more_info)| {
+						let (emoji, _, long_name) =
+							more_info.strings();
+						let text_string =
+							format!("{emoji} {long_name}");
+						let text =
+							trim_length_left(&text_string, width);
+						(
+							self.selected_index == idx,
+							format!("{text}{:width$}", " "),
+						)
+					})
+					.collect_vec()
+			}
+			#[cfg(not(feature = "gitmoji"))]
+			{
+				vec![]
+			}
 		} else {
 			let max_len = self
 				.query_results_type
@@ -516,7 +539,14 @@ impl ConventionalCommitPopup {
 		let new_selection = new_selection.clamp(
 			0,
 			if self.seleted_commit_type.is_some() {
-				self.query_results_more_info.len()
+				#[cfg(feature = "gitmoji")]
+				{
+					self.query_results_more_info.len()
+				}
+				#[cfg(not(feature = "gitmoji"))]
+				{
+					self.query_results_type.len()
+				}
 			} else {
 				self.query_results_type.len()
 			}
@@ -544,20 +574,29 @@ impl ConventionalCommitPopup {
 		let new_len = if let Some(commit_type) =
 			&self.seleted_commit_type
 		{
-			self.query_results_more_info = commit_type
-				.more_info()
-				.iter()
-				.filter(|more_info_commit| {
-					more_info_commit
-						.strings()
-						.2
-						.to_lowercase()
-						.contains(&query)
-				})
-				.copied()
-				.collect_vec();
+			#[cfg(feature = "gitmoji")]
+			{
+				self.query_results_more_info = commit_type
+					.more_info()
+					.iter()
+					.filter(|more_info_commit| {
+						more_info_commit
+							.strings()
+							.2
+							.to_lowercase()
+							.contains(&query)
+					})
+					.copied()
+					.collect_vec();
 
-			self.query_results_more_info.len()
+				self.query_results_more_info.len()
+			}
+			#[cfg(not(feature = "gitmoji"))]
+			{
+				let _ = commit_type;
+				self.hide();
+				self.query_results_type.len()
+			}
 		} else {
 			self.query_results_type = self
 				.options
@@ -641,9 +680,14 @@ impl DrawableComponent for ConventionalCommitPopup {
 					.borders(Borders::all())
 					.style(self.theme.title(true))
 					.title(Span::styled(
-						if self.seleted_commit_type.is_some() {
-							strings::POPUP_TITLE_GITMOJI
-						} else {
+						{
+							#[cfg(feature = "gitmoji")]
+							if self.seleted_commit_type.is_some() {
+								strings::POPUP_TITLE_GITMOJI
+							} else {
+								strings::POPUP_TITLE_CONVENTIONAL_COMMIT
+							}
+							#[cfg(not(feature = "gitmoji"))]
 							strings::POPUP_TITLE_CONVENTIONAL_COMMIT
 						},
 						self.theme.title(true),
@@ -835,7 +879,10 @@ impl Component for ConventionalCommitPopup {
 		self.is_visible = false;
 		self.seleted_commit_type = None;
 		self.query_results_type = CommitType::iter().collect_vec();
-		self.query_results_more_info = Vec::new();
+		#[cfg(feature = "gitmoji")]
+		{
+			self.query_results_more_info.clear();
+		}
 	}
 
 	fn show(&mut self) -> Result<()> {
