@@ -223,6 +223,7 @@ impl CommitPopup {
 
 			self.hide();
 			self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+			self.queue.push(InternalEvent::StatusLastFileMoved);
 			self.input.clear();
 		}
 

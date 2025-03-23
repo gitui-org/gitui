@@ -136,6 +136,7 @@ mod tests {
 	#[test]
 	fn test_symbolic_links() {
 		let app_home = get_app_config_path().unwrap();
+		fs::create_dir_all(&app_home).unwrap();
 		// save current config
 		let original_key_list_path = app_home.join(KEY_LIST_FILENAME);
 		let renamed_key_list = if original_key_list_path.exists() {

@@ -62,6 +62,52 @@ pub fn untracked_files_config_repo(
 	Ok(ShowUntrackedFilesConfig::All)
 }
 
+// see https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
+/// represents `push.default` git config
+#[derive(PartialEq, Eq)]
+pub enum PushDefaultStrategyConfig {
+	Nothing,
+	Current,
+	Upstream,
+	Simple,
+	Matching,
+}
+
+impl Default for PushDefaultStrategyConfig {
+	fn default() -> Self {
+		Self::Simple
+	}
+}
+
+impl<'a> TryFrom<&'a str> for PushDefaultStrategyConfig {
+	type Error = crate::Error;
+	fn try_from(
+		value: &'a str,
+	) -> std::result::Result<Self, Self::Error> {
+		match value {
+			"nothing" => Ok(Self::Nothing),
+			"current" => Ok(Self::Current),
+			"upstream" | "tracking" => Ok(Self::Upstream),
+			"simple" => Ok(Self::Simple),
+			"matching" => Ok(Self::Matching),
+			_ => Err(crate::Error::GitConfig(format!(
+				"malformed value for push.default: {value}, must be one of nothing, matching, simple, upstream or current"
+			))),
+		}
+	}
+}
+
+pub fn push_default_strategy_config_repo(
+	repo: &Repository,
+) -> Result<PushDefaultStrategyConfig> {
+	(get_config_string_repo(repo, "push.default")?).map_or_else(
+		|| Ok(PushDefaultStrategyConfig::default()),
+		|entry_str| {
+			PushDefaultStrategyConfig::try_from(entry_str.as_str())
+		},
+	)
+}
+
 ///
 pub fn untracked_files_config(
 	repo_path: &RepoPath,
