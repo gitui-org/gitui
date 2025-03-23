@@ -475,8 +475,8 @@ impl ConventionalCommitPopup {
 		let mut available_chars = ('a'..='z').collect_vec();
 
 		for k in [
-			self.key_config.keys.move_down,
-			self.key_config.keys.move_up,
+			self.key_config.keys.popup_up,
+			self.key_config.keys.popup_down,
 			self.key_config.keys.exit_popup,
 			self.key_config.keys.breaking,
 			self.key_config.keys.exit,
@@ -721,7 +721,7 @@ impl Component for ConventionalCommitPopup {
 			}
 
 			out.push(CommandInfo::new(
-				strings::commands::scroll(&self.key_config),
+				strings::commands::scroll_popup(&self.key_config),
 				true,
 				true,
 			));
@@ -813,7 +813,9 @@ impl Component for ConventionalCommitPopup {
 							}
 						}
 						#[cfg(not(feature = "gitmoji"))]
-						self.validate_escape(commit);
+						self.validate_escape(
+							self.query_results_type[idx],
+						);
 					}
 				}
 			}
