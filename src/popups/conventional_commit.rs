@@ -10,7 +10,7 @@ use ratatui::{
 	text::Span,
 	widgets::{Block, Borders, Clear},
 };
-use strum::{Display, EnumIter, IntoEnumIterator};
+use strum::{Display, EnumIter, IntoEnumIterator, IntoStaticStr};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::components::visibility_blocking;
@@ -28,7 +28,7 @@ use crate::{
 	ui,
 };
 
-#[derive(EnumIter, Display, Copy, Clone)]
+#[derive(EnumIter, Copy, Clone, IntoStaticStr, Display)]
 #[strum(serialize_all = "lowercase")]
 enum CommitType {
 	Refactor,
@@ -453,7 +453,7 @@ impl ConventionalCommitPopup {
 			let max_len = self
 				.query_results_type
 				.iter()
-				.map(|s| s.to_string().len())
+				.map(|s| Into::<&str>::into(s).len())
 				.max();
 
 			ui::draw_list_block(
@@ -518,9 +518,8 @@ impl ConventionalCommitPopup {
 
 		self.query_results_type
 			.iter()
-			.map(std::string::ToString::to_string)
 			.map(|s| {
-				if let Some(ch) = s.chars()
+				if let Some(ch) = Into::<&str>::into(s).chars()
 					.find(|c| available_chars.contains(c)) {
                     available_chars.retain(|&c| c != ch);
                     ch
@@ -573,44 +572,45 @@ impl ConventionalCommitPopup {
 		let query = query.borrow().to_lowercase();
 		self.query = Some(query.clone());
 
-		let new_len = if let Some(commit_type) =
-			&self.seleted_commit_type
-		{
-			#[cfg(feature = "gitmoji")]
-			{
-				self.query_results_more_info = commit_type
-					.more_info()
+		let new_len =
+			if let Some(commit_type) = &self.seleted_commit_type {
+				#[cfg(feature = "gitmoji")]
+				{
+					self.query_results_more_info = commit_type
+						.more_info()
+						.iter()
+						.filter(|more_info_commit| {
+							more_info_commit
+								.strings()
+								.2
+								.to_lowercase()
+								.contains(&query)
+						})
+						.copied()
+						.collect_vec();
+
+					self.query_results_more_info.len()
+				}
+				#[cfg(not(feature = "gitmoji"))]
+				{
+					let _ = commit_type;
+					self.hide();
+					self.query_results_type.len()
+				}
+			} else {
+				self.query_results_type = self
+					.options
 					.iter()
-					.filter(|more_info_commit| {
-						more_info_commit
-							.strings()
-							.2
+					.filter(|option| {
+						Into::<&str>::into(*option)
 							.to_lowercase()
 							.contains(&query)
 					})
 					.copied()
 					.collect_vec();
 
-				self.query_results_more_info.len()
-			}
-			#[cfg(not(feature = "gitmoji"))]
-			{
-				let _ = commit_type;
-				self.hide();
 				self.query_results_type.len()
-			}
-		} else {
-			self.query_results_type = self
-				.options
-				.iter()
-				.filter(|option| {
-					option.to_string().to_lowercase().contains(&query)
-				})
-				.copied()
-				.collect_vec();
-
-			self.query_results_type.len()
-		};
+			};
 
 		if self.selected_index >= new_len {
 			self.selected_index = new_len.saturating_sub(1);
