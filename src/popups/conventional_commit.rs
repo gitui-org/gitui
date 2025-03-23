@@ -890,7 +890,7 @@ impl Component for ConventionalCommitPopup {
 	fn show(&mut self) -> Result<()> {
 		self.is_visible = true;
 		self.input.show()?;
-		self.input.set_text(String::new());
+		self.input.clear();
 		Ok(())
 	}
 }
