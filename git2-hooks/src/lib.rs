@@ -67,6 +67,7 @@ pub enum HookResult {
 		/// path of the hook that was run
 		hook: PathBuf,
 	},
+	/// Hook took too long to execute and was killed
 	TimedOut {
 		/// path of the hook that was run
 		hook: PathBuf,
@@ -148,10 +149,10 @@ pub fn hooks_commit_msg(
 	let temp_file = hook.git.join(HOOK_COMMIT_MSG_TEMP_FILE);
 	File::create(&temp_file)?.write_all(msg.as_bytes())?;
 
-	let res = hook.run_hook(
-		&[temp_file.as_os_str().to_string_lossy().as_ref()],
-		Duration::ZERO,
-	)?;
+	let res = hook.run_hook(&[temp_file
+		.as_os_str()
+		.to_string_lossy()
+		.as_ref()])?;
 
 	// load possibly altered msg
 	msg.clear();
@@ -174,7 +175,7 @@ pub fn hooks_commit_msg_with_timeout(
 	let temp_file = hook.git.join(HOOK_COMMIT_MSG_TEMP_FILE);
 	File::create(&temp_file)?.write_all(msg.as_bytes())?;
 
-	let res = hook.run_hook(
+	let res = hook.run_hook_with_timeout(
 		&[temp_file.as_os_str().to_string_lossy().as_ref()],
 		timeout,
 	)?;
@@ -193,7 +194,7 @@ pub fn hooks_pre_commit(
 ) -> Result<HookResult> {
 	let hook = find_hook!(repo, other_paths, HOOK_PRE_COMMIT);
 
-	hook.run_hook(&[], Duration::ZERO)
+	hook.run_hook(&[])
 }
 
 /// this hook is documented here <https://git-scm.com/docs/githooks#_pre_commit>
@@ -204,7 +205,7 @@ pub fn hooks_pre_commit_with_timeout(
 ) -> Result<HookResult> {
 	let hook = find_hook!(repo, other_paths, HOOK_PRE_COMMIT);
 
-	hook.run_hook(&[], timeout)
+	hook.run_hook_with_timeout(&[], timeout)
 }
 
 /// this hook is documented here <https://git-scm.com/docs/githooks#_post_commit>
@@ -214,7 +215,7 @@ pub fn hooks_post_commit(
 ) -> Result<HookResult> {
 	let hook = find_hook!(repo, other_paths, HOOK_POST_COMMIT);
 
-	hook.run_hook(&[], Duration::ZERO)
+	hook.run_hook(&[])
 }
 
 /// this hook is documented here <https://git-scm.com/docs/githooks#_post_commit>
@@ -225,7 +226,7 @@ pub fn hooks_post_commit_with_timeout(
 ) -> Result<HookResult> {
 	let hook = find_hook!(repo, other_paths, HOOK_POST_COMMIT);
 
-	hook.run_hook(&[], timeout)
+	hook.run_hook_with_timeout(&[], timeout)
 }
 
 #[derive(Clone, Copy)]
@@ -274,7 +275,7 @@ pub fn hooks_prepare_commit_msg(
 		args.push(id);
 	}
 
-	let res = hook.run_hook(args.as_slice(), Duration::ZERO)?;
+	let res = hook.run_hook(args.as_slice())?;
 
 	// load possibly altered msg
 	msg.clear();
@@ -320,7 +321,7 @@ pub fn hooks_prepare_commit_msg_with_timeout(
 		args.push(id);
 	}
 
-	let res = hook.run_hook(args.as_slice(), timeout)?;
+	let res = hook.run_hook_with_timeout(args.as_slice(), timeout)?;
 
 	// load possibly altered msg
 	msg.clear();
@@ -334,7 +335,7 @@ mod tests {
 	use super::*;
 	use git2_testing::{repo_init, repo_init_bare};
 	use pretty_assertions::assert_eq;
-	use tempfile::TempDir;
+	use tempfile::{tempdir, TempDir};
 
 	#[test]
 	fn test_smoke() {
@@ -345,7 +346,7 @@ mod tests {
 
 		assert_eq!(res, HookResult::NoHookFound);
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 exit 0
         ";
 
@@ -360,7 +361,7 @@ exit 0
 	fn test_hooks_commit_msg_ok() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 exit 0
         ";
 
@@ -378,7 +379,7 @@ exit 0
 	fn test_hooks_commit_msg_with_shell_command_ok() {
 		let (_td, repo) = repo_init();
 
-		let hook = br#"#!/bin/sh
+		let hook = br#"#!/usr/bin/env sh
 COMMIT_MSG="$(cat "$1")"
 printf "$COMMIT_MSG" | sed 's/sth/shell_command/g' >"$1"
 exit 0
@@ -398,7 +399,7 @@ exit 0
 	fn test_pre_commit_sh() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 exit 0
         ";
 
@@ -419,7 +420,7 @@ exit 0
 	fn test_other_path() {
 		let (td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 exit 0
         ";
 
@@ -442,7 +443,7 @@ exit 0
 		let (td, repo) = repo_init();
 
 		{
-			let hook = b"#!/bin/sh
+			let hook = b"#!/usr/bin/env sh
 exit 0
         ";
 
@@ -450,7 +451,7 @@ exit 0
 		}
 
 		{
-			let reject_hook = b"#!/bin/sh
+			let reject_hook = b"#!/usr/bin/env sh
 exit 1
         ";
 
@@ -474,7 +475,7 @@ exit 1
 	fn test_pre_commit_fail_sh() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo 'rejected'
 exit 1
         ";
@@ -488,7 +489,7 @@ exit 1
 	fn test_env_containing_path() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 export
 exit 1
         ";
@@ -510,7 +511,7 @@ exit 1
 		let (_td, repo) = repo_init();
 		let hooks = TempDir::new().unwrap();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo 'rejected'
 exit 1
         ";
@@ -540,7 +541,7 @@ exit 1
 	fn test_pre_commit_fail_bare() {
 		let (_td, repo) = repo_init_bare();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo 'rejected'
 exit 1
         ";
@@ -596,7 +597,7 @@ sys.exit(1)
 	fn test_hooks_commit_msg_reject() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo 'msg' > $1
 echo 'rejected'
 exit 1
@@ -622,7 +623,7 @@ exit 1
 	fn test_commit_msg_no_block_but_alter() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo 'msg' > $1
 exit 0
         ";
@@ -662,7 +663,7 @@ exit 0
 	fn test_hooks_prep_commit_msg_success() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo msg:$2 > $1
 exit 0
         ";
@@ -686,7 +687,7 @@ exit 0
 	fn test_hooks_prep_commit_msg_reject() {
 		let (_td, repo) = repo_init();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 echo $2,$3 > $1
 echo 'rejected'
 exit 2
@@ -717,5 +718,74 @@ exit 2
 				"commit,0000000000000000000000000000000000000000\n"
 			)
 		);
+	}
+
+	#[test]
+	fn test_hooks_timeout_kills() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/usr/bin/env sh
+sleep 0.25
+        ";
+
+		create_hook(&repo, HOOK_PRE_COMMIT, hook);
+
+		let res = hooks_pre_commit_with_timeout(
+			&repo,
+			None,
+			Duration::from_millis(200),
+		)
+		.unwrap();
+
+		assert!(res.is_timeout());
+	}
+
+	#[test]
+	fn test_hooks_timeout_with_zero() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/usr/bin/env sh
+sleep 0.25
+        ";
+
+		create_hook(&repo, HOOK_PRE_COMMIT, hook);
+
+		let res = hooks_pre_commit_with_timeout(
+			&repo,
+			None,
+			Duration::ZERO,
+		);
+
+		assert!(res.is_ok());
+	}
+
+	#[test]
+	fn test_hooks_timeout_faster_than_timeout() {
+		let (_td, repo) = repo_init();
+
+		let temp_dir = tempdir().expect("temp dir");
+		let file = temp_dir.path().join("test");
+		let hook = format!(
+			"#!/usr/bin/env sh
+sleep 0.1
+echo 'after sleep' > {}
+        ",
+			file.to_str().unwrap()
+		);
+
+		create_hook(&repo, HOOK_PRE_COMMIT, hook.as_bytes());
+
+		let res = hooks_pre_commit_with_timeout(
+			&repo,
+			None,
+			Duration::from_millis(150),
+		);
+
+		assert!(res.is_ok());
+		assert!(file.exists());
+
+		let mut str = String::new();
+		File::open(file).unwrap().read_to_string(&mut str).unwrap();
+		assert!(str == "after sleep\n");
 	}
 }

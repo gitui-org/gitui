@@ -328,9 +328,8 @@ mod tests {
 		let file = temp_dir.path().join("test");
 		let hook = format!(
 			"#!/usr/bin/env sh
-    sleep 1
-
-    echo 'after sleep' > {}
+sleep 1
+echo 'after sleep' > {}
         ",
 			file.as_path().to_str().unwrap()
 		);
