@@ -50,7 +50,21 @@ pub fn stash_pop(
 
 	let index = get_stash_index(&mut repo, stash_id.into())?;
 
-	repo.stash_pop(index, None)?;
+	// todo: The allow_conflicts parameter set in CheckoutBuilder is not actually taking effect.
+	let mut checkout = CheckoutBuilder::new();
+	checkout.allow_conflicts(false);
+
+	let mut opt = StashApplyOptions::default();
+	opt.checkout_options(checkout);
+	repo.stash_apply(index, None)?;
+
+	// check for merge conflicts
+	if repo.index()?.has_conflicts() {
+		return Err(Error::StashApplyConflict);
+	}
+
+	// remove the entry at the specified index from the stash list
+	repo.stash_drop(index)?;
 
 	Ok(())
 }

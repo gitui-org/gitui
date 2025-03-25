@@ -22,6 +22,10 @@ pub enum Error {
 	RebaseConflict,
 
 	///
+	#[error("git: conflict during stash apply")]
+	StashApplyConflict,
+
+	///
 	#[error("git: remote url not found")]
 	UnknownRemote,
 
