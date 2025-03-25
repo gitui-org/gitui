@@ -41,6 +41,9 @@ jobs:
         toolchain: ${{ matrix.rust }}
         components: clippy
 
+    - name: Override rust toolchain
+      run: rustup override set ${{ matrix.rust }}
+
     - name: Rustup Show
       run: rustup show
 
@@ -112,6 +115,12 @@ jobs:
     - name: Manually install target
       run: rustup target add x86_64-unknown-linux-musl
 
+    - name: Override rust toolchain
+      run: rustup override set ${{ matrix.rust }}
+
+    - name: Rustup Show
+      run: rustup show
+
     - name: Setup MUSL
       run: |
         sudo apt-get -qq install musl-tools
@@ -151,6 +160,10 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ matrix.rust }}
+
+    - name: Override rust toolchain
+      run: rustup override set ${{ matrix.rust }}
+
     - name: Setup ARM toolchain
       run: |
         rustup target add aarch64-unknown-linux-gnu
@@ -165,6 +178,9 @@ jobs:
 
         echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
         echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
+
+    - name: Rustup Show
+      run: rustup show
 
     - name: Build Debug
       run: |
@@ -195,8 +211,15 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ matrix.rust }}
+
+    - name: Override rust toolchain
+      run: rustup override set ${{ matrix.rust }}
+
     - name: Setup target
       run: rustup target add x86_64-apple-darwin
+
+    - name: Rustup Show
+      run: rustup show
 
     - name: Build Debug
       run: |
