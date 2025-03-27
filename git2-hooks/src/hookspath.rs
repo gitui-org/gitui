@@ -3,6 +3,7 @@ use git2::Repository;
 use crate::{error::Result, HookResult, HooksError};
 
 use std::{
+	ffi::OsString,
 	path::{Path, PathBuf},
 	process::Command,
 	str::FromStr,
@@ -121,35 +122,41 @@ impl HookPaths {
 		let output = if cfg!(windows) {
 			// execute hook in shell
 			let command = {
-				let mut os_str = std::ffi::OsString::new();
+				// SEE: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_02
+				// Enclosing characters in single-quotes ( '' ) shall preserve the literal value of each character within the single-quotes.
+				// A single-quote cannot occur within single-quotes.
+				const REPLACEMENT: &str = concat!(
+					"'",   // closing single-quote
+					"\\'", // one escaped single-quote (outside of single-quotes)
+					"'",   // new single-quote
+				);
+
+				let mut os_str = OsString::new();
 				os_str.push("'");
 				if let Some(hook) = hook.to_str() {
-					// SEE: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_02
-					// Enclosing characters in single-quotes ( '' ) shall preserve the literal value of each character within the single-quotes.
-					// A single-quote cannot occur within single-quotes.
-					const REPLACEMENT: &str = concat!(
-						"'",   // closing single-quote
-						"\\'", // one escaped single-quote (outside of single-quotes)
-						"'",   // new single-quote
-					);
 					os_str.push(hook.replace('\'', REPLACEMENT));
 				} else {
 					#[cfg(windows)]
 					{
-						use std::os::windows::ffi::OsStrExt;
-						if hook
-							.as_os_str()
-							.encode_wide()
-							.into_iter()
-							.find(|x| *x == (b'\'' as u16))
-							.is_some()
-						{
-							// TODO: escape single quotes instead of failing
-							return Err(HooksError::PathToString);
-						}
-					}
+						use std::os::windows::ffi::{
+							OsStrExt, OsStringExt,
+						};
 
-					os_str.push(hook.as_os_str());
+						let mut new_str: Vec<u16> = vec![];
+
+						for ch in hook.as_os_str().encode_wide() {
+							if ch == (b'\'' as u16) {
+								new_str.extend(
+									std::ffi::OsStr::new(REPLACEMENT)
+										.encode_wide(),
+								);
+							} else {
+								new_str.push(ch);
+							}
+						}
+
+						os_str.push(OsString::from_wide(&new_str));
+					}
 				}
 				os_str.push("'");
 				os_str.push(" \"$@\"");
