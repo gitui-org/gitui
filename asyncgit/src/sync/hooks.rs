@@ -87,16 +87,6 @@ mod tests {
 
 		os_string.push("gitui $# ' ");
 
-		#[cfg(windows)]
-		{
-			use std::os::windows::ffi::OsStringExt;
-
-			const INVALID_UTF16: &[u16] = &[0xD83D];
-
-			os_string.push(OsString::from_wide(INVALID_UTF16));
-
-			assert!(os_string.to_str().is_none());
-		}
 		#[cfg(target_os = "linux")]
 		{
 			use std::os::unix::ffi::OsStrExt;

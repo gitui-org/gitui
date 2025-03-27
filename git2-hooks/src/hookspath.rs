@@ -1,4 +1,4 @@
-use git2::Repository;
+use git2::{IntoCString, Repository};
 
 use crate::{error::Result, HookResult, HooksError};
 
@@ -146,27 +146,7 @@ impl HookPaths {
 				if let Some(hook) = hook.to_str() {
 					os_str.push(hook.replace('\'', REPLACEMENT));
 				} else {
-					#[cfg(windows)]
-					{
-						use std::os::windows::ffi::{
-							OsStrExt, OsStringExt,
-						};
-
-						let mut new_str: Vec<u16> = vec![];
-
-						for ch in hook.as_os_str().encode_wide() {
-							if ch == (b'\'' as u16) {
-								new_str.extend(
-									std::ffi::OsStr::new(REPLACEMENT)
-										.encode_wide(),
-								);
-							} else {
-								new_str.push(ch);
-							}
-						}
-
-						os_str.push(OsString::from_wide(&new_str));
-					}
+					return Err(HooksError::PathToString);
 				}
 				os_str.push("'");
 				os_str.push(" \"$@\"");
