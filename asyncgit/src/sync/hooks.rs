@@ -74,6 +74,8 @@ pub fn hooks_prepare_commit_msg(
 
 #[cfg(test)]
 mod tests {
+	use std::ffi::{OsStr, OsString};
+
 	use git2::Repository;
 	use tempfile::TempDir;
 
@@ -81,7 +83,32 @@ mod tests {
 	use crate::sync::tests::repo_init_with_prefix;
 
 	fn repo_init() -> Result<(TempDir, Repository)> {
-		repo_init_with_prefix("gitui $# ' ")
+		const INVALID_UTF8: &[u8] = b"\xED\xA0\x80";
+		let mut os_string: OsString = OsString::new();
+
+		os_string.push("gitui $# ' ");
+
+		#[cfg(windows)]
+		{
+			use std::os::windows::ffi::OsStringExt;
+
+			const INVALID_UTF8: &[u16] =
+				INVALID_UTF8.map(|b| b as u16);
+
+			os_str.push(OsString::from_wide(INVALID_UTF8));
+
+			assert!(os_string.to_str().is_none());
+		}
+		#[cfg(unix)]
+		{
+			use std::os::unix::ffi::OsStrExt;
+
+			os_string.push(OsStr::from_bytes(INVALID_UTF8));
+
+			assert!(os_string.to_str().is_none());
+		}
+
+		repo_init_with_prefix(os_string)
 	}
 
 	#[test]

@@ -123,7 +123,7 @@ pub mod tests {
 	};
 	use crate::error::Result;
 	use git2::Repository;
-	use std::{path::Path, process::Command};
+	use std::{ffi::OsStr, path::Path, process::Command};
 	use tempfile::TempDir;
 
 	///
@@ -150,7 +150,7 @@ pub mod tests {
 	///
 	#[inline]
 	pub fn repo_init_with_prefix(
-		prefix: &'static str,
+		prefix: impl AsRef<OsStr>,
 	) -> Result<(TempDir, Repository)> {
 		init_log();
 
