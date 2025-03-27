@@ -16,6 +16,7 @@ pub struct Theme {
 	command_fg: Color,
 	selection_bg: Color,
 	selection_fg: Color,
+	use_selection_fg: bool,
 	cmdbar_bg: Color,
 	cmdbar_extra_lines_bg: Color,
 	disabled_fg: Color,
@@ -151,7 +152,11 @@ impl Theme {
 		selected: bool,
 	) -> Style {
 		if selected {
-			style.bg(self.selection_bg).fg(self.selection_fg)
+			if self.use_selection_fg {
+				style.bg(self.selection_bg).fg(self.selection_fg)
+			} else {
+				style.bg(self.selection_bg)
+			}
 		} else {
 			style
 		}
@@ -340,6 +345,7 @@ impl Default for Theme {
 			command_fg: Color::White,
 			selection_bg: Color::Blue,
 			selection_fg: Color::White,
+			use_selection_fg: true,
 			cmdbar_bg: Color::Blue,
 			cmdbar_extra_lines_bg: Color::Blue,
 			disabled_fg: Color::DarkGray,
@@ -387,6 +393,7 @@ mod tests {
 (
 	selection_bg: Some("Black"),
 	selection_fg: Some("#ffffff"),
+	use_selection_fg: Some(false),
 	syntax: Some("InspiredGitHub")
 )
 "##
