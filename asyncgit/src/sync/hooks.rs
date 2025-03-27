@@ -96,7 +96,7 @@ mod tests {
 
 			let invalid_utf8 = INVALID_UTF8
 				.into_iter()
-				.map(|b| b as u16)
+				.map(|b| *b as u16)
 				.collect::<Vec<u16>>();
 
 			os_string.push(OsString::from_wide(&invalid_utf8));
