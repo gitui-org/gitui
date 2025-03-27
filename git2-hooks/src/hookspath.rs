@@ -3,7 +3,7 @@ use git2::Repository;
 use crate::{error::Result, HookResult, HooksError};
 
 use std::{
-	env,
+	ffi::{OsStr, OsString},
 	path::{Path, PathBuf},
 	process::Command,
 	str::FromStr,
@@ -17,6 +17,7 @@ pub struct HookPaths {
 
 const CONFIG_HOOKS_PATH: &str = "core.hooksPath";
 const DEFAULT_HOOKS_PATH: &str = "hooks";
+const ENOEXEC: i32 = 8;
 
 impl HookPaths {
 	/// `core.hooksPath` always takes precedence.
@@ -107,30 +108,63 @@ impl HookPaths {
 	/// this function calls hook scripts based on conventions documented here
 	/// see <https://git-scm.com/docs/githooks>
 	pub fn run_hook(&self, args: &[&str]) -> Result<HookResult> {
+		self.run_hook_os_str(args)
+	}
+
+	/// this function calls hook scripts based on conventions documented here
+	/// see <https://git-scm.com/docs/githooks>
+	pub fn run_hook_os_str<I, S>(&self, args: I) -> Result<HookResult>
+	where
+		I: IntoIterator<Item = S> + Copy,
+		S: AsRef<OsStr>,
+	{
 		let hook = self.hook.clone();
-
-		let arg_str = format!("{:?} {}", hook, args.join(" "));
-		// Use -l to avoid "command not found" on Windows.
-		let bash_args =
-			vec!["-l".to_string(), "-c".to_string(), arg_str];
-
 		log::trace!("run hook '{:?}' in '{:?}'", hook, self.pwd);
 
-		let git_shell = find_bash_executable()
-			.or_else(find_default_unix_shell)
-			.unwrap_or_else(|| "bash".into());
-		let output = Command::new(git_shell)
-			.args(bash_args)
-			.with_no_window()
-			.current_dir(&self.pwd)
-			// This call forces Command to handle the Path environment correctly on windows,
-			// the specific env set here does not matter
-			// see https://github.com/rust-lang/rust/issues/37519
-			.env(
-				"DUMMY_ENV_TO_FIX_WINDOWS_CMD_RUNS",
-				"FixPathHandlingOnWindows",
+		let run_command = |command: &mut Command| {
+			command
+				.args(args)
+				.current_dir(&self.pwd)
+				.with_no_window()
+				.output()
+		};
+
+		let output = if cfg!(windows) {
+			// execute hook in shell
+			let command = {
+				// SEE: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_02
+				// Enclosing characters in single-quotes ( '' ) shall preserve the literal value of each character within the single-quotes.
+				// A single-quote cannot occur within single-quotes.
+				const REPLACEMENT: &str = concat!(
+					"'",   // closing single-quote
+					"\\'", // one escaped single-quote (outside of single-quotes)
+					"'",   // new single-quote
+				);
+
+				let mut os_str = OsString::new();
+				os_str.push("'");
+				if let Some(hook) = hook.to_str() {
+					os_str.push(hook.replace('\'', REPLACEMENT));
+				} else {
+					return Err(HooksError::PathToString);
+				}
+				os_str.push("'");
+				os_str.push(" \"$@\"");
+
+				os_str
+			};
+			run_command(
+				sh_command().arg("-c").arg(command).arg(&hook),
 			)
-			.output()?;
+		} else {
+			// execute hook directly
+			match run_command(&mut Command::new(&hook)) {
+				Err(err) if err.raw_os_error() == Some(ENOEXEC) => {
+					run_command(sh_command().arg(&hook))
+				}
+				result => result,
+			}
+		}?;
 
 		if output.status.success() {
 			Ok(HookResult::Ok { hook })
@@ -147,6 +181,49 @@ impl HookPaths {
 				hook,
 			})
 		}
+	}
+}
+
+fn sh_command() -> Command {
+	let mut command = Command::new(sh_path());
+
+	if cfg!(windows) {
+		// This call forces Command to handle the Path environment correctly on windows,
+		// the specific env set here does not matter
+		// see https://github.com/rust-lang/rust/issues/37519
+		command.env(
+			"DUMMY_ENV_TO_FIX_WINDOWS_CMD_RUNS",
+			"FixPathHandlingOnWindows",
+		);
+
+		// Use -l to avoid "command not found"
+		command.arg("-l");
+	}
+
+	command
+}
+
+/// Get the path to the sh executable.
+/// On Windows get the sh.exe bundled with Git for Windows
+pub fn sh_path() -> PathBuf {
+	if cfg!(windows) {
+		Command::new("where.exe")
+			.arg("git")
+			.output()
+			.ok()
+			.map(|out| {
+				PathBuf::from(Into::<String>::into(
+					String::from_utf8_lossy(&out.stdout),
+				))
+			})
+			.as_deref()
+			.and_then(Path::parent)
+			.and_then(Path::parent)
+			.map(|p| p.join("usr/bin/sh.exe"))
+			.filter(|p| p.exists())
+			.unwrap_or_else(|| "sh".into())
+	} else {
+		"sh".into()
 	}
 }
 
@@ -168,38 +245,10 @@ fn is_executable(path: &Path) -> bool {
 }
 
 #[cfg(windows)]
-/// windows does not consider bash scripts to be executable so we consider everything
+/// windows does not consider shell scripts to be executable so we consider everything
 /// to be executable (which is not far from the truth for windows platform.)
 const fn is_executable(_: &Path) -> bool {
 	true
-}
-
-// Find bash.exe, and avoid finding wsl's bash.exe on Windows.
-// None for non-Windows.
-fn find_bash_executable() -> Option<PathBuf> {
-	if cfg!(windows) {
-		Command::new("where.exe")
-			.arg("git")
-			.output()
-			.ok()
-			.map(|out| {
-				PathBuf::from(Into::<String>::into(
-					String::from_utf8_lossy(&out.stdout),
-				))
-			})
-			.as_deref()
-			.and_then(Path::parent)
-			.and_then(Path::parent)
-			.map(|p| p.join("usr/bin/bash.exe"))
-			.filter(|p| p.exists())
-	} else {
-		None
-	}
-}
-
-// Find default shell on Unix-like OS.
-fn find_default_unix_shell() -> Option<PathBuf> {
-	env::var_os("SHELL").map(PathBuf::from)
 }
 
 trait CommandExt {

@@ -123,7 +123,7 @@ pub mod tests {
 	};
 	use crate::error::Result;
 	use git2::Repository;
-	use std::{path::Path, process::Command};
+	use std::{ffi::OsStr, path::Path, process::Command};
 	use tempfile::TempDir;
 
 	///
@@ -144,11 +144,19 @@ pub mod tests {
 
 	///
 	pub fn repo_init() -> Result<(TempDir, Repository)> {
+		repo_init_with_prefix("gitui")
+	}
+
+	///
+	#[inline]
+	pub fn repo_init_with_prefix(
+		prefix: impl AsRef<OsStr>,
+	) -> Result<(TempDir, Repository)> {
 		init_log();
 
 		sandbox_config_files();
 
-		let td = TempDir::new()?;
+		let td = TempDir::with_prefix(prefix)?;
 		let repo = Repository::init(td.path())?;
 		{
 			let mut config = repo.config()?;

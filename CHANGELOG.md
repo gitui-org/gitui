@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+* execute git-hooks directly if possible (on *nix) else use sh instead of bash (without reading SHELL variable) [[@Joshix](https://github.com/Joshix-1)] ([#2483](https://github.com/extrawurst/gitui/pull/2483))
 
 ### Added
 * support loading custom syntax highlighting themes from a file [[@acuteenvy](https://github.com/acuteenvy)] ([#2565](https://github.com/gitui-org/gitui/pull/2565))
