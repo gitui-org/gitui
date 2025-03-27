@@ -83,9 +83,6 @@ mod tests {
 	use crate::sync::tests::repo_init_with_prefix;
 
 	fn repo_init() -> Result<(TempDir, Repository)> {
-		#[allow(dead_code)]
-		const INVALID_UTF8: &[u8] = b"\xED\xA0\x80";
-
 		let mut os_string: OsString = OsString::new();
 
 		os_string.push("gitui $# ' ");
@@ -94,12 +91,9 @@ mod tests {
 		{
 			use std::os::windows::ffi::OsStringExt;
 
-			let invalid_utf8 = INVALID_UTF8
-				.into_iter()
-				.map(|b| *b as u16)
-				.collect::<Vec<u16>>();
+			const INVALID_UTF16: &[u16] = &[0xD83D];
 
-			os_string.push(OsString::from_wide(&invalid_utf8));
+			os_string.push(OsString::from_wide(INVALID_UTF16));
 
 			assert!(os_string.to_str().is_none());
 		}
@@ -107,10 +101,14 @@ mod tests {
 		{
 			use std::os::unix::ffi::OsStrExt;
 
+			const INVALID_UTF8: &[u8] = b"\xED\xA0\x80";
+
 			os_string.push(std::ffi::OsStr::from_bytes(INVALID_UTF8));
 
 			assert!(os_string.to_str().is_none());
 		}
+
+		os_string.push(" ");
 
 		repo_init_with_prefix(os_string)
 	}
