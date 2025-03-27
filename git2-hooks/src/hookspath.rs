@@ -1,4 +1,4 @@
-use git2::{IntoCString, Repository};
+use git2::Repository;
 
 use crate::{error::Result, HookResult, HooksError};
 
