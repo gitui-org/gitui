@@ -308,16 +308,17 @@ impl StatusTree {
 				new_index = new_index.saturating_add(1);
 			}
 
-			if self.is_visible_index(new_index) {
-				count += 1;
-			}
-
 			if count == self.window_height.get().unwrap_or(0) {
 				break;
 			}
 
-			if new_index == 0 || new_index == self.tree.len() - 1 {
+			if new_index == 0 || new_index >= self.tree.len() - 1 {
+				new_index = cmp::min(new_index, self.tree.len() - 1);
 				break;
+			}
+
+			if self.is_visible_index(new_index) {
+				count += 1;
 			}
 		}
 
