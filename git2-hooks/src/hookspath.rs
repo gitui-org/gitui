@@ -146,7 +146,22 @@ impl HookPaths {
 				if let Some(hook) = hook.to_str() {
 					os_str.push(hook.replace('\'', REPLACEMENT));
 				} else {
-					os_str.push(hook.as_os_str()); // TODO: this doesn't work if `hook` contains single-quotes
+					#[cfg(windows)]
+					{
+						use std::os::windows::ffi::OsStrExt;
+						if hook
+							.as_os_str()
+							.encode_wide()
+							.into_iter()
+							.find(|x| *x == (b'\'' as u16))
+							.is_some()
+						{
+							// TODO: escape single quotes instead of failing
+							return Err(HooksError::PathToString);
+						}
+					}
+
+					os_str.push(hook.as_os_str());
 				}
 				os_str.push("'");
 				os_str.push(" \"$@\"");
