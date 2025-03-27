@@ -74,7 +74,7 @@ pub fn hooks_prepare_commit_msg(
 
 #[cfg(test)]
 mod tests {
-	use std::ffi::{OsStr, OsString};
+	use std::ffi::OsString;
 
 	use git2::Repository;
 	use tempfile::TempDir;
@@ -83,6 +83,7 @@ mod tests {
 	use crate::sync::tests::repo_init_with_prefix;
 
 	fn repo_init() -> Result<(TempDir, Repository)> {
+		#[allow(dead_code)]
 		const INVALID_UTF8: &[u8] = b"\xED\xA0\x80";
 
 		let mut os_string: OsString = OsString::new();
@@ -106,7 +107,7 @@ mod tests {
 		{
 			use std::os::unix::ffi::OsStrExt;
 
-			os_string.push(OsStr::from_bytes(INVALID_UTF8));
+			os_string.push(std::ffi::OsStr::from_bytes(INVALID_UTF8));
 
 			assert!(os_string.to_str().is_none());
 		}
