@@ -114,6 +114,9 @@ impl CommitList {
 		self.marked.len()
 	}
 
+	// Clippy wants this to be const in nightly, which is not possible.
+	// Disable check to make clippy pass:
+	#[allow(clippy::missing_const_for_fn)]
 	///
 	pub fn marked(&self) -> &[(usize, CommitId)] {
 		&self.marked
@@ -490,24 +493,36 @@ impl CommitList {
 			txt.push(splitter.clone());
 		}
 
-		let style_hash = normal
-			.then(|| theme.commit_hash(selected))
-			.unwrap_or_else(|| theme.commit_unhighlighted());
-		let style_time = normal
-			.then(|| theme.commit_time(selected))
-			.unwrap_or_else(|| theme.commit_unhighlighted());
-		let style_author = normal
-			.then(|| theme.commit_author(selected))
-			.unwrap_or_else(|| theme.commit_unhighlighted());
-		let style_tags = normal
-			.then(|| theme.tags(selected))
-			.unwrap_or_else(|| theme.commit_unhighlighted());
-		let style_branches = normal
-			.then(|| theme.branch(selected, true))
-			.unwrap_or_else(|| theme.commit_unhighlighted());
-		let style_msg = normal
-			.then(|| theme.text(true, selected))
-			.unwrap_or_else(|| theme.commit_unhighlighted());
+		let style_hash = if normal {
+			theme.commit_hash(selected)
+		} else {
+			theme.commit_unhighlighted()
+		};
+		let style_time = if normal {
+			theme.commit_time(selected)
+		} else {
+			theme.commit_unhighlighted()
+		};
+		let style_author = if normal {
+			theme.commit_author(selected)
+		} else {
+			theme.commit_unhighlighted()
+		};
+		let style_tags = if normal {
+			theme.tags(selected)
+		} else {
+			theme.commit_unhighlighted()
+		};
+		let style_branches = if normal {
+			theme.branch(selected, true)
+		} else {
+			theme.commit_unhighlighted()
+		};
+		let style_msg = if normal {
+			theme.text(true, selected)
+		} else {
+			theme.commit_unhighlighted()
+		};
 
 		// commit hash
 		txt.push(Span::styled(Cow::from(&*e.hash_short), style_hash));

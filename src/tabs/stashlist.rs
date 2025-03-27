@@ -102,7 +102,7 @@ impl StashList {
 			Action::StashDrop(ids) => self.drop(repo, ids)?,
 			Action::StashPop(id) => self.pop(repo, *id)?,
 			_ => (),
-		};
+		}
 
 		Ok(())
 	}

@@ -176,7 +176,7 @@ impl TextInputComponent {
 						)
 						.title(self.title.clone()),
 				);
-			};
+			}
 			text_area
 		});
 	}

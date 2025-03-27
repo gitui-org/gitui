@@ -55,7 +55,7 @@ impl TreeItemInfo {
 				Path::new(
 					self.full_path
 						.components()
-						.last()
+						.next_back()
 						.and_then(|c| c.as_os_str().to_str())
 						.unwrap_or_default(),
 				)

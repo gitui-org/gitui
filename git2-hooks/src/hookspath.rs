@@ -109,6 +109,7 @@ impl HookPaths {
 	pub fn run_hook(&self, args: &[&str]) -> Result<HookResult> {
 		let hook = self.hook.clone();
 
+		#[allow(clippy::unnecessary_debug_formatting)]
 		let arg_str = format!("{:?} {}", hook, args.join(" "));
 		// Use -l to avoid "command not found" on Windows.
 		let bash_args =

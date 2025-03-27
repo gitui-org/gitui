@@ -40,6 +40,11 @@ impl KeyConfig {
 		Ok(Self { keys, symbols })
 	}
 
+	// Clippy wants this to be const in nightly
+	// This can't really be const, as deref into &str is not const, even
+	// in nightly.
+	// Disable clippy warning to build on nightly.
+	#[allow(clippy::missing_const_for_fn)]
 	fn get_key_symbol(&self, k: KeyCode) -> &str {
 		match k {
 			KeyCode::Enter => &self.symbols.enter,
@@ -106,6 +111,11 @@ impl KeyConfig {
 		}
 	}
 
+	// Clippy wants this to be const in nightly
+	// This can't really be const, as deref into &str is not const, even
+	// in nightly.
+	// Disable clippy warning to build on nightly.
+	#[allow(clippy::missing_const_for_fn)]
 	fn get_modifier_hint(&self, modifier: KeyModifiers) -> &str {
 		match modifier {
 			KeyModifiers::CONTROL => &self.symbols.control,

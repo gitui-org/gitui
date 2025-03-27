@@ -207,7 +207,7 @@ impl OptionsPopup {
 						.borrow_mut()
 						.diff_hunk_lines_change(true);
 				}
-			};
+			}
 		} else {
 			match self.selection {
 				AppOption::StatusShowUntracked => {
@@ -246,7 +246,7 @@ impl OptionsPopup {
 						.borrow_mut()
 						.diff_hunk_lines_change(false);
 				}
-			};
+			}
 		}
 
 		self.queue

@@ -139,7 +139,7 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 		path
 	};
 
-	println!("Logging enabled. Log written to: {path:?}");
+	println!("Logging enabled. Log written to: {}", path.display());
 
 	WriteLogger::init(
 		LevelFilter::Trace,

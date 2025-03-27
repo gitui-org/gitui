@@ -90,7 +90,7 @@ impl FileTreeItem {
 
 		match path
 			.components()
-			.last()
+			.next_back()
 			.map(std::path::Component::as_os_str)
 			.map(OsStr::to_string_lossy)
 			.map(String::from)
