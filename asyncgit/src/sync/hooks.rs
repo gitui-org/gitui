@@ -84,6 +84,7 @@ mod tests {
 
 	fn repo_init() -> Result<(TempDir, Repository)> {
 		const INVALID_UTF8: &[u8] = b"\xED\xA0\x80";
+
 		let mut os_string: OsString = OsString::new();
 
 		os_string.push("gitui $# ' ");
@@ -92,14 +93,16 @@ mod tests {
 		{
 			use std::os::windows::ffi::OsStringExt;
 
-			const INVALID_UTF8: &[u16] =
-				INVALID_UTF8.map(|b| b as u16);
+			let invalid_utf8 = INVALID_UTF8
+				.into_iter()
+				.map(|b| b as u16)
+				.collect::<Vec<u16>>();
 
-			os_str.push(OsString::from_wide(INVALID_UTF8));
+			os_string.push(OsString::from_wide(&invalid_utf8));
 
 			assert!(os_string.to_str().is_none());
 		}
-		#[cfg(unix)]
+		#[cfg(target_os = "linux")]
 		{
 			use std::os::unix::ffi::OsStrExt;
 
