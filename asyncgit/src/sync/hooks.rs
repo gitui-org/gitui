@@ -130,9 +130,7 @@ mod tests {
 		let subfolder = root.join("foo/");
 		std::fs::create_dir_all(&subfolder).unwrap();
 
-		let res =
-			hooks_post_commit(&subfolder.to_str().unwrap().into())
-				.unwrap();
+		let res = hooks_post_commit(&subfolder.into()).unwrap();
 
 		assert_eq!(
 			res,
@@ -148,10 +146,11 @@ mod tests {
 	fn test_pre_commit_workdir() {
 		let (_td, repo) = repo_init().unwrap();
 		let root = repo.path().parent().unwrap();
-		let repo_path: &RepoPath =
-			&root.as_os_str().to_str().unwrap().into();
+		let repo_path: &RepoPath = &root.to_path_buf().into();
+		let repository =
+			crate::sync::repository::repo(repo_path).unwrap();
 		let workdir =
-			crate::sync::utils::repo_work_dir(repo_path).unwrap();
+			crate::sync::utils::work_dir(&repository).unwrap();
 
 		let hook = b"#!/bin/sh
 	echo \"$(pwd)\"
@@ -165,8 +164,9 @@ mod tests {
 		let res = hooks_pre_commit(repo_path).unwrap();
 		if let HookResult::NotOk(res) = res {
 			assert_eq!(
-				std::path::Path::new(res.trim_end()),
-				std::path::Path::new(&workdir)
+				res.trim_end().trim_end_matches('/'),
+				// TODO: fix if output isn't utf8.
+				workdir.to_string_lossy().trim_end_matches('/'),
 			);
 		} else {
 			assert!(false);
@@ -194,11 +194,8 @@ mod tests {
 		std::fs::create_dir_all(&subfolder).unwrap();
 
 		let mut msg = String::from("test");
-		let res = hooks_commit_msg(
-			&subfolder.to_str().unwrap().into(),
-			&mut msg,
-		)
-		.unwrap();
+		let res =
+			hooks_commit_msg(&subfolder.into(), &mut msg).unwrap();
 
 		assert_eq!(
 			res,

@@ -3,7 +3,7 @@ use git2::Repository;
 use crate::{error::Result, HookResult, HooksError};
 
 use std::{
-	ffi::OsString,
+	ffi::{OsStr, OsString},
 	path::{Path, PathBuf},
 	process::Command,
 	str::FromStr,
@@ -108,6 +108,16 @@ impl HookPaths {
 	/// this function calls hook scripts based on conventions documented here
 	/// see <https://git-scm.com/docs/githooks>
 	pub fn run_hook(&self, args: &[&str]) -> Result<HookResult> {
+		self.run_hook_os_str(args)
+	}
+
+	/// this function calls hook scripts based on conventions documented here
+	/// see <https://git-scm.com/docs/githooks>
+	pub fn run_hook_os_str<I, S>(&self, args: I) -> Result<HookResult>
+	where
+		I: IntoIterator<Item = S> + Copy,
+		S: AsRef<OsStr>,
+	{
 		let hook = self.hook.clone();
 		log::trace!("run hook '{:?}' in '{:?}'", hook, self.pwd);
 

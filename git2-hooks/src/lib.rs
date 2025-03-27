@@ -132,10 +132,7 @@ pub fn hooks_commit_msg(
 	let temp_file = hook.git.join(HOOK_COMMIT_MSG_TEMP_FILE);
 	File::create(&temp_file)?.write_all(msg.as_bytes())?;
 
-	let res = hook.run_hook(&[temp_file
-		.as_os_str()
-		.to_string_lossy()
-		.as_ref()])?;
+	let res = hook.run_hook_os_str([&temp_file])?;
 
 	// load possibly altered msg
 	msg.clear();
