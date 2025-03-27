@@ -5,8 +5,8 @@
 
 </h1>
 
-[s0]: https://github.com/extrawurst/gitui/workflows/CI/badge.svg
-[l0]: https://github.com/extrawurst/gitui/actions
+[s0]: https://github.com/gitui-org/gitui/workflows/CI/badge.svg
+[l0]: https://github.com/gitui-org/gitui/actions
 [s1]: https://img.shields.io/crates/v/gitui.svg
 [l1]: https://crates.io/crates/gitui
 [s2]: https://img.shields.io/badge/license-MIT-blue.svg
@@ -14,8 +14,8 @@
 [l3]: https://github.com/rust-secure-code/safety-dance/
 [s6]: https://img.shields.io/twitter/follow/extrawurst?label=follow&style=social
 [l6]: https://twitter.com/intent/follow?screen_name=extrawurst
-[s7]: https://deps.rs/repo/github/extrawurst/gitui/status.svg
-[l7]: https://deps.rs/repo/github/extrawurst/gitui
+[s7]: https://deps.rs/repo/github/gitui-org/gitui/status.svg
+[l7]: https://deps.rs/repo/github/gitui-org/gitui
 [s8]: https://img.shields.io/discord/1176858176897953872
 [l8]: https://discord.gg/rQNeEnMhus
 
@@ -54,7 +54,7 @@
 - Responsive terminal UI
 - Async git API for fluid control
 - Submodule support
-- gpg commit signing with shortcomings (see [#97](https://github.com/extrawurst/gitui/issues/97)))
+- gpg commit signing with shortcomings (see [#97](https://github.com/gitui-org/gitui/issues/97)))
 
 ## 2. <a name="motivation"></a> Motivation <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
@@ -78,14 +78,14 @@ For a [RustBerlin meetup presentation](https://youtu.be/rpilJV-eIVw?t=5334) ([sl
 
 These are the high level goals before calling out `1.0`:
 
-* visualize branching structure in log tab ([#81](https://github.com/extrawurst/gitui/issues/81))
-* interactive rebase ([#32](https://github.com/extrawurst/gitui/issues/32))
+* visualize branching structure in log tab ([#81](https://github.com/gitui-org/gitui/issues/81))
+* interactive rebase ([#32](https://github.com/gitui-org/gitui/issues/32))
 
 ## 5. <a name="limitations"></a> Known Limitations <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
-- no sparse repo support (see [#1226](https://github.com/extrawurst/gitui/issues/1226))
-- no git-lfs support (see [#1089](https://github.com/extrawurst/gitui/discussions/1089))
-- *credential.helper* for https needs to be **explicitly** configured (see [#800](https://github.com/extrawurst/gitui/issues/800))
+- no sparse repo support (see [#1226](https://github.com/gitui-org/gitui/issues/1226))
+- no git-lfs support (see [#1089](https://github.com/gitui-org/gitui/discussions/1089))
+- *credential.helper* for https needs to be **explicitly** configured (see [#800](https://github.com/gitui-org/gitui/issues/800))
 
 Currently, this tool does not fully substitute the _git shell_, however both tools work well in tandem.
 
@@ -189,7 +189,7 @@ conda install -c conda-forge gitui
 
 ### Release Binaries
 
-[Available for download in releases](https://github.com/extrawurst/gitui/releases)
+[Available for download in releases](https://github.com/gitui-org/gitui/releases)
 
 Binaries available for:
 
@@ -288,8 +288,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Thanks goes to all the contributors that help make GitUI amazing! ❤️
 
-Wanna become a co-maintainer? We are looking for [you](https://github.com/extrawurst/gitui/issues/2084)!
+Wanna become a co-maintainer? We are looking for [you](https://github.com/gitui-org/gitui/issues/2084)!
 
-<a href="https://github.com/extrawurst/gitui/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=extrawurst/gitui" />
+<a href="https://github.com/gitui-org/gitui/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=gitui-org/gitui" />
 </a>
