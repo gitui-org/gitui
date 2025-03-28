@@ -147,12 +147,15 @@ impl StatusTree {
 				}
 				MoveSelection::Home => SelectionChange::new(0, false),
 				MoveSelection::End => self.selection_end(),
-				MoveSelection::PageUp => {
-					self.selection_page_updown(selection, true)
-				}
-				MoveSelection::PageDown => {
-					self.selection_page_updown(selection, false)
-				}
+				MoveSelection::PageUp => self.selection_page_updown(
+					selection,
+					(0..(selection + 1)).rev(),
+				),
+				MoveSelection::PageDown => self
+					.selection_page_updown(
+						selection,
+						selection..(self.tree.len()),
+					),
 			};
 
 			let changed_index =
@@ -296,31 +299,18 @@ impl StatusTree {
 	fn selection_page_updown(
 		&self,
 		current_index: usize,
-		up: bool,
+		range: impl Iterator<Item = usize>,
 	) -> SelectionChange {
-		let mut new_index = current_index;
-		let mut count = 0;
+		let page_size = self.window_height.get().unwrap_or(0);
 
-		loop {
-			if up {
-				new_index = new_index.saturating_sub(1);
-			} else {
-				new_index = new_index.saturating_add(1);
-			}
-
-			if count == self.window_height.get().unwrap_or(0) {
-				break;
-			}
-
-			if new_index == 0 || new_index >= self.tree.len() - 1 {
-				new_index = cmp::min(new_index, self.tree.len() - 1);
-				break;
-			}
-
-			if self.is_visible_index(new_index) {
-				count += 1;
-			}
-		}
+		let new_index = range
+			.filter(|index| {
+				self.available_selections.contains(index)
+					&& self.is_visible_index(*index)
+			})
+			.take(page_size)
+			.last()
+			.unwrap_or(current_index);
 
 		SelectionChange::new(new_index, false)
 	}
