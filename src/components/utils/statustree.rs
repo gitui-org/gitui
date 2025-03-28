@@ -149,7 +149,7 @@ impl StatusTree {
 				MoveSelection::End => self.selection_end(),
 				MoveSelection::PageUp => self.selection_page_updown(
 					selection,
-					(0..(selection + 1)).rev(),
+					(0..=selection).rev(),
 				),
 				MoveSelection::PageDown => self
 					.selection_page_updown(
