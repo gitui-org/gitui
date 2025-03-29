@@ -30,7 +30,7 @@ pub struct FileTree {
 	selection: Option<usize>,
 	// caches the absolute selection translated to visual index
 	visual_selection: Option<VisualSelection>,
-	pub show_height: Cell<Option<usize>>,
+	pub window_height: Cell<Option<usize>>,
 }
 
 impl FileTree {
@@ -43,7 +43,7 @@ impl FileTree {
 			items: FileTreeItems::new(list, collapsed)?,
 			selection: if list.is_empty() { None } else { Some(0) },
 			visual_selection: None,
-			show_height: None.into(),
+			window_height: None.into(),
 		};
 		new_self.visual_selection = new_self.calc_visual_selection();
 
@@ -145,7 +145,7 @@ impl FileTree {
 				count += 1;
 			}
 
-			if count >= self.show_height.get().unwrap_or(0) {
+			if count >= self.window_height.get().unwrap_or(0) {
 				break;
 			}
 		}
@@ -584,7 +584,7 @@ mod test {
 		let mut tree =
 			FileTree::new(&items, &BTreeSet::new()).unwrap();
 
-		tree.show_height.set(Some(2));
+		tree.window_height.set(Some(2));
 
 		tree.selection = Some(0);
 		assert!(tree.move_selection(MoveSelection::PageDown));
