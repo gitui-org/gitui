@@ -132,10 +132,9 @@ impl CommitList {
 		commits
 	}
 
-	///
-	pub fn copy_commit_hash(&self) -> Result<()> {
-		let marked = self.marked.as_slice();
-		let yank: Option<String> = match marked {
+	/// Build string of marked or selected (if none are marked) commit ids
+	fn concat_selected_commit_ids(&self) -> Option<String> {
+		match self.marked.as_slice() {
 			[] => self
 				.items
 				.iter()
@@ -144,24 +143,19 @@ impl CommitList {
 						.saturating_sub(self.items.index_offset()),
 				)
 				.map(|e| e.id.to_string()),
-			[(_idx, commit)] => Some(commit.to_string()),
-			[first, .., last] => {
-				let marked_consecutive =
-					marked.windows(2).all(|w| w[0].0 + 1 == w[1].0);
+			marked => Some(
+				marked
+					.iter()
+					.map(|(_idx, commit)| commit.to_string())
+					.join(" "),
+			),
+		}
+	}
 
-				let yank = if marked_consecutive {
-					format!("{}^..{}", first.1, last.1)
-				} else {
-					marked
-						.iter()
-						.map(|(_idx, commit)| commit.to_string())
-						.join(" ")
-				};
-				Some(yank)
-			}
-		};
-
-		if let Some(yank) = yank {
+	/// Copy currently marked or selected (if none are marked) commit ids
+	/// to clipboard
+	pub fn copy_commit_hash(&self) -> Result<()> {
+		if let Some(yank) = self.concat_selected_commit_ids() {
 			crate::clipboard::copy_string(&yank)?;
 			self.queue.push(InternalEvent::ShowInfoMsg(
 				strings::copy_success(&yank),
@@ -893,7 +887,35 @@ impl Component for CommitList {
 
 #[cfg(test)]
 mod tests {
+	use asyncgit::sync::CommitInfo;
+
 	use super::*;
+
+	impl Default for CommitList {
+		fn default() -> Self {
+			Self {
+				title: String::from("").into_boxed_str(),
+				selection: 0,
+				highlighted_selection: Option::None,
+				highlights: Option::None,
+				tags: Option::None,
+				items: ItemBatch::default(),
+				commits: IndexSet::default(),
+				marked: Vec::default(),
+				scroll_top: Cell::default(),
+				local_branches: BTreeMap::default(),
+				remote_branches: BTreeMap::default(),
+				theme: SharedTheme::default(),
+				key_config: SharedKeyConfig::default(),
+				scroll_state: (Instant::now(), 0.0),
+				current_size: Cell::default(),
+				repo: RepoPathRef::new(sync::RepoPath::Path(
+					std::path::PathBuf::default(),
+				)),
+				queue: Queue::default(),
+			}
+		}
+	}
 
 	#[test]
 	fn test_string_width_align() {
@@ -914,6 +936,128 @@ mod tests {
 		assert_eq!(
 			string_width_align("Jon Grythe Stødle", 19),
 			"Jon Grythe Stødle  "
+		);
+	}
+
+	/// Build a commit list with a few commits loaded
+	fn build_commit_list_with_some_commits() -> CommitList {
+		let mut items = ItemBatch::default();
+		let basic_commit_info = CommitInfo {
+			message: String::default(),
+			time: 0,
+			author: String::default(),
+			id: CommitId::default(),
+		};
+		// This just creates a sequence of fake ordered ids
+		// 0000000000000000000000000000000000000000
+		// 0000000000000000000000000000000000000001
+		// 0000000000000000000000000000000000000002
+		// ...
+		items.set_items(
+			2, /* randomly choose an offset */
+			(0..20)
+				.map(|idx| CommitInfo {
+					id: CommitId::from_str_unchecked(&format!(
+						"{idx:040}",
+					))
+					.unwrap(),
+					..basic_commit_info.clone()
+				})
+				.collect(),
+			None,
+		);
+		CommitList {
+			items,
+			selection: 4, // Randomly select one commit
+			..Default::default()
+		}
+	}
+
+	/// Build a value for cl.marked based on indices into cl.items
+	fn build_marked_from_indices(
+		cl: &CommitList,
+		marked_indices: &[usize],
+	) -> Vec<(usize, CommitId)> {
+		let offset = cl.items.index_offset();
+		marked_indices
+			.iter()
+			.map(|idx| {
+				(*idx, cl.items.iter().nth(*idx - offset).unwrap().id)
+			})
+			.collect()
+	}
+
+	#[test]
+	fn test_copy_commit_list_empty() {
+		assert_eq!(
+			CommitList::default().concat_selected_commit_ids(),
+			None
+		);
+	}
+
+	#[test]
+	fn test_copy_commit_none_marked() {
+		let cl = CommitList {
+			selection: 4,
+			..build_commit_list_with_some_commits()
+		};
+		// ids from build_commit_list_with_some_commits() are
+		// offset by two, so we expect commit id 2 for
+		// selection = 4
+		assert_eq!(
+			cl.concat_selected_commit_ids(),
+			Some(String::from(
+				"0000000000000000000000000000000000000002"
+			))
+		);
+	}
+
+	#[test]
+	fn test_copy_commit_one_marked() {
+		let cl = build_commit_list_with_some_commits();
+		let cl = CommitList {
+			marked: build_marked_from_indices(&cl, &[3]),
+			..cl
+		};
+		assert_eq!(
+			cl.concat_selected_commit_ids(),
+			Some(String::from(
+				"0000000000000000000000000000000000000001",
+			))
+		);
+	}
+
+	#[test]
+	fn test_copy_commit_range_marked() {
+		let cl = build_commit_list_with_some_commits();
+		let cl = CommitList {
+			marked: build_marked_from_indices(&cl, &[4, 5, 6, 7]),
+			..cl
+		};
+		assert_eq!(
+			cl.concat_selected_commit_ids(),
+			Some(String::from(concat!(
+				"0000000000000000000000000000000000000002 ",
+				"0000000000000000000000000000000000000003 ",
+				"0000000000000000000000000000000000000004 ",
+				"0000000000000000000000000000000000000005"
+			)))
+		);
+	}
+
+	#[test]
+	fn test_copy_commit_random_marked() {
+		let cl = build_commit_list_with_some_commits();
+		let cl = CommitList {
+			marked: build_marked_from_indices(&cl, &[4, 7]),
+			..cl
+		};
+		assert_eq!(
+			cl.concat_selected_commit_ids(),
+			Some(String::from(concat!(
+				"0000000000000000000000000000000000000002 ",
+				"0000000000000000000000000000000000000005"
+			)))
 		);
 	}
 }
