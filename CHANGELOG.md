@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * new command-line option to override the default log file path (`--logfile`) [[@acuteenvy](https://github.com/acuteenvy)] ([#2539](https://github.com/gitui-org/gitui/pull/2539))
 * dx: `make check` checks Cargo.toml dependency ordering using `cargo sort` [[@naseschwarz](https://github.com/naseschwarz)]
 * add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
+* Add "go to line" command for the blame view [[@andrea-berling](https://github.com/andrea-berling)] ([#2262](https://github.com/extrawurst/gitui/pull/2262))
 
 ### Changed
 * improve syntax highlighting file detection [[@acuteenvy](https://github.com/acuteenvy)] ([#2524](https://github.com/extrawurst/gitui/pull/2524))
@@ -34,13 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * use default shell instead of bash on Unix-like OS [[@yerke](https://github.com/yerke)] ([#2343](https://github.com/gitui-org/gitui/pull/2343))
 
 ### Added
-* add popups for viewing, adding, updating and removing remotes [[@robin-thoene](https://github.com/robin-thoene)] ([#2172](https://github.com/gitui-org/gitui/issues/2172))
-* support for `Copy Path` action in WSL [[@johnDeSilencio](https://github.com/johnDeSilencio)] ([#2413](https://github.com/gitui-org/gitui/pull/2413))
-* help popup scrollbar [[@wugeer](https://github.com/wugeer)] ([#2388](https://github.com/gitui-org/gitui/pull/2388))
 
-### Fixes
-* respect env vars like `GIT_CONFIG_GLOBAL` ([#2298](https://github.com/gitui-org/gitui/issues/2298))
-* Set `CREATE_NO_WINDOW` flag when executing Git hooks on Windows ([#2371](https://github.com/gitui-org/gitui/pull/2371))
+* support for "Copy Path" action in WSL [[@johnDeSilencio](https://github.com/johnDeSilencio)] ([#2413](https://github.com/extrawurst/gitui/pull/2413))
+* help popup scrollbar [[@wugeer](https://github.com/wugeer)](https://github.com/extrawurst/gitui/pull/2388))
+* add popups for viewing, adding, updating and removing remotes [[@robin-thoene](https://github.com/robin-thoene)] ([#2172](https://github.com/extrawurst/gitui/issues/2172))
 
 ## [0.26.3] - 2024-06-02
 

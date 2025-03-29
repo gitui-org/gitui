@@ -14,7 +14,7 @@ use std::{
 };
 
 ///
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, Debug)]
 pub struct BlameParams {
 	/// path to the file to blame
 	pub file_path: String,
@@ -22,15 +22,17 @@ pub struct BlameParams {
 	pub commit_id: Option<CommitId>,
 }
 
+#[derive(Debug)]
 struct Request<R, A>(R, Option<A>);
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 struct LastResult<P, R> {
 	params: P,
 	result: R,
 }
 
 ///
+#[derive(Debug, Clone)]
 pub struct AsyncBlame {
 	current: Arc<Mutex<Request<u64, FileBlame>>>,
 	last: Arc<Mutex<Option<LastResult<BlameParams, FileBlame>>>>,
