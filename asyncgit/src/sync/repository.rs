@@ -42,6 +42,12 @@ impl RepoPath {
 	}
 }
 
+impl From<PathBuf> for RepoPath {
+	fn from(value: PathBuf) -> Self {
+		Self::Path(value)
+	}
+}
+
 impl From<&str> for RepoPath {
 	fn from(p: &str) -> Self {
 		Self::Path(PathBuf::from(p))
