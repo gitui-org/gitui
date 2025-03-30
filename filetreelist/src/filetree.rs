@@ -552,7 +552,7 @@ mod test {
 		let mut tree =
 			FileTree::new(&items, &BTreeSet::new()).unwrap();
 
-		tree.window_height.set(Some(2));
+		tree.window_height.set(Some(3));
 
 		tree.selection = Some(0);
 		assert!(tree.move_selection(MoveSelection::PageDown));
