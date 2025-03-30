@@ -152,9 +152,7 @@ impl HookPaths {
 						if hook
 							.as_os_str()
 							.encode_wide()
-							.into_iter()
-							.find(|x| *x == (b'\'' as u16))
-							.is_some()
+							.any(|x| x == u16::from(b'\''))
 						{
 							// TODO: escape single quotes instead of failing
 							return Err(HooksError::PathToString);
