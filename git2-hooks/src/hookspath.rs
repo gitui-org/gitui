@@ -146,7 +146,7 @@ impl HookPaths {
 				if let Some(hook) = hook.to_str() {
 					os_str.push(hook.replace('\'', REPLACEMENT));
 				} else {
-					return Err(HooksError::PathToString);
+					os_str.push(hook.as_os_str()); // TODO: this doesn't work if `hook` contains single-quotes
 				}
 				os_str.push("'");
 				os_str.push(" \"$@\"");
