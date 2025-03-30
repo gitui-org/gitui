@@ -277,7 +277,7 @@ impl RevisionFilesComponent {
 
 		self.tree
 			.window_height
-			.set(Some(tree_height.saturating_sub(1)));
+			.set(Some(tree_height));
 
 		self.tree.visual_selection().map_or_else(
 			|| {

@@ -116,45 +116,14 @@ impl FileTree {
 
 	fn selection_page_updown(
 		&self,
-		current_index: usize,
-		up: bool,
+		range: impl Iterator<Item = usize>,
 	) -> Option<usize> {
-		let mut index = current_index;
+		let page_size = self.window_height.get().unwrap_or(0);
 
-		let mut count = 0;
-		loop {
-			index = {
-				let new_index = if up {
-					index.saturating_sub(1)
-				} else {
-					index.saturating_add(1)
-				};
-
-				if new_index == index {
-					break;
-				}
-
-				if new_index >= self.items.len() {
-					break;
-				}
-
-				new_index
-			};
-
-			if self.is_visible_index(index) {
-				count += 1;
-			}
-
-			if count >= self.window_height.get().unwrap_or(0) {
-				break;
-			}
-		}
-
-		if index == current_index {
-			None
-		} else {
-			Some(index)
-		}
+		range
+			.filter(|index| self.is_visible_index(*index))
+			.take(page_size)
+			.last()
 	}
 
 	///
@@ -176,13 +145,12 @@ impl FileTree {
 				}
 				MoveSelection::End => self.selection_end(selection),
 				MoveSelection::PageUp => {
-					Self::selection_page_updown(self, selection, true)
+					self.selection_page_updown((0..=selection).rev())
 				}
-				MoveSelection::PageDown => {
-					Self::selection_page_updown(
-						self, selection, false,
-					)
-				}
+				MoveSelection::PageDown => self
+					.selection_page_updown(
+						selection..(self.items.len()),
+					),
 			};
 
 			let changed_index =
