@@ -74,7 +74,6 @@ pub struct FileHistoryEntry {
 ///
 pub struct CommitFilterResult {
 	///
-	pub result: Vec<FileHistoryEntry>,
 	pub duration: Duration,
 }
 
@@ -91,6 +90,10 @@ pub struct AsyncFileHistoryResults(Arc<Mutex<Vec<FileHistoryEntry>>>);
 
 impl PartialEq for AsyncFileHistoryResults {
 	fn eq(&self, other: &Self) -> bool {
+		if Arc::ptr_eq(&self.0, &other.0) {
+			return true;
+		}
+
 		if let Ok(left) = self.0.lock() {
 			if let Ok(right) = other.0.lock() {
 				return *left == *right;
@@ -167,8 +170,16 @@ impl AsyncFileHistoryJob {
 			      -> Result<bool> {
 				let file_path = file_path.clone();
 
-				if fun_name(file_path, results.clone(), repo, commit_id)? {
+				if fun_name(
+					file_path,
+					results.clone(),
+					repo,
+					commit_id,
+				)? {
 					params.send(AsyncGitNotification::FileHistory)?;
+					params.set_progress(AsyncFileHistoryResults(
+						results.clone(),
+					))?;
 					Ok(true)
 				} else {
 					Ok(false)
@@ -202,13 +213,8 @@ impl AsyncFileHistoryJob {
 
 		walker.read(None)?;
 
-//		let result =
-//			std::mem::replace(&mut *result.lock()?, Vec::new());
-
 		let result = CommitFilterResult {
 			duration: start.elapsed(),
-			result: Default::default(), // TODO
-	//		result: self.results.0.into_inner()?,
 		};
 
 		Ok(result)

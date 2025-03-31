@@ -193,39 +193,17 @@ impl FileRevlogPopup {
 	}
 
 	pub fn update_list(&mut self) -> Result<()> {
-		let is_pending = self
-			.git_history
-			.as_ref()
-			.map(|git| git.is_pending())
-			.unwrap_or_default();
-
-		if is_pending {
-			if let Some(progress) = self
-				.git_history
-				.as_ref()
-				.and_then(|job| job.progress())
-			{
-				let result = progress.extract_results()?;
-
-				log::info!(
-					"file history update in progress: {}",
-					result.len()
-				);
-
-				self.items.extend(result.into_iter());
-			}
-		}
-
-		if let Some(job) =
-			self.git_history.as_ref().and_then(|job| job.take_last())
+		if let Some(progress) =
+			self.git_history.as_ref().and_then(|job| job.progress())
 		{
-			let result = job.extract_results()?;
+			let result = progress.extract_results()?;
 
-			log::info!("file history finished: {}", result.len());
+			log::info!(
+				"file history update in progress: {}",
+				result.len()
+			);
 
 			self.items.extend(result.into_iter());
-
-			self.git_history = None;
 		}
 
 		Ok(())
