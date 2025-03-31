@@ -243,7 +243,7 @@ impl FileRevlogPopup {
 			|open_request| {
 				strings::file_log_title(
 					&open_request.file_path,
-					selected,
+					selected + 1,
 					revisions,
 				)
 			},
