@@ -157,33 +157,29 @@ impl FileRevlogPopup {
 
 	pub fn update_diff(&mut self) -> Result<()> {
 		if self.is_visible() {
-			if let Some(commit_id) = self.selected_commit() {
-				if let Some(open_request) = &self.open_request {
-					let diff_params = DiffParams {
-						path: open_request.file_path.clone(),
-						diff_type: DiffType::Commit(commit_id),
-						options: self.options.borrow().diff_options(),
-					};
+			if let Some(item) = self.selected_item() {
+				let diff_params = DiffParams {
+					path: item.file_path.clone(),
+					diff_type: DiffType::Commit(item.commit),
+					options: self.options.borrow().diff_options(),
+				};
 
-					if let Some((params, last)) =
-						self.git_diff.last()?
-					{
-						if params == diff_params {
-							self.diff.update(
-								open_request.file_path.to_string(),
-								false,
-								last,
-							);
+				if let Some((params, last)) = self.git_diff.last()? {
+					if params == diff_params {
+						self.diff.update(
+							item.file_path.clone(),
+							false,
+							last,
+						);
 
-							return Ok(());
-						}
+						return Ok(());
 					}
-
-					self.git_diff.request(diff_params)?;
-					self.diff.clear(true);
-
-					return Ok(());
 				}
+
+				self.git_diff.request(diff_params)?;
+				self.diff.clear(true);
+
+				return Ok(());
 			}
 
 			self.diff.clear(false);
@@ -218,19 +214,20 @@ impl FileRevlogPopup {
 		Ok(())
 	}
 
-	fn selected_commit(&self) -> Option<CommitId> {
+	fn selected_item(&self) -> Option<&FileHistoryEntry> {
 		let table_state = self.table_state.take();
 
-		let commit_id = table_state.selected().and_then(|selected| {
-			self.items
-				.get(selected)
-				.as_ref()
-				.map(|entry| entry.commit)
-		});
+		let item = table_state
+			.selected()
+			.and_then(|selected| self.items.get(selected));
 
 		self.table_state.set(table_state);
 
-		commit_id
+		item
+	}
+
+	fn selected_commit(&self) -> Option<CommitId> {
+		Some(self.selected_item()?.commit)
 	}
 
 	fn can_focus_diff(&self) -> bool {
