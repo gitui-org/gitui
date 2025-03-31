@@ -326,7 +326,7 @@ impl FileRevlogPopup {
 	) -> Result<()> {
 		let old_selection =
 			self.table_state.get_mut().selected().unwrap_or(0);
-		let max_selection = self.items.len();
+		let max_selection = self.items.len().saturating_sub(1);
 		let height_in_items = self.current_height.get() / 2;
 
 		let new_selection = match scroll_type {
