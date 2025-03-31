@@ -1,5 +1,5 @@
 use asyncgit::sync::{CommitId, CommitInfo};
-use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 use indexmap::IndexSet;
 use std::{rc::Rc, slice::Iter};
 
@@ -67,11 +67,7 @@ impl LogEntry {
 	pub fn timestamp_to_datetime(
 		time: i64,
 	) -> Option<DateTime<Local>> {
-		let date = NaiveDateTime::from_timestamp(time, 0);
-
-		Some(DateTime::<Local>::from(
-			DateTime::<Utc>::from_naive_utc_and_offset(date, Utc),
-		))
+		Some(DateTime::<_>::from(DateTime::from_timestamp(time, 0)?))
 	}
 
 	///

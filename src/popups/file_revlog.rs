@@ -18,7 +18,7 @@ use asyncgit::{
 	AsyncDiff, AsyncGitNotification, DiffParams, DiffType,
 };
 use asyncgit::{AsyncFileHistoryJob, FileHistoryEntry};
-use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Local};
 use crossbeam_channel::Sender;
 use crossterm::event::Event;
 use ratatui::{
@@ -281,11 +281,7 @@ impl FileRevlogPopup {
 	pub fn timestamp_to_datetime(
 		time: i64,
 	) -> Option<DateTime<Local>> {
-		let date = NaiveDateTime::from_timestamp(time, 0);
-
-		Some(DateTime::<Local>::from(
-			DateTime::<Utc>::from_naive_utc_and_offset(date, Utc),
-		))
+		Some(DateTime::<_>::from(DateTime::from_timestamp(time, 0)?))
 	}
 
 	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row> {
