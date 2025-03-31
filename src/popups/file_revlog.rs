@@ -203,7 +203,14 @@ impl FileRevlogPopup {
 				result.len()
 			);
 
+			let was_empty = self.items.is_empty();
+
 			self.items.extend(result.into_iter());
+
+			if was_empty && !self.items.is_empty() {
+				self.queue
+					.push(InternalEvent::Update(NeedsUpdate::DIFF));
+			}
 		}
 
 		Ok(())
