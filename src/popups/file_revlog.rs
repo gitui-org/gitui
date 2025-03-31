@@ -126,7 +126,7 @@ impl FileRevlogPopup {
 			|| self
 				.git_history
 				.as_ref()
-				.map_or(false, AsyncSingleJob::is_pending)
+				.is_some_and(AsyncSingleJob::is_pending)
 	}
 
 	///
@@ -145,7 +145,7 @@ impl FileRevlogPopup {
 		if self.visible {
 			match event {
 				AsyncGitNotification::FileHistory => {
-					self.update_list()?
+					self.update_list()?;
 				}
 				AsyncGitNotification::Diff => self.update_diff()?,
 				_ => (),
@@ -193,8 +193,10 @@ impl FileRevlogPopup {
 	}
 
 	pub fn update_list(&mut self) -> Result<()> {
-		if let Some(progress) =
-			self.git_history.as_ref().and_then(|job| job.progress())
+		if let Some(progress) = self
+			.git_history
+			.as_ref()
+			.and_then(asyncgit::asyncjob::AsyncSingleJob::progress)
 		{
 			let result = progress.extract_results()?;
 
@@ -205,7 +207,7 @@ impl FileRevlogPopup {
 
 			let was_empty = self.items.is_empty();
 
-			self.items.extend(result.into_iter());
+			self.items.extend(result);
 
 			if was_empty && !self.items.is_empty() {
 				self.queue
@@ -221,8 +223,7 @@ impl FileRevlogPopup {
 
 		let commit_id = table_state.selected().and_then(|selected| {
 			self.items
-				.iter()
-				.nth(selected)
+				.get(selected)
 				.as_ref()
 				.map(|entry| entry.commit)
 		});
@@ -323,10 +324,7 @@ impl FileRevlogPopup {
 			.collect()
 	}
 
-	fn move_selection(
-		&mut self,
-		scroll_type: ScrollType,
-	) -> Result<()> {
+	fn move_selection(&mut self, scroll_type: ScrollType) {
 		let old_selection =
 			self.table_state.get_mut().selected().unwrap_or(0);
 		let max_selection = self.items.len().saturating_sub(1);
@@ -353,8 +351,6 @@ impl FileRevlogPopup {
 		}
 
 		self.set_selection(new_selection);
-
-		Ok(())
 	}
 
 	fn set_selection(&mut self, selection: usize) {
@@ -416,9 +412,7 @@ impl FileRevlogPopup {
 		// at index 50. Subtracting the current offset from the selected index
 		// yields the correct index in `self.items`, in this case 0.
 		let mut adjusted_table_state = TableState::default()
-			.with_selected(
-				table_state.selected().map(|selected| selected),
-			)
+			.with_selected(table_state.selected())
 			.with_offset(table_state.offset());
 
 		f.render_widget(Clear, area);
@@ -541,12 +535,12 @@ impl Component for FileRevlogPopup {
 					}
 				} else if key_match(key, self.key_config.keys.move_up)
 				{
-					self.move_selection(ScrollType::Up)?;
+					self.move_selection(ScrollType::Up);
 				} else if key_match(
 					key,
 					self.key_config.keys.move_down,
 				) {
-					self.move_selection(ScrollType::Down)?;
+					self.move_selection(ScrollType::Down);
 				} else if key_match(
 					key,
 					self.key_config.keys.shift_up,
@@ -554,7 +548,7 @@ impl Component for FileRevlogPopup {
 					key,
 					self.key_config.keys.home,
 				) {
-					self.move_selection(ScrollType::Home)?;
+					self.move_selection(ScrollType::Home);
 				} else if key_match(
 					key,
 					self.key_config.keys.shift_down,
@@ -562,15 +556,15 @@ impl Component for FileRevlogPopup {
 					key,
 					self.key_config.keys.end,
 				) {
-					self.move_selection(ScrollType::End)?;
+					self.move_selection(ScrollType::End);
 				} else if key_match(key, self.key_config.keys.page_up)
 				{
-					self.move_selection(ScrollType::PageUp)?;
+					self.move_selection(ScrollType::PageUp);
 				} else if key_match(
 					key,
 					self.key_config.keys.page_down,
 				) {
-					self.move_selection(ScrollType::PageDown)?;
+					self.move_selection(ScrollType::PageDown);
 				}
 			}
 

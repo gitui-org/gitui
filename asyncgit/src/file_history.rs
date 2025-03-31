@@ -44,21 +44,19 @@ impl From<git2::Delta> for FileHistoryEntryDelta {
 			| git2::Delta::Ignored
 			| git2::Delta::Unreadable
 			| git2::Delta::Conflicted
-			| git2::Delta::Untracked => FileHistoryEntryDelta::None,
-			git2::Delta::Added => FileHistoryEntryDelta::Added,
-			git2::Delta::Deleted => FileHistoryEntryDelta::Deleted,
-			git2::Delta::Modified => FileHistoryEntryDelta::Modified,
-			git2::Delta::Renamed => FileHistoryEntryDelta::Renamed,
-			git2::Delta::Copied => FileHistoryEntryDelta::Copied,
-			git2::Delta::Typechange => {
-				FileHistoryEntryDelta::Typechange
-			}
+			| git2::Delta::Untracked => Self::None,
+			git2::Delta::Added => Self::Added,
+			git2::Delta::Deleted => Self::Deleted,
+			git2::Delta::Modified => Self::Modified,
+			git2::Delta::Renamed => Self::Renamed,
+			git2::Delta::Copied => Self::Copied,
+			git2::Delta::Typechange => Self::Typechange,
 		}
 	}
 }
 
 ///
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileHistoryEntry {
 	///
 	pub commit: CommitId,
@@ -170,12 +168,7 @@ impl AsyncFileHistoryJob {
 			      -> Result<bool> {
 				let file_path = file_path.clone();
 
-				if fun_name(
-					file_path,
-					results.clone(),
-					repo,
-					commit_id,
-				)? {
+				if fun_name(&file_path, &results, repo, commit_id)? {
 					params.send(AsyncGitNotification::FileHistory)?;
 					params.set_progress(AsyncFileHistoryResults(
 						results.clone(),
@@ -222,8 +215,8 @@ impl AsyncFileHistoryJob {
 }
 
 fn fun_name(
-	file_path: Arc<RwLock<String>>,
-	results: Arc<Mutex<Vec<FileHistoryEntry>>>,
+	file_path: &Arc<RwLock<String>>,
+	results: &Arc<Mutex<Vec<FileHistoryEntry>>>,
 	repo: &Repository,
 	commit_id: &CommitId,
 ) -> Result<bool> {
@@ -246,7 +239,7 @@ fn fun_name(
 
 		let entry = FileHistoryEntry {
 			commit: *commit_id,
-			delta: delta.clone().into(),
+			delta: delta.into(),
 			info: commit_info,
 			file_path: current_file_path.clone(),
 		};
