@@ -211,13 +211,14 @@ mod tests {
 	};
 	use commit::{amend, commit_message_prettify, tag_commit};
 	use git2::Repository;
+	use std::cell::RefCell;
 	use std::{fs::File, io::Write, path::Path};
 
 	fn count_commits(repo: &Repository, max: usize) -> usize {
-		let mut items = Vec::new();
-		let mut walk = LogWalker::new(repo, max).unwrap();
-		walk.read(&mut items).unwrap();
-		items.len()
+		let items = RefCell::new(Vec::new());
+		let mut walk = LogWalker::new(repo, Some(max)).unwrap();
+		walk.read(Some(&items)).unwrap();
+		items.take().len()
 	}
 
 	#[test]

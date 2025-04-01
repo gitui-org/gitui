@@ -3,7 +3,7 @@ use crate::{
 	components::{
 		event_pump, visibility_blocking, CommandBlocking,
 		CommandInfo, Component, DiffComponent, DrawableComponent,
-		EventState, ItemBatch, ScrollType,
+		EventState, ScrollType,
 	},
 	keys::{key_match, SharedKeyConfig},
 	options::SharedOptions,
@@ -12,13 +12,13 @@ use crate::{
 	ui::{draw_scrollbar, style::SharedTheme, Orientation},
 };
 use anyhow::Result;
+use asyncgit::asyncjob::AsyncSingleJob;
 use asyncgit::{
-	sync::{
-		diff_contains_file, get_commits_info, CommitId, RepoPathRef,
-	},
-	AsyncDiff, AsyncGitNotification, AsyncLog, DiffParams, DiffType,
+	sync::{CommitId, RepoPathRef},
+	AsyncDiff, AsyncGitNotification, DiffParams, DiffType,
 };
-use chrono::{DateTime, Local};
+use asyncgit::{AsyncFileHistoryJob, FileHistoryEntry};
+use chrono::{DateTime, Duration, Local};
 use crossbeam_channel::Sender;
 use crossterm::event::Event;
 use ratatui::{
@@ -29,8 +29,6 @@ use ratatui::{
 };
 
 use super::{BlameFileOpen, InspectCommitOpen};
-
-const SLICE_SIZE: usize = 1200;
 
 #[derive(Clone, Debug)]
 pub struct FileRevOpen {
@@ -49,7 +47,7 @@ impl FileRevOpen {
 
 ///
 pub struct FileRevlogPopup {
-	git_log: Option<AsyncLog>,
+	git_history: Option<AsyncSingleJob<AsyncFileHistoryJob>>,
 	git_diff: AsyncDiff,
 	theme: SharedTheme,
 	queue: Queue,
@@ -59,7 +57,7 @@ pub struct FileRevlogPopup {
 	repo_path: RepoPathRef,
 	open_request: Option<FileRevOpen>,
 	table_state: std::cell::Cell<TableState>,
-	items: ItemBatch,
+	items: Vec<FileHistoryEntry>,
 	count_total: usize,
 	key_config: SharedKeyConfig,
 	options: SharedOptions,
@@ -75,16 +73,16 @@ impl FileRevlogPopup {
 			queue: env.queue.clone(),
 			sender: env.sender_git.clone(),
 			diff: DiffComponent::new(env, true),
-			git_log: None,
 			git_diff: AsyncDiff::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
 			),
+			git_history: None,
 			visible: false,
 			repo_path: env.repo.clone(),
 			open_request: None,
 			table_state: std::cell::Cell::new(TableState::default()),
-			items: ItemBatch::default(),
+			items: Vec::new(),
 			count_total: 0,
 			key_config: env.key_config.clone(),
 			current_width: std::cell::Cell::new(0),
@@ -99,16 +97,17 @@ impl FileRevlogPopup {
 
 	///
 	pub fn open(&mut self, open_request: FileRevOpen) -> Result<()> {
+		self.items.clear();
 		self.open_request = Some(open_request.clone());
 
-		let filter = diff_contains_file(open_request.file_path);
-		self.git_log = Some(AsyncLog::new(
+		let job = AsyncSingleJob::new(self.sender.clone());
+		job.spawn(AsyncFileHistoryJob::new(
 			self.repo_path.borrow().clone(),
-			&self.sender,
-			Some(filter),
+			open_request.file_path,
 		));
 
-		self.items.clear();
+		self.git_history = Some(job);
+
 		self.set_selection(open_request.selection.unwrap_or(0));
 
 		self.show()?;
@@ -124,17 +123,16 @@ impl FileRevlogPopup {
 	///
 	pub fn any_work_pending(&self) -> bool {
 		self.git_diff.is_pending()
-			|| self.git_log.as_ref().is_some_and(AsyncLog::is_pending)
+			|| self
+				.git_history
+				.as_ref()
+				.is_some_and(AsyncSingleJob::is_pending)
 	}
 
 	///
+	//TODO: needed?
 	pub fn update(&mut self) -> Result<()> {
-		if let Some(ref mut git_log) = self.git_log {
-			git_log.fetch()?;
-
-			self.fetch_commits_if_needed()?;
-			self.update_diff()?;
-		}
+		self.update_list()?;
 
 		Ok(())
 	}
@@ -146,8 +144,9 @@ impl FileRevlogPopup {
 	) -> Result<()> {
 		if self.visible {
 			match event {
-				AsyncGitNotification::CommitFiles
-				| AsyncGitNotification::Log => self.update()?,
+				AsyncGitNotification::FileHistory => {
+					self.update_list()?;
+				}
 				AsyncGitNotification::Diff => self.update_diff()?,
 				_ => (),
 			}
@@ -158,33 +157,29 @@ impl FileRevlogPopup {
 
 	pub fn update_diff(&mut self) -> Result<()> {
 		if self.is_visible() {
-			if let Some(commit_id) = self.selected_commit() {
-				if let Some(open_request) = &self.open_request {
-					let diff_params = DiffParams {
-						path: open_request.file_path.clone(),
-						diff_type: DiffType::Commit(commit_id),
-						options: self.options.borrow().diff_options(),
-					};
+			if let Some(item) = self.selected_item() {
+				let diff_params = DiffParams {
+					path: item.file_path.clone(),
+					diff_type: DiffType::Commit(item.commit),
+					options: self.options.borrow().diff_options(),
+				};
 
-					if let Some((params, last)) =
-						self.git_diff.last()?
-					{
-						if params == diff_params {
-							self.diff.update(
-								open_request.file_path.to_string(),
-								false,
-								last,
-							);
+				if let Some((params, last)) = self.git_diff.last()? {
+					if params == diff_params {
+						self.diff.update(
+							item.file_path.clone(),
+							false,
+							last,
+						);
 
-							return Ok(());
-						}
+						return Ok(());
 					}
-
-					self.git_diff.request(diff_params)?;
-					self.diff.clear(true);
-
-					return Ok(());
 				}
+
+				self.git_diff.request(diff_params)?;
+				self.diff.clear(true);
+
+				return Ok(());
 			}
 
 			self.diff.clear(false);
@@ -193,49 +188,46 @@ impl FileRevlogPopup {
 		Ok(())
 	}
 
-	fn fetch_commits(
-		&mut self,
-		new_offset: usize,
-		new_max_offset: usize,
-	) -> Result<()> {
-		if let Some(git_log) = &mut self.git_log {
-			let amount = new_max_offset
-				.saturating_sub(new_offset)
-				.max(SLICE_SIZE);
+	pub fn update_list(&mut self) -> Result<()> {
+		if let Some(progress) = self
+			.git_history
+			.as_ref()
+			.and_then(asyncgit::asyncjob::AsyncSingleJob::progress)
+		{
+			let result = progress.extract_results()?;
 
-			let commits = get_commits_info(
-				&self.repo_path.borrow(),
-				&git_log.get_slice(new_offset, amount)?,
-				self.current_width.get(),
+			log::info!(
+				"file history update in progress: {}",
+				result.len()
 			);
 
-			if let Ok(commits) = commits {
-				self.items.set_items(new_offset, commits, None);
-			}
+			let was_empty = self.items.is_empty();
 
-			self.count_total = git_log.count()?;
+			self.items.extend(result);
+
+			if was_empty && !self.items.is_empty() {
+				self.queue
+					.push(InternalEvent::Update(NeedsUpdate::DIFF));
+			}
 		}
 
 		Ok(())
 	}
 
-	fn selected_commit(&self) -> Option<CommitId> {
+	fn selected_item(&self) -> Option<&FileHistoryEntry> {
 		let table_state = self.table_state.take();
 
-		let commit_id = table_state.selected().and_then(|selected| {
-			self.items
-				.iter()
-				.nth(
-					selected
-						.saturating_sub(self.items.index_offset()),
-				)
-				.as_ref()
-				.map(|entry| entry.id)
-		});
+		let item = table_state
+			.selected()
+			.and_then(|selected| self.items.get(selected));
 
 		self.table_state.set(table_state);
 
-		commit_id
+		item
+	}
+
+	fn selected_commit(&self) -> Option<CommitId> {
+		Some(self.selected_item()?.commit)
 	}
 
 	fn can_focus_diff(&self) -> bool {
@@ -249,18 +241,45 @@ impl FileRevlogPopup {
 			self.table_state.set(table);
 			res
 		};
-		let revisions = self.get_max_selection();
+		let revisions = self.items.len();
 
 		self.open_request.as_ref().map_or(
 			"<no history available>".into(),
 			|open_request| {
 				strings::file_log_title(
 					&open_request.file_path,
-					selected,
+					selected + 1,
 					revisions,
 				)
 			},
 		)
+	}
+
+	fn time_as_string(
+		time: DateTime<Local>,
+		now: DateTime<Local>,
+	) -> String {
+		let delta = now - time;
+		if delta < Duration::try_minutes(30).unwrap_or_default() {
+			let delta_str = if delta
+				< Duration::try_minutes(1).unwrap_or_default()
+			{
+				"<1m ago".to_string()
+			} else {
+				format!("{:0>2}m ago", delta.num_minutes())
+			};
+			format!("{delta_str: <10}")
+		} else if time.date_naive() == now.date_naive() {
+			time.format("%T  ").to_string()
+		} else {
+			time.format("%Y-%m-%d").to_string()
+		}
+	}
+
+	pub fn timestamp_to_datetime(
+		time: i64,
+	) -> Option<DateTime<Local>> {
+		Some(DateTime::<_>::from(DateTime::from_timestamp(time, 0)?))
 	}
 
 	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row> {
@@ -269,23 +288,31 @@ impl FileRevlogPopup {
 			.map(|entry| {
 				let spans = Line::from(vec![
 					Span::styled(
-						entry.hash_short.to_string(),
+						entry.commit.get_short_string(),
 						self.theme.commit_hash(false),
 					),
 					Span::raw(" "),
 					Span::styled(
-						entry.time_to_string(now),
+						Self::time_as_string(
+							Self::timestamp_to_datetime(
+								entry.info.time,
+							)
+							.unwrap_or_default(),
+							now,
+						),
 						self.theme.commit_time(false),
 					),
 					Span::raw(" "),
 					Span::styled(
-						entry.author.to_string(),
+						entry.info.author.clone(),
 						self.theme.commit_author(false),
 					),
 				]);
 
 				let mut text = Text::from(spans);
-				text.extend(Text::raw(entry.msg.to_string()));
+				text.extend(Text::raw(
+					entry.info.message.to_string(),
+				));
 
 				let cells = vec![Cell::from(""), Cell::from(text)];
 
@@ -294,19 +321,10 @@ impl FileRevlogPopup {
 			.collect()
 	}
 
-	fn get_max_selection(&self) -> usize {
-		self.git_log.as_ref().map_or(0, |log| {
-			log.count().unwrap_or(0).saturating_sub(1)
-		})
-	}
-
-	fn move_selection(
-		&mut self,
-		scroll_type: ScrollType,
-	) -> Result<()> {
+	fn move_selection(&mut self, scroll_type: ScrollType) {
 		let old_selection =
 			self.table_state.get_mut().selected().unwrap_or(0);
-		let max_selection = self.get_max_selection();
+		let max_selection = self.items.len().saturating_sub(1);
 		let height_in_items = self.current_height.get() / 2;
 
 		let new_selection = match scroll_type {
@@ -330,9 +348,6 @@ impl FileRevlogPopup {
 		}
 
 		self.set_selection(new_selection);
-		self.fetch_commits_if_needed()?;
-
-		Ok(())
 	}
 
 	fn set_selection(&mut self, selection: usize) {
@@ -347,22 +362,6 @@ impl FileRevlogPopup {
 
 		*self.table_state.get_mut().offset_mut() = new_offset;
 		self.table_state.get_mut().select(Some(selection));
-	}
-
-	fn fetch_commits_if_needed(&mut self) -> Result<()> {
-		let selection =
-			self.table_state.get_mut().selected().unwrap_or(0);
-		let offset = *self.table_state.get_mut().offset_mut();
-		let height_in_items =
-			(self.current_height.get().saturating_sub(2)) / 2;
-		let new_max_offset =
-			selection.saturating_add(height_in_items);
-
-		if self.items.needs_data(offset, new_max_offset) {
-			self.fetch_commits(offset, new_max_offset)?;
-		}
-
-		Ok(())
 	}
 
 	fn get_selection(&self) -> Option<usize> {
@@ -410,14 +409,8 @@ impl FileRevlogPopup {
 		// at index 50. Subtracting the current offset from the selected index
 		// yields the correct index in `self.items`, in this case 0.
 		let mut adjusted_table_state = TableState::default()
-			.with_selected(table_state.selected().map(|selected| {
-				selected.saturating_sub(self.items.index_offset())
-			}))
-			.with_offset(
-				table_state
-					.offset()
-					.saturating_sub(self.items.index_offset()),
-			);
+			.with_selected(table_state.selected())
+			.with_offset(table_state.offset());
 
 		f.render_widget(Clear, area);
 		f.render_stateful_widget(
@@ -523,15 +516,19 @@ impl Component for FileRevlogPopup {
 						));
 					};
 				} else if key_match(key, self.key_config.keys.blame) {
-					if let Some(open_request) =
-						self.open_request.clone()
+					if let Some(selected_item) =
+						self.selected_item().map(ToOwned::to_owned)
 					{
 						self.hide_stacked(true);
 						self.queue.push(InternalEvent::OpenPopup(
 							StackablePopupOpen::BlameFile(
 								BlameFileOpen {
-									file_path: open_request.file_path,
-									commit_id: self.selected_commit(),
+									file_path: selected_item
+										.file_path
+										.clone(),
+									commit_id: Some(
+										selected_item.commit,
+									),
 									selection: None,
 								},
 							),
@@ -539,12 +536,12 @@ impl Component for FileRevlogPopup {
 					}
 				} else if key_match(key, self.key_config.keys.move_up)
 				{
-					self.move_selection(ScrollType::Up)?;
+					self.move_selection(ScrollType::Up);
 				} else if key_match(
 					key,
 					self.key_config.keys.move_down,
 				) {
-					self.move_selection(ScrollType::Down)?;
+					self.move_selection(ScrollType::Down);
 				} else if key_match(
 					key,
 					self.key_config.keys.shift_up,
@@ -552,7 +549,7 @@ impl Component for FileRevlogPopup {
 					key,
 					self.key_config.keys.home,
 				) {
-					self.move_selection(ScrollType::Home)?;
+					self.move_selection(ScrollType::Home);
 				} else if key_match(
 					key,
 					self.key_config.keys.shift_down,
@@ -560,15 +557,15 @@ impl Component for FileRevlogPopup {
 					key,
 					self.key_config.keys.end,
 				) {
-					self.move_selection(ScrollType::End)?;
+					self.move_selection(ScrollType::End);
 				} else if key_match(key, self.key_config.keys.page_up)
 				{
-					self.move_selection(ScrollType::PageUp)?;
+					self.move_selection(ScrollType::PageUp);
 				} else if key_match(
 					key,
 					self.key_config.keys.page_down,
 				) {
-					self.move_selection(ScrollType::PageDown)?;
+					self.move_selection(ScrollType::PageDown);
 				}
 			}
 

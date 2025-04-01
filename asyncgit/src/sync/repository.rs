@@ -47,6 +47,11 @@ impl From<&str> for RepoPath {
 		Self::Path(PathBuf::from(p))
 	}
 }
+impl From<&Path> for RepoPath {
+	fn from(p: &Path) -> Self {
+		Self::Path(PathBuf::from(p))
+	}
+}
 
 pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
 	let repo = Repository::open_ext(

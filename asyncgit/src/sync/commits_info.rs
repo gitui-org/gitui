@@ -5,7 +5,7 @@ use crate::{
 	error::Result,
 	sync::{commit_details::get_author_of_commit, repository::repo},
 };
-use git2::{Commit, Error, Oid};
+use git2::{Commit, Error, Oid, Repository};
 use scopetime::scope_time;
 use unicode_truncate::UnicodeTruncateStr;
 
@@ -73,7 +73,7 @@ impl From<Oid> for CommitId {
 }
 
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitInfo {
 	///
 	pub message: String,
@@ -131,9 +131,17 @@ pub fn get_commit_info(
 	scope_time!("get_commit_info");
 
 	let repo = repo(repo_path)?;
-	let mailmap = repo.mailmap()?;
 
+	get_commit_info_repo(&repo, commit_id)
+}
+
+///
+pub fn get_commit_info_repo(
+	repo: &Repository,
+	commit_id: &CommitId,
+) -> Result<CommitInfo> {
 	let commit = repo.find_commit((*commit_id).into())?;
+	let mailmap = repo.mailmap()?;
 	let author = get_author_of_commit(&commit, &mailmap);
 
 	Ok(CommitInfo {
