@@ -516,15 +516,19 @@ impl Component for FileRevlogPopup {
 						));
 					}
 				} else if key_match(key, self.key_config.keys.blame) {
-					if let Some(open_request) =
-						self.open_request.clone()
+					if let Some(selected_item) =
+						self.selected_item().map(ToOwned::to_owned)
 					{
 						self.hide_stacked(true);
 						self.queue.push(InternalEvent::OpenPopup(
 							StackablePopupOpen::BlameFile(
 								BlameFileOpen {
-									file_path: open_request.file_path,
-									commit_id: self.selected_commit(),
+									file_path: selected_item
+										.file_path
+										.clone(),
+									commit_id: Some(
+										selected_item.commit,
+									),
 									selection: None,
 								},
 							),
