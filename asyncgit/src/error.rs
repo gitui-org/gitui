@@ -114,6 +114,20 @@ pub enum Error {
 	GixRevisionWalk(#[from] gix::revision::walk::Error),
 
 	///
+	#[error("gix::traverse::commit::topo error: {0}")]
+	GixTraverseCommitTopo(#[from] gix::traverse::commit::topo::Error),
+
+	///
+	#[error("gix::repository::diff_resource_cache error: {0}")]
+	GixRepositoryDiffResourceCache(
+		#[from] Box<gix::repository::diff_resource_cache::Error>,
+	),
+
+	///
+	#[error("gix_blame error: {0}")]
+	GixBlame(#[from] gix_blame::Error),
+
+	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
 	SignAmendNonLastCommit,
 
@@ -144,5 +158,13 @@ impl<T> From<crossbeam_channel::SendError<T>> for Error {
 impl From<gix::discover::Error> for Error {
 	fn from(error: gix::discover::Error) -> Self {
 		Self::GixDiscover(Box::new(error))
+	}
+}
+
+impl From<gix::repository::diff_resource_cache::Error> for Error {
+	fn from(
+		error: gix::repository::diff_resource_cache::Error,
+	) -> Self {
+		Self::GixRepositoryDiffResourceCache(Box::new(error))
 	}
 }
