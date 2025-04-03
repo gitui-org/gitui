@@ -34,6 +34,15 @@ pub struct FileBlame {
 	pub lines: Vec<(Option<BlameHunk>, String)>,
 }
 
+fn object_id_to_oid(object_id: gix::ObjectId) -> git2::Oid {
+	// TODO
+	// This should not fail. It will also become obsolete once `gix::ObjectId` is used throughout
+	// `gitui`.
+	#[allow(clippy::expect_used)]
+	git2::Oid::from_bytes(object_id.as_bytes())
+		.expect("ObjectId could not be converted to Oid")
+}
+
 ///
 pub fn blame_file(
 	repo_path: &RepoPath,
@@ -56,11 +65,10 @@ pub fn blame_file(
 		[tip],
 		None::<Vec<gix::ObjectId>>,
 	)
-	.build()
-	.expect("TODO");
+	.build()?;
 
 	let mut resource_cache =
-		repo.diff_resource_cache_for_tree_diff().expect("TODO");
+		repo.diff_resource_cache_for_tree_diff()?;
 
 	let outcome = gix_blame::file(
 		&repo.objects,
@@ -68,8 +76,7 @@ pub fn blame_file(
 		&mut resource_cache,
 		file_path.into(),
 		None,
-	)
-	.expect("TODO");
+	)?;
 
 	let commit_id = if let Some(commit_id) = commit_id {
 		commit_id
@@ -82,12 +89,7 @@ pub fn blame_file(
 	let unique_commit_ids: HashSet<_> = outcome
 		.entries
 		.iter()
-		.map(|entry| {
-			CommitId::new(
-				git2::Oid::from_bytes(entry.commit_id.as_bytes())
-					.expect("TODO"),
-			)
-		})
+		.map(|entry| CommitId::new(object_id_to_oid(entry.commit_id)))
 		.collect();
 	let mut commit_ids = Vec::with_capacity(unique_commit_ids.len());
 	commit_ids.extend(unique_commit_ids);
@@ -104,10 +106,8 @@ pub fn blame_file(
 	let lines: Vec<(Option<BlameHunk>, String)> = outcome
 		.entries_with_lines()
 		.flat_map(|(entry, lines)| {
-			let commit_id = CommitId::new(
-				git2::Oid::from_bytes(entry.commit_id.as_bytes())
-					.expect("TODO"),
-			);
+			let commit_id =
+				CommitId::new(object_id_to_oid(entry.commit_id));
 			let start_in_blamed_file =
 				entry.start_in_blamed_file as usize;
 
@@ -128,7 +128,8 @@ pub fn blame_file(
 								author: commit_info.author.clone(),
 								time: commit_info.time,
 								start_line: start_in_blamed_file + i,
-								end_line: start_in_blamed_file + i,
+								end_line: start_in_blamed_file
+									+ i + 1,
 							}),
 							trimmed_line,
 						);
