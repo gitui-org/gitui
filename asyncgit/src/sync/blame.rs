@@ -53,9 +53,9 @@ pub fn blame_file(
 	};
 
 	let cache: Option<gix::commitgraph::Graph> =
-		repo.commit_graph_if_enabled().expect("TODO");
+		repo.commit_graph_if_enabled()?;
 	let mut resource_cache =
-		repo.diff_resource_cache_for_tree_diff().expect("TODO");
+		repo.diff_resource_cache_for_tree_diff()?;
 
 	let options: gix_blame::Options = Default::default();
 
@@ -66,8 +66,7 @@ pub fn blame_file(
 		&mut resource_cache,
 		file_path.into(),
 		options,
-	)
-	.expect("TODO");
+	)?;
 
 	let commit_id = if let Some(commit_id) = commit_id {
 		commit_id
@@ -77,15 +76,10 @@ pub fn blame_file(
 		utils::get_head_repo(&repo)?
 	};
 
-	let unique_commit_ids: HashSet<_> = outcome
+	let unique_commit_ids: HashSet<CommitId> = outcome
 		.entries
 		.iter()
-		.map(|entry| {
-			CommitId::new(
-				git2::Oid::from_bytes(entry.commit_id.as_bytes())
-					.expect("TODO"),
-			)
-		})
+		.map(|entry| entry.commit_id.into())
 		.collect();
 	let mut commit_ids = Vec::with_capacity(unique_commit_ids.len());
 	commit_ids.extend(unique_commit_ids);
@@ -102,10 +96,7 @@ pub fn blame_file(
 	let lines: Vec<(Option<BlameHunk>, String)> = outcome
 		.entries_with_lines()
 		.flat_map(|(entry, lines)| {
-			let commit_id = CommitId::new(
-				git2::Oid::from_bytes(entry.commit_id.as_bytes())
-					.expect("TODO"),
-			);
+			let commit_id = entry.commit_id.into();
 			let start_in_blamed_file =
 				entry.start_in_blamed_file as usize;
 
@@ -126,7 +117,8 @@ pub fn blame_file(
 								author: commit_info.author.clone(),
 								time: commit_info.time,
 								start_line: start_in_blamed_file + i,
-								end_line: start_in_blamed_file + i,
+								end_line: start_in_blamed_file
+									+ i + 1,
 							}),
 							trimmed_line,
 						);
