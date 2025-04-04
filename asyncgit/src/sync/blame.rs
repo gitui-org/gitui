@@ -1,15 +1,9 @@
 //! Sync git API for fetching a file blame
 
 use super::{utils, CommitId, RepoPath};
-use crate::{
-	error::{Error, Result},
-	sync::{get_commits_info, repository::repo},
-};
-use git2::BlameOptions;
+use crate::{error::Result, sync::get_commits_info};
 use scopetime::scope_time;
 use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader};
-use std::path::Path;
 
 /// A `BlameHunk` contains all the information that will be shown to the user.
 #[derive(Clone, Hash, Debug, PartialEq, Eq)]
@@ -40,17 +34,13 @@ pub struct FileBlame {
 	pub lines: Vec<(Option<BlameHunk>, String)>,
 }
 
-/// fixup `\` windows path separators to git compatible `/`
-fn fixup_windows_path(path: &str) -> String {
-	#[cfg(windows)]
-	{
-		path.replace('\\', "/")
-	}
-
-	#[cfg(not(windows))]
-	{
-		path.to_string()
-	}
+fn object_id_to_oid(object_id: gix::ObjectId) -> git2::Oid {
+	// TODO
+	// This should not fail. It will also become obsolete once `gix::ObjectId` is used throughout
+	// `gitui`.
+	#[allow(clippy::expect_used)]
+	git2::Oid::from_bytes(object_id.as_bytes())
+		.expect("ObjectId could not be converted to Oid")
 }
 
 ///
@@ -61,35 +51,45 @@ pub fn blame_file(
 ) -> Result<FileBlame> {
 	scope_time!("blame_file");
 
-	let repo = repo(repo_path)?;
+	let repo: gix::Repository =
+				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
+						.map(Into::into)?;
+	let tip: gix::ObjectId = match commit_id {
+		Some(commit_id) => gix::ObjectId::from_bytes_or_panic(
+			commit_id.get_oid().as_bytes(),
+		),
+		_ => repo.head()?.peel_to_commit_in_place()?.id,
+	};
+	let traverse = gix::traverse::commit::topo::Builder::from_iters(
+		&repo.objects,
+		[tip],
+		None::<Vec<gix::ObjectId>>,
+	)
+	.build()?;
+
+	let mut resource_cache =
+		repo.diff_resource_cache_for_tree_diff()?;
+
+	let outcome = gix_blame::file(
+		&repo.objects,
+		traverse,
+		&mut resource_cache,
+		file_path.into(),
+		None,
+	)?;
 
 	let commit_id = if let Some(commit_id) = commit_id {
 		commit_id
 	} else {
+		let repo = crate::sync::repo(repo_path)?;
+
 		utils::get_head_repo(&repo)?
 	};
 
-	let spec =
-		format!("{}:{}", commit_id, fixup_windows_path(file_path));
-
-	let object = repo.revparse_single(&spec)?;
-	let blob = repo.find_blob(object.id())?;
-
-	if blob.is_binary() {
-		return Err(Error::NoBlameOnBinaryFile);
-	}
-
-	let mut opts = BlameOptions::new();
-	opts.newest_commit(commit_id.into());
-
-	let blame =
-		repo.blame_file(Path::new(file_path), Some(&mut opts))?;
-
-	let reader = BufReader::new(blob.content());
-
-	let unique_commit_ids: HashSet<_> = blame
+	let unique_commit_ids: HashSet<_> = outcome
+		.entries
 		.iter()
-		.map(|hunk| CommitId::new(hunk.final_commit_id()))
+		.map(|entry| CommitId::new(object_id_to_oid(entry.commit_id)))
 		.collect();
 	let mut commit_ids = Vec::with_capacity(unique_commit_ids.len());
 	commit_ids.extend(unique_commit_ids);
@@ -100,40 +100,44 @@ pub fn blame_file(
 		.map(|commit_info| (commit_info.id, commit_info))
 		.collect();
 
-	let lines: Vec<(Option<BlameHunk>, String)> = reader
-		.lines()
-		.enumerate()
-		.map(|(i, line)| {
-			// Line indices in a `FileBlame` are 1-based.
-			let corresponding_hunk = blame.get_line(i + 1);
+	// TODO
+	// The shape of data as returned by `entries_with_lines` is preferable to the one chosen here
+	// because the former is much closer to what the UI is going to need in the end.
+	let lines: Vec<(Option<BlameHunk>, String)> = outcome
+		.entries_with_lines()
+		.flat_map(|(entry, lines)| {
+			let commit_id =
+				CommitId::new(object_id_to_oid(entry.commit_id));
+			let start_in_blamed_file =
+				entry.start_in_blamed_file as usize;
 
-			if let Some(hunk) = corresponding_hunk {
-				let commit_id = CommitId::new(hunk.final_commit_id());
-				// Line indices in a `BlameHunk` are 1-based.
-				let start_line =
-					hunk.final_start_line().saturating_sub(1);
-				let end_line =
-					start_line.saturating_add(hunk.lines_in_hunk());
+			lines
+				.iter()
+				.enumerate()
+				.map(|(i, line)| {
+					// TODO
+					let trimmed_line =
+						line.to_string().trim_end().to_string();
 
-				if let Some(commit_info) =
-					unique_commit_infos.get(&commit_id)
-				{
-					let hunk = BlameHunk {
-						commit_id,
-						author: commit_info.author.clone(),
-						time: commit_info.time,
-						start_line,
-						end_line,
+					if let Some(commit_info) =
+						unique_commit_infos.get(&commit_id)
+					{
+						return (
+							Some(BlameHunk {
+								commit_id,
+								author: commit_info.author.clone(),
+								time: commit_info.time,
+								start_line: start_in_blamed_file + i,
+								end_line: start_in_blamed_file
+									+ i + 1,
+							}),
+							trimmed_line,
+						);
 					};
 
-					return (
-						Some(hunk),
-						line.unwrap_or_else(|_| String::new()),
-					);
-				}
-			}
-
-			(None, line.unwrap_or_else(|_| String::new()))
+					(None, trimmed_line)
+				})
+				.collect::<Vec<_>>()
 		})
 		.collect();
 
