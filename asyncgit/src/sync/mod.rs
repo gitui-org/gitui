@@ -66,6 +66,7 @@ pub use config::{
 };
 pub use diff::get_diff_commit;
 pub use git2::BranchType;
+pub use git2::ResetType;
 pub use git2::Sort;
 pub use hooks::{
 	hooks_commit_msg, hooks_post_commit, hooks_pre_commit,
@@ -111,8 +112,6 @@ pub use utils::{
 	stage_add_all, stage_add_file, stage_addremoved, Head,
 };
 
-pub use git2::ResetType;
-
 /// test utils
 #[cfg(test)]
 pub mod tests {
@@ -126,6 +125,7 @@ pub mod tests {
 	};
 	use crate::error::Result;
 	use git2::Repository;
+
 	use std::{path::Path, process::Command};
 	use tempfile::TempDir;
 
