@@ -24,6 +24,7 @@ mod rebase;
 pub mod remotes;
 mod repository;
 mod reset;
+mod revwalk;
 mod reword;
 pub mod sign;
 mod staging;
@@ -65,6 +66,7 @@ pub use config::{
 };
 pub use diff::get_diff_commit;
 pub use git2::BranchType;
+pub use git2::Sort;
 pub use hooks::{
 	hooks_commit_msg, hooks_post_commit, hooks_pre_commit,
 	hooks_pre_push, hooks_prepare_commit_msg, HookResult,
@@ -88,6 +90,7 @@ pub use remotes::{
 pub(crate) use repository::{gix_repo, repo};
 pub use repository::{RepoPath, RepoPathRef};
 pub use reset::{reset_repo, reset_stage, reset_workdir};
+pub use revwalk::revwalk;
 pub use reword::reword;
 pub use staging::{discard_lines, stage_lines};
 pub use stash::{

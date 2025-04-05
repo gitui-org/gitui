@@ -14,8 +14,8 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::sync::{
-	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
-	RepoPathRef, Tags,
+	self, checkout_commit, revwalk, BranchDetails, BranchInfo,
+	CommitId, RepoPathRef, Sort, Tags,
 };
 use chrono::{DateTime, Local};
 use crossterm::event::Event;
@@ -29,8 +29,8 @@ use ratatui::{
 	Frame,
 };
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
-	time::Instant,
+	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, ops::Bound,
+	rc::Rc, time::Instant,
 };
 
 const ELEMENTS_PER_LINE: usize = 9;
@@ -131,37 +131,52 @@ impl CommitList {
 	}
 
 	/// Build string of marked or selected (if none are marked) commit ids
-	fn concat_selected_commit_ids(&self) -> Option<String> {
+	fn concat_selected_commit_ids(&self) -> Result<Option<String>> {
 		match self.marked.as_slice() {
-			[] => self
+			[] => Ok(self
 				.items
 				.iter()
 				.nth(
 					self.selection
 						.saturating_sub(self.items.index_offset()),
 				)
-				.map(|e| e.id.to_string()),
-			[latest, .., earliest]
-				if self
-					.marked()
-					.windows(2)
-					.all(|w| w[0].0 + 1 == w[1].0) =>
-			{
-				Some(format!("{}^..{}", earliest.1, latest.1))
+				.map(|e| e.id.to_string())),
+			[(_idx, commit)] => Ok(Some(commit.to_string())),
+			[latest, .., earliest] => {
+				let marked_rev = self.marked.iter().rev();
+				let marked_topo_consecutive = revwalk(
+					&self.repo.borrow(),
+					Bound::Excluded(&earliest.1),
+					Bound::Included(&latest.1),
+					Sort::TOPOLOGICAL | Sort::REVERSE,
+					|revwalk| {
+						revwalk.zip(marked_rev).try_fold(
+							true,
+							|acc, (r, m)| {
+								let revwalked = CommitId::new(r?);
+								let marked = m.1;
+								Ok(acc && (revwalked == marked))
+							},
+						)
+					},
+				)?;
+				let yank = if marked_topo_consecutive {
+					format!("{}^..{}", earliest.1, latest.1)
+				} else {
+					self.marked
+						.iter()
+						.map(|(_idx, commit)| commit.to_string())
+						.join(" ")
+				};
+				Ok(Some(yank))
 			}
-			marked => Some(
-				marked
-					.iter()
-					.map(|(_idx, commit)| commit.to_string())
-					.join(" "),
-			),
 		}
 	}
 
 	/// Copy currently marked or selected (if none are marked) commit ids
 	/// to clipboard
 	pub fn copy_commit_hash(&self) -> Result<()> {
-		if let Some(yank) = self.concat_selected_commit_ids() {
+		if let Some(yank) = self.concat_selected_commit_ids()? {
 			crate::clipboard::copy_string(&yank)?;
 			self.queue.push(InternalEvent::ShowInfoMsg(
 				strings::copy_success(&yank),
@@ -1007,7 +1022,9 @@ mod tests {
 	#[test]
 	fn test_copy_commit_list_empty() {
 		assert_eq!(
-			CommitList::default().concat_selected_commit_ids(),
+			CommitList::default()
+				.concat_selected_commit_ids()
+				.unwrap(),
 			None
 		);
 	}
@@ -1022,7 +1039,7 @@ mod tests {
 		// offset by two, so we expect commit id 2 for
 		// selection = 4
 		assert_eq!(
-			cl.concat_selected_commit_ids(),
+			cl.concat_selected_commit_ids().unwrap(),
 			Some(String::from(
 				"0000000000000000000000000000000000000002"
 			))
@@ -1037,7 +1054,7 @@ mod tests {
 			..cl
 		};
 		assert_eq!(
-			cl.concat_selected_commit_ids(),
+			cl.concat_selected_commit_ids().unwrap(),
 			Some(String::from(
 				"0000000000000000000000000000000000000001",
 			))
@@ -1045,6 +1062,7 @@ mod tests {
 	}
 
 	#[test]
+	#[ignore = "needs real repository to run test. Will be moved to revwalk module."]
 	fn test_copy_commit_range_marked() {
 		let cl = build_commit_list_with_some_commits();
 		let cl = CommitList {
@@ -1052,12 +1070,13 @@ mod tests {
 			..cl
 		};
 		assert_eq!(
-			cl.concat_selected_commit_ids(),
+			cl.concat_selected_commit_ids().unwrap(),
 			Some(String::from("0000000000000000000000000000000000000005^..0000000000000000000000000000000000000002"))
 		);
 	}
 
 	#[test]
+	#[ignore = "needs real repository to run test. Will be moved to revwalk module."]
 	fn test_copy_commit_random_marked() {
 		let cl = build_commit_list_with_some_commits();
 		let cl = CommitList {
@@ -1065,7 +1084,7 @@ mod tests {
 			..cl
 		};
 		assert_eq!(
-			cl.concat_selected_commit_ids(),
+			cl.concat_selected_commit_ids().unwrap(),
 			Some(String::from(concat!(
 				"0000000000000000000000000000000000000002 ",
 				"0000000000000000000000000000000000000005"
