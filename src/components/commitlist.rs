@@ -14,8 +14,8 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::sync::{
-	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
-	RepoPathRef, Tags,
+	self, checkout_commit, revwalk, BranchDetails, BranchInfo,
+	CommitId, RepoPathRef, Sort, Tags,
 };
 use chrono::{DateTime, Local};
 use crossterm::event::Event;
@@ -29,8 +29,8 @@ use ratatui::{
 	Frame,
 };
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
-	time::Instant,
+	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, ops::Bound,
+	rc::Rc, time::Instant,
 };
 
 const ELEMENTS_PER_LINE: usize = 9;
@@ -134,9 +134,7 @@ impl CommitList {
 
 	///
 	pub fn copy_commit_hash(&self) -> Result<()> {
-		let marked = self.marked.iter().rev().cloned().collect_vec();
-		let marked = marked.as_slice();
-
+		let marked = self.marked.as_slice();
 		let yank: Option<String> = match marked {
 			[] => self
 				.items
@@ -147,12 +145,27 @@ impl CommitList {
 				)
 				.map(|e| e.id.to_string()),
 			[(_idx, commit)] => Some(commit.to_string()),
-			[first, .., last] => {
-				let marked_consecutive =
-					marked.windows(2).all(|w| w[0].0 - 1 == w[1].0);
-
-				let yank = if marked_consecutive {
-					format!("{}^..{}", first.1, last.1)
+			[latest, .., earliest] => {
+				let marked_rev = marked.iter().rev();
+				let marked_topo_consecutive = revwalk(
+					&self.repo.borrow(),
+					Bound::Excluded(&earliest.1),
+					Bound::Included(&latest.1),
+					Sort::TOPOLOGICAL | Sort::REVERSE,
+					|revwalk| {
+						revwalk.zip(marked_rev).try_fold(
+							true,
+							|acc, (r, m)| {
+								let revwalked = CommitId::new(r?);
+								let marked = m.1;
+								log::trace!("comparing revwalk with marked: {} <-> {}",revwalked,marked);
+								Ok(acc && (revwalked == marked))
+							},
+						)
+					},
+				)?;
+				let yank = if marked_topo_consecutive {
+					format!("{}^..{}", earliest.1, latest.1)
 				} else {
 					marked
 						.iter()
