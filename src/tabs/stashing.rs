@@ -245,7 +245,7 @@ impl Component for Stashing {
 				} else {
 					Ok(EventState::NotConsumed)
 				};
-			};
+			}
 		}
 
 		Ok(EventState::NotConsumed)

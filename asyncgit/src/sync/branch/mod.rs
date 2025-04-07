@@ -271,7 +271,7 @@ pub fn config_is_pull_rebase(repo_path: &RepoPath) -> Result<bool> {
 		let value =
 			rebase.value().map(String::from).unwrap_or_default();
 		return Ok(value == "true");
-	};
+	}
 
 	Ok(false)
 }
