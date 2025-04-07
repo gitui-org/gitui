@@ -348,7 +348,7 @@ impl Status {
 
 					self.diff.focus(true);
 				}
-			};
+			}
 
 			self.update_diff()?;
 

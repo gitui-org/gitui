@@ -35,7 +35,7 @@ impl<'a> Iterator for TreeItemsIterator<'a> {
 				*i += 1;
 			} else {
 				self.increments = Some(0);
-			};
+			}
 
 			loop {
 				if !init {
