@@ -92,7 +92,7 @@ impl ChangesComponent {
 							&self.repo.borrow(),
 							path,
 						)?,
-					};
+					}
 				} else {
 					let config =
 						self.options.borrow().status_show_untracked();

@@ -17,6 +17,7 @@ use crate::{
 use crossbeam_channel::Sender;
 use git2::{PackBuilderStage, PushOptions};
 use scopetime::scope_time;
+use std::fmt::Write as _;
 
 ///
 pub trait AsyncProgress: Clone + Send + Sync {
@@ -182,7 +183,7 @@ pub fn push_raw(
 		if let Ok(Some(branch_upstream_merge)) =
 			get_branch_upstream_merge(repo_path, branch)
 		{
-			push_ref.push_str(&format!(":{branch_upstream_merge}"));
+			let _ = write!(push_ref, ":{branch_upstream_merge}");
 		}
 	}
 
