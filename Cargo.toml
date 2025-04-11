@@ -45,7 +45,7 @@ ratatui = { version = "0.29", default-features = false, features = [
     'serde',
 ] }
 rayon-core = "1.12"
-ron = "0.9"
+ron = "0.10"
 scopeguard = "1.2"
 scopetime = { path = "./scopetime", version = "0.1" }
 serde = "1.0"
