@@ -521,7 +521,7 @@ impl Component for FileRevlogPopup {
 								InspectCommitOpen::new(commit_id),
 							),
 						));
-					};
+					}
 				} else if key_match(key, self.key_config.keys.blame) {
 					if let Some(open_request) =
 						self.open_request.clone()
