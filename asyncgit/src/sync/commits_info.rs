@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use super::RepoPath;
-use crate::{error::Result, sync::repository::repo};
+use crate::{
+	error::Result,
+	sync::{commit_details::get_author_of_commit, repository::repo},
+};
 use git2::{Commit, Error, Oid};
 use scopetime::scope_time;
 use unicode_truncate::UnicodeTruncateStr;
@@ -46,6 +49,18 @@ impl CommitId {
 		let commit_obj = repo.revparse_single(revision)?;
 		Ok(commit_obj.id().into())
 	}
+
+	/// Tries to convert a &str representation of a commit id into
+	/// a `CommitId`
+	pub fn from_str_unchecked(commit_id_str: &str) -> Result<Self> {
+		match Oid::from_str(commit_id_str) {
+			Err(e) => Err(crate::Error::Generic(format!(
+				"Could not convert {}",
+				e.message()
+			))),
+			Ok(v) => Ok(Self::new(v)),
+		}
+	}
 }
 
 impl Display for CommitId {
@@ -70,7 +85,7 @@ impl From<Oid> for CommitId {
 }
 
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommitInfo {
 	///
 	pub message: String,
@@ -91,6 +106,7 @@ pub fn get_commits_info(
 	scope_time!("get_commits_info");
 
 	let repo = repo(repo_path)?;
+	let mailmap = repo.mailmap()?;
 
 	let commits = ids
 		.iter()
@@ -101,10 +117,12 @@ pub fn get_commits_info(
 	let res = commits
 		.map(|c: Commit| {
 			let message = get_message(&c, Some(message_length_limit));
-			let author = c.author().name().map_or_else(
-				|| String::from("<unknown>"),
-				String::from,
-			);
+			let author = get_author_of_commit(&c, &mailmap)
+				.name()
+				.map_or_else(
+					|| String::from("<unknown>"),
+					String::from,
+				);
 			CommitInfo {
 				message,
 				author,
@@ -125,9 +143,10 @@ pub fn get_commit_info(
 	scope_time!("get_commit_info");
 
 	let repo = repo(repo_path)?;
+	let mailmap = repo.mailmap()?;
 
 	let commit = repo.find_commit((*commit_id).into())?;
-	let author = commit.author();
+	let author = get_author_of_commit(&commit, &mailmap);
 
 	Ok(CommitInfo {
 		message: commit.message().unwrap_or("").into(),
@@ -188,6 +207,12 @@ mod tests {
 		assert_eq!(res[0].message.as_str(), "commit2");
 		assert_eq!(res[0].author.as_str(), "name");
 		assert_eq!(res[1].message.as_str(), "commit1");
+
+		File::create(root.join(".mailmap"))?
+			.write_all(b"new name <newemail> <email>")?;
+		let res = get_commits_info(repo_path, &[c2], 50).unwrap();
+
+		assert_eq!(res[0].author.as_str(), "new name");
 
 		Ok(())
 	}

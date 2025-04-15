@@ -275,3 +275,31 @@ jobs:
       with:
         name: release-notes.txt
         path: ./release-notes.txt
+
+  test-homebrew:
+    name: Test Homebrew Formula (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install Homebrew
+        run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+      - name: Set up Homebrew in PATH
+        run: |
+          echo "$HOMEBREW_PREFIX/bin:$HOMEBREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" >> $GITHUB_PATH
+
+      - name: Update Homebrew
+        run: brew update
+
+      - name: Let Homebrew build gitui from source
+        run: brew install --head --build-from-source gitui
+
+      - name: Run Homebrew test
+        run: brew test gitui

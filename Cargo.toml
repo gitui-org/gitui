@@ -45,17 +45,18 @@ ratatui = { version = "0.29", default-features = false, features = [
     'serde',
 ] }
 rayon-core = "1.12"
-ron = "0.9"
+ron = "0.10"
 scopeguard = "1.2"
 scopetime = { path = "./scopetime", version = "0.1" }
 serde = "1.0"
 shellexpand = "3.1"
 simplelog = { version = "0.12", default-features = false }
-struct-patch = "0.8"
+struct-patch = "0.9"
 syntect = { version = "5.2", default-features = false, features = [
     "parsing",
     "default-syntaxes",
     "default-themes",
+    "plist-load",
     "html",
 ] }
 tui-textarea = "0.7"

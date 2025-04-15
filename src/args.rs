@@ -49,7 +49,9 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.get_one::<String>("theme")
 		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
 
-	let theme = get_app_config_path()?.join(arg_theme);
+	let confpath = get_app_config_path()?;
+	fs::create_dir_all(&confpath)?;
+	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
 		*arg_matches.get_one("watcher").unwrap_or(&false);
@@ -166,7 +168,6 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 	.ok_or_else(|| anyhow!("failed to find os config dir."))?;
 
 	path.push("gitui");
-	fs::create_dir_all(&path)?;
 	Ok(path)
 }
 

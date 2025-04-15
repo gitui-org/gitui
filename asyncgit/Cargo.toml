@@ -19,7 +19,7 @@ easy-cast = "0.5"
 fuzzy-matcher = "0.3"
 git2 = "0.20"
 git2-hooks = { path = "../git2-hooks", version = ">=0.4" }
-gix = { version = "0.70.0", default-features = false, features = [
+gix = { version = "0.71.0", default-features = false, features = [
     "max-performance",
     "revision",
 ] }
