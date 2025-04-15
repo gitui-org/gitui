@@ -74,7 +74,7 @@ pub fn hooks_prepare_commit_msg(
 
 #[cfg(test)]
 mod tests {
-	use std::ffi::OsString;
+	use std::{ffi::OsString, io::Write as _, path::Path};
 
 	use git2::Repository;
 	use tempfile::TempDir;
@@ -103,10 +103,27 @@ mod tests {
 		repo_init_with_prefix(os_string)
 	}
 
+	fn create_hook_in_path(path: &Path, hook_script: &[u8]) {
+		std::fs::File::create(path)
+			.unwrap()
+			.write_all(hook_script)
+			.unwrap();
+
+		#[cfg(unix)]
+		{
+			std::process::Command::new("chmod")
+				.arg("+x")
+				.arg(path)
+				// .current_dir(path)
+				.output()
+				.unwrap();
+		}
+	}
+
 	#[test]
 	fn test_post_commit_hook_reject_in_subfolder() {
 		let (_td, repo) = repo_init().unwrap();
-		let root = repo.path().parent().unwrap();
+		let root = repo.workdir().unwrap();
 
 		let hook = b"#!/bin/sh
 	echo 'rejected'
@@ -137,12 +154,8 @@ mod tests {
 	#[cfg(unix)]
 	fn test_pre_commit_workdir() {
 		let (_td, repo) = repo_init().unwrap();
-		let root = repo.path().parent().unwrap();
+		let root = repo.workdir().unwrap();
 		let repo_path: &RepoPath = &root.to_path_buf().into();
-		let repository =
-			crate::sync::repository::repo(repo_path).unwrap();
-		let workdir =
-			crate::sync::utils::work_dir(&repository).unwrap();
 
 		let hook = b"#!/bin/sh
 	echo \"$(pwd)\"
@@ -158,7 +171,7 @@ mod tests {
 			assert_eq!(
 				res.trim_end().trim_end_matches('/'),
 				// TODO: fix if output isn't utf8.
-				workdir.to_string_lossy().trim_end_matches('/'),
+				root.to_string_lossy().trim_end_matches('/'),
 			);
 		} else {
 			assert!(false);
@@ -168,7 +181,7 @@ mod tests {
 	#[test]
 	fn test_hooks_commit_msg_reject_in_subfolder() {
 		let (_td, repo) = repo_init().unwrap();
-		let root = repo.path().parent().unwrap();
+		let root = repo.workdir().unwrap();
 
 		let hook = b"#!/bin/sh
 	echo 'msg' > \"$1\"
@@ -189,6 +202,39 @@ mod tests {
 		let res =
 			hooks_commit_msg(&subfolder.into(), &mut msg).unwrap();
 
+		assert_eq!(
+			res,
+			HookResult::NotOk(String::from("rejected\n"))
+		);
+
+		assert_eq!(msg, String::from("msg\n"));
+	}
+
+	#[test]
+	fn test_hooks_commit_msg_reject_in_hooks_folder_githooks_moved_absolute(
+	) {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.workdir().unwrap();
+		let mut config = repo.config().unwrap();
+
+		const HOOKS_DIR: &str = "my_hooks";
+		config.set_str("core.hooksPath", HOOKS_DIR).unwrap();
+
+		let hook = b"#!/bin/sh
+	echo 'msg' > \"$1\"
+	echo 'rejected'
+	exit 1
+	        ";
+		let hooks_folder = root.join(HOOKS_DIR);
+		std::fs::create_dir_all(&hooks_folder).unwrap();
+		create_hook_in_path(&hooks_folder.join("commit-msg"), hook);
+
+		let mut msg = String::from("test");
+		let res = hooks_commit_msg(
+			&hooks_folder.to_path_buf().into(),
+			&mut msg,
+		)
+		.unwrap();
 		assert_eq!(
 			res,
 			HookResult::NotOk(String::from("rejected\n"))

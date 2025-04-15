@@ -41,6 +41,10 @@ struct SyntaxFileBlame {
 }
 
 impl SyntaxFileBlame {
+	#[expect(
+		clippy::missing_const_for_fn,
+		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
+	)]
 	fn path(&self) -> &str {
 		&self.file_blame.path
 	}
