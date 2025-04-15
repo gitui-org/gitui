@@ -230,11 +230,8 @@ mod tests {
 		create_hook_in_path(&hooks_folder.join("commit-msg"), hook);
 
 		let mut msg = String::from("test");
-		let res = hooks_commit_msg(
-			&hooks_folder.to_path_buf().into(),
-			&mut msg,
-		)
-		.unwrap();
+		let res =
+			hooks_commit_msg(&hooks_folder.into(), &mut msg).unwrap();
 		assert_eq!(
 			res,
 			HookResult::NotOk(String::from("rejected\n"))

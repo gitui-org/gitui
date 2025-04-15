@@ -331,8 +331,8 @@ mod test {
 	fn test_hookspath_relative() {
 		assert_eq!(
 			HookPaths::expand_path(
-				&Path::new("pre-commit"),
-				&Path::new("example_git_root"),
+				Path::new("pre-commit"),
+				Path::new("example_git_root"),
 			)
 			.unwrap(),
 			Path::new("example_git_root").join("pre-commit")
@@ -346,7 +346,7 @@ mod test {
 		assert_eq!(
 			HookPaths::expand_path(
 				&absolute_hook,
-				&Path::new("example_git_root"),
+				Path::new("example_git_root"),
 			)
 			.unwrap(),
 			absolute_hook

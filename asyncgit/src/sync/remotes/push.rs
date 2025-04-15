@@ -290,7 +290,7 @@ mod tests {
 
 		// Attempt force push,
 		// should work as it forces the push through
-		assert!(!push_branch(
+		assert!(push_branch(
 			&tmp_other_repo_dir.path().to_str().unwrap().into(),
 			"origin",
 			"master",
@@ -299,7 +299,7 @@ mod tests {
 			None,
 			None,
 		)
-		.is_err());
+		.is_ok());
 	}
 
 	#[test]

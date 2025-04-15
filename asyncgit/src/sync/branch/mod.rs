@@ -701,7 +701,7 @@ mod tests_branches {
 			&root.as_os_str().to_str().unwrap().into();
 
 		let upstream_merge_res =
-			get_branch_upstream_merge(&repo_path, "master");
+			get_branch_upstream_merge(repo_path, "master");
 		assert!(
 			upstream_merge_res.is_ok_and(|v| v.as_ref().is_none())
 		);
@@ -721,12 +721,12 @@ mod tests_branches {
 		config
 			.set_str(
 				&format!("branch.{branch_name}.merge"),
-				&upstrem_merge,
+				upstrem_merge,
 			)
 			.expect("fail set branch merge config");
 
 		let upstream_merge_res =
-			get_branch_upstream_merge(&repo_path, &branch_name);
+			get_branch_upstream_merge(repo_path, branch_name);
 		assert!(upstream_merge_res
 			.as_ref()
 			.is_ok_and(|v| v.as_ref().is_some()));

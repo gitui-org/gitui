@@ -242,7 +242,7 @@ mod tests {
 		let root = repo.path().parent().unwrap();
 		let repo_path = root.as_os_str().to_str().unwrap();
 
-		assert!(!stage_add_file(&repo_path.into(), file_path).is_ok());
+		assert!(stage_add_file(&repo_path.into(), file_path).is_err());
 	}
 
 	#[test]
@@ -440,7 +440,7 @@ mod tests {
 		let repo_path: &RepoPath =
 			&root.as_os_str().to_str().unwrap().into();
 
-		assert!(!get_head(repo_path).is_ok());
+		assert!(get_head(repo_path).is_err());
 
 		Ok(())
 	}
