@@ -64,12 +64,6 @@ impl LogEntry {
 		Self::time_as_string(self.time, now)
 	}
 
-	pub fn timestamp_to_datetime(
-		time: i64,
-	) -> Option<DateTime<Local>> {
-		Some(DateTime::<_>::from(DateTime::from_timestamp(time, 0)?))
-	}
-
 	///
 	pub fn time_as_string(
 		time: DateTime<Local>,
