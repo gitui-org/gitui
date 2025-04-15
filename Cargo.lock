@@ -1138,6 +1138,7 @@ version = "0.4.0"
 dependencies = [
  "git2",
  "git2-testing",
+ "gix-path",
  "log",
  "pretty_assertions",
  "shellexpand",
