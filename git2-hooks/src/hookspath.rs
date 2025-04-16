@@ -225,7 +225,7 @@ impl HookPaths {
 }
 
 fn sh_command() -> Command {
-	let mut command = Command::new(sh_path());
+	let mut command = Command::new(gix_path::env::shell());
 
 	if cfg!(windows) {
 		// This call forces Command to handle the Path environment correctly on windows,
@@ -241,30 +241,6 @@ fn sh_command() -> Command {
 	}
 
 	command
-}
-
-/// Get the path to the sh executable.
-/// On Windows get the sh.exe bundled with Git for Windows
-pub fn sh_path() -> PathBuf {
-	if cfg!(windows) {
-		Command::new("where.exe")
-			.arg("git")
-			.output()
-			.ok()
-			.map(|out| {
-				PathBuf::from(Into::<String>::into(
-					String::from_utf8_lossy(&out.stdout),
-				))
-			})
-			.as_deref()
-			.and_then(Path::parent)
-			.and_then(Path::parent)
-			.map(|p| p.join("usr/bin/sh.exe"))
-			.filter(|p| p.exists())
-			.unwrap_or_else(|| "sh".into())
-	} else {
-		"sh".into()
-	}
 }
 
 #[cfg(unix)]
