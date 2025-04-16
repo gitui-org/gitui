@@ -41,12 +41,11 @@ impl From<CommitInfo> for LogEntry {
 		};
 
 		let author = c.author;
-		#[allow(unused_mut)]
-		let mut msg = c.message;
+		let msg = c.message;
 
 		// Replace markdown emojis with Unicode equivalent
 		#[cfg(feature = "ghemoji")]
-		emojifi_string(&mut msg);
+		let msg = emojifi_string(msg);
 
 		Self {
 			author: author.into(),
@@ -175,9 +174,7 @@ mod tests {
 	use super::*;
 
 	fn test_conversion(s: &str) -> String {
-		let mut s = s.to_string();
-		emojifi_string(&mut s);
-		s
+		emojifi_string(s.into())
 	}
 
 	#[test]
