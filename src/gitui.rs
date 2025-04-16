@@ -152,7 +152,6 @@ impl Gitui {
 
 	#[cfg(test)]
 	fn update_async(&mut self, event: crate::AsyncNotification) {
-		dbg!(event);
 		self.app.update_async(event).unwrap();
 	}
 
@@ -199,7 +198,7 @@ mod tests {
 
 	use asyncgit::{sync::RepoPath, AsyncGitNotification};
 	use crossterm::event::{KeyCode, KeyModifiers};
-	use git2_testing::repo_init;
+	use git2_testing::repo_init_suffix;
 	use insta::assert_snapshot;
 	use ratatui::{backend::TestBackend, Terminal};
 
@@ -212,12 +211,11 @@ mod tests {
 	macro_rules! apply_common_filters {
 		{} => {
 			let mut settings = insta::Settings::clone_current();
-			// MacOS Temp Folder
-			settings.add_filter(r" *\[…\]\S+?/T/\S+", "[TEMP_FILE]");
+			// Windows and MacOS
+			// We don't match on the full path, but on the suffix we pass to `repo_init_suffix` below.
+			settings.add_filter(r" *\[…\]\S+-insta/?", "[TEMP_FILE]");
 			// Linux Temp Folder
-			settings.add_filter(r" */tmp/\.tmp\S+", "[TEMP_FILE]");
-			// Windows Temp folder
-			settings.add_filter(r" *\[…\].*/Local/Temp/\S+", "[TEMP_FILE]");
+			settings.add_filter(r" */tmp/\.tmp\S+-insta/", "[TEMP_FILE]");
 			// Commit ids that follow a vertical bar
 			settings.add_filter(r"│[a-z0-9]{7} ", "│[AAAAA] ");
 			let _bound = settings.bind_to_scope();
@@ -228,7 +226,7 @@ mod tests {
 	fn gitui_starts() {
 		apply_common_filters!();
 
-		let (temp_dir, _repo) = repo_init();
+		let (temp_dir, _repo) = repo_init_suffix(Some("-insta"));
 		let path: RepoPath = temp_dir.path().to_str().unwrap().into();
 
 		let theme = Theme::init(&PathBuf::new());
@@ -239,7 +237,7 @@ mod tests {
 				.unwrap();
 
 		let mut terminal =
-			Terminal::new(TestBackend::new(120, 12)).unwrap();
+			Terminal::new(TestBackend::new(90, 12)).unwrap();
 
 		gitui.draw(&mut terminal).unwrap();
 
