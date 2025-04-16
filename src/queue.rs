@@ -160,7 +160,7 @@ pub enum InternalEvent {
 }
 
 /// single threaded simple queue for components to communicate with each other
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Queue {
 	data: Rc<RefCell<VecDeque<InternalEvent>>>,
 }
