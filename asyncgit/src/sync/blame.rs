@@ -60,22 +60,27 @@ pub fn blame_file(
 		),
 		_ => repo.head()?.peel_to_commit_in_place()?.id,
 	};
-	let traverse = gix::traverse::commit::topo::Builder::from_iters(
-		&repo.objects,
-		[tip],
-		None::<Vec<gix::ObjectId>>,
-	)
-	.build()?;
 
+	let cache: Option<gix::commitgraph::Graph> =
+		repo.commit_graph_if_enabled().expect("TODO");
 	let mut resource_cache =
 		repo.diff_resource_cache_for_tree_diff()?;
 
+	let diff_algorithm = repo.diff_algorithm().expect("TODO");
+
+	let options = gix_blame::Options {
+		diff_algorithm,
+		range: None,
+		since: None,
+	};
+
 	let outcome = gix_blame::file(
 		&repo.objects,
-		traverse,
+		tip.into(),
+		cache,
 		&mut resource_cache,
 		file_path.into(),
-		None,
+		options,
 	)?;
 
 	let commit_id = if let Some(commit_id) = commit_id {
