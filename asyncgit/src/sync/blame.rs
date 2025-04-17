@@ -76,7 +76,7 @@ pub fn blame_file(
 
 	let outcome = gix_blame::file(
 		&repo.objects,
-		tip.into(),
+		tip,
 		cache,
 		&mut resource_cache,
 		file_path.into(),
