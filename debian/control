@@ -1,0 +1,44 @@
+Source: gitui
+Section: vcs
+Priority: optional
+Maintainer: Stephan Dilly <dilly.stephan@gmail.com>
+Build-Depends:
+ debhelper (>= 11),
+ dh-cargo (>= 2),
+ cargo:native,
+ rustc:native (>= 1.51)
+Standards-Version: 4.5.0
+Rules-Requires-Root: no
+Homepage: https://github.com/extrawurst/gitui
+Vcs-Browser: https://github.com/extrawurst/gitui
+Vcs-Git: https://github.com/extrawurst/gitui.git
+X-Cargo-Crate: gitui
+
+Package: gitui
+Architecture: any
+Multi-Arch: allowed
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+ ${cargo:Depends}
+Recommends:
+ ${cargo:Recommends}
+Suggests:
+ ${cargo:Suggests}
+Provides:
+ ${cargo:Provides}
+Built-Using: ${cargo:Built-Using}
+XB-X-Cargo-Built-Using: ${cargo:X-Cargo-Built-Using}
+Description: blazing fast terminal-ui for git
+ Features
+  * Fast and intuitive keyboard only control
+  * Context based help (no need to memorize tons of hot-keys)
+  * Inspect, commit, and amend changes (incl. hooks: commit-msg/post-commit)
+  * Stage, unstage, revert and reset files, hunks and lines
+  * Stashing (save, apply, drop, and inspect)
+  * Push/Fetch to/from remote
+  * Branch List (create, rename, delete)
+  * Browse commit log, diff committed changes
+  * Scalable terminal UI layout
+  * Async input polling
+  * Async git API for fluid control
