@@ -138,7 +138,7 @@ pub fn blame_file(
 							}),
 							trimmed_line,
 						);
-					};
+					}
 
 					(None, trimmed_line)
 				})
