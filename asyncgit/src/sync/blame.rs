@@ -51,6 +51,10 @@ pub fn blame_file(
 ) -> Result<FileBlame> {
 	scope_time!("blame_file");
 
+	let file_path: &gix::bstr::BStr = file_path.into();
+	let file_path =
+		gix::path::to_unix_separators_on_windows(file_path);
+
 	let repo: gix::Repository =
 				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
 						.map(Into::into)?;
@@ -79,7 +83,7 @@ pub fn blame_file(
 		tip,
 		cache,
 		&mut resource_cache,
-		file_path.into(),
+		&file_path,
 		options,
 	)?;
 
@@ -148,7 +152,7 @@ pub fn blame_file(
 
 	let file_blame = FileBlame {
 		commit_id,
-		path: file_path.into(),
+		path: file_path.to_string(),
 		lines,
 	};
 
