@@ -62,11 +62,11 @@ pub fn blame_file(
 	};
 
 	let cache: Option<gix::commitgraph::Graph> =
-		repo.commit_graph_if_enabled().expect("TODO");
+		repo.commit_graph_if_enabled()?;
 	let mut resource_cache =
 		repo.diff_resource_cache_for_tree_diff()?;
 
-	let diff_algorithm = repo.diff_algorithm().expect("TODO");
+	let diff_algorithm = repo.diff_algorithm()?;
 
 	let options = gix_blame::Options {
 		diff_algorithm,

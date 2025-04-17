@@ -124,6 +124,18 @@ pub enum Error {
 	),
 
 	///
+	#[error("gix::repository::commit_graph_if_enabled error: {0}")]
+	GixRepositoryCommitGraphIfEnabled(
+		#[from] gix::repository::commit_graph_if_enabled::Error,
+	),
+
+	///
+	#[error("gix::config::diff::algorithm error: {0}")]
+	GixConfigDiffAlgorithm(
+		#[from] gix::config::diff::algorithm::Error,
+	),
+
+	///
 	#[error("gix_blame error: {0}")]
 	GixBlame(#[from] gix_blame::Error),
 
