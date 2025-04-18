@@ -22,7 +22,9 @@ git2-hooks = { path = "../git2-hooks", version = ">=0.4" }
 gix = { version = "0.71.0", default-features = false, features = [
     "max-performance",
     "revision",
+    "blob-diff"
 ] }
+gix-blame = "0.1.0"
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
 # git2 = { git="https://github.com/extrawurst/git2-rs.git", rev="fc13dcc", features = ["vendored-openssl"]}
