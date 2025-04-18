@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
 use git2::{Commit, Oid, Repository};

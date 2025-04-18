@@ -1,6 +1,3 @@
-//TODO: hopefully released in next rust (see https://github.com/rust-lang/rust-clippy/issues/9440)
-#![allow(clippy::use_self)]
-
 use crate::error::Result;
 use git2::Repository;
 use scopetime::scope_time;

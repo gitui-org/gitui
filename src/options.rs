@@ -152,8 +152,6 @@ impl Options {
 		Ok(from_bytes(&buffer)?)
 	}
 
-	//TODO: fix once FP in clippy is fixed
-	#[allow(clippy::needless_borrow)]
 	fn save_failable(&self) -> Result<()> {
 		let dir = Self::options_file(&self.repo)?;
 
