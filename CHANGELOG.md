@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
 
 ### Changed
+* improve error messages [[@acuteenvy](https://github.com/acuteenvy)] ([#2617](https://github.com/gitui-org/gitui/pull/2617))
 * increase MSRV from 1.70 to 1.81 [[@naseschwarz](https://github.com/naseschwarz)] ([#2094](https://github.com/gitui-org/gitui/issues/2094))
 * improve syntax highlighting file detection [[@acuteenvy](https://github.com/acuteenvy)] ([#2524](https://github.com/extrawurst/gitui/pull/2524))
 * Updated project links to point to `gitui-org` instead of `extrawurst`  [[@vasleymus](https://github.com/vasleymus)] ([#2538](https://github.com/gitui-org/gitui/pull/2538))

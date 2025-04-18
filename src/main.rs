@@ -119,20 +119,24 @@ enum Updater {
 	NotifyWatcher,
 }
 
+/// Do `log::error!` and `eprintln!` in one line.
+macro_rules! log_eprintln {
+	( $($arg:tt)* ) => {{
+		log::error!($($arg)*);
+		eprintln!($($arg)*);
+	}};
+}
+
 fn main() -> Result<()> {
 	let app_start = Instant::now();
 
 	let cliargs = process_cmdline()?;
 
 	asyncgit::register_tracing_logging();
-
-	if !valid_path(&cliargs.repo_path) {
-		eprintln!("invalid path\nplease run gitui inside of a non-bare git repository");
-		return Ok(());
-	}
+	ensure_valid_path(&cliargs.repo_path)?;
 
 	let key_config = KeyConfig::init()
-		.map_err(|e| eprintln!("KeyConfig loading error: {e}"))
+		.map_err(|e| log_eprintln!("KeyConfig loading error: {e}"))
 		.unwrap_or_default();
 	let theme = Theme::init(&cliargs.theme);
 
@@ -141,7 +145,7 @@ fn main() -> Result<()> {
 		shutdown_terminal();
 	}
 
-	set_panic_handlers()?;
+	set_panic_handler()?;
 
 	let mut repo_path = cliargs.repo_path;
 	let mut terminal = start_terminal(io::stdout(), &repo_path)?;
@@ -291,13 +295,13 @@ fn shutdown_terminal() {
 		io::stdout().execute(LeaveAlternateScreen).map(|_f| ());
 
 	if let Err(e) = leave_screen {
-		eprintln!("leave_screen failed:\n{e}");
+		log::error!("leave_screen failed:\n{e}");
 	}
 
 	let leave_raw_mode = disable_raw_mode();
 
 	if let Err(e) = leave_raw_mode {
-		eprintln!("leave_raw_mode failed:\n{e}");
+		log::error!("leave_raw_mode failed:\n{e}");
 	}
 }
 
@@ -315,12 +319,14 @@ fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
 	Ok(())
 }
 
-fn valid_path(repo_path: &RepoPath) -> bool {
-	let error = asyncgit::sync::repo_open_error(repo_path);
-	if let Some(error) = &error {
-		log::error!("repo open error: {error}");
+fn ensure_valid_path(repo_path: &RepoPath) -> Result<()> {
+	match asyncgit::sync::repo_open_error(repo_path) {
+		Some(e) => {
+			log::error!("{e}");
+			bail!(e)
+		}
+		None => Ok(()),
 	}
-	error.is_none()
 }
 
 fn select_event(
@@ -388,20 +394,11 @@ fn start_terminal(
 	Ok(terminal)
 }
 
-// do log::error! and eprintln! in one line, pass string, error and backtrace
-macro_rules! log_eprintln {
-	($string:expr, $e:expr, $bt:expr) => {
-		log::error!($string, $e, $bt);
-		eprintln!($string, $e, $bt);
-	};
-}
-
-fn set_panic_handlers() -> Result<()> {
-	// regular panic handler
+fn set_panic_handler() -> Result<()> {
 	panic::set_hook(Box::new(|e| {
 		let backtrace = Backtrace::new();
 		shutdown_terminal();
-		log_eprintln!("\nGitUI was close due to an unexpected panic.\nPlease file an issue on https://github.com/gitui-org/gitui/issues with the following info:\n\n{:?}\ntrace:\n{:?}", e, backtrace);
+		log_eprintln!("\nGitUI was closed due to an unexpected panic.\nPlease file an issue on https://github.com/gitui-org/gitui/issues with the following info:\n\n{e}\n\ntrace:\n{backtrace:?}");
 	}));
 
 	// global threadpool
