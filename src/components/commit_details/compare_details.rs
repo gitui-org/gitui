@@ -58,7 +58,6 @@ impl CompareDetailsComponent {
 		});
 	}
 
-	#[allow(unstable_name_collisions)]
 	fn get_commit_text(&self, data: &CommitDetails) -> Vec<Line> {
 		let mut res = vec![
 			Line::from(vec![

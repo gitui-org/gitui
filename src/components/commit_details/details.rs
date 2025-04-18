@@ -155,7 +155,7 @@ impl DetailsComponent {
 			.collect()
 	}
 
-	#[allow(unstable_name_collisions, clippy::too_many_lines)]
+	#[allow(clippy::too_many_lines)]
 	fn get_text_info(&self) -> Vec<Line> {
 		self.data.as_ref().map_or_else(Vec::new, |data| {
 			let mut res = vec![
