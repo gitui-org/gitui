@@ -40,6 +40,10 @@ impl KeyConfig {
 		Ok(Self { keys, symbols })
 	}
 
+	#[expect(
+		clippy::missing_const_for_fn,
+		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
+	)]
 	fn get_key_symbol(&self, k: KeyCode) -> &str {
 		match k {
 			KeyCode::Enter => &self.symbols.enter,
@@ -106,6 +110,10 @@ impl KeyConfig {
 		}
 	}
 
+	#[expect(
+		clippy::missing_const_for_fn,
+		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
+	)]
 	fn get_modifier_hint(&self, modifier: KeyModifiers) -> &str {
 		match modifier {
 			KeyModifiers::CONTROL => &self.symbols.control,

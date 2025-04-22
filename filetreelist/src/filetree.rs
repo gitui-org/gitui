@@ -2,7 +2,7 @@ use crate::{
 	error::Result, filetreeitems::FileTreeItems,
 	tree_iter::TreeIterator, TreeItemInfo,
 };
-use std::{collections::BTreeSet, path::Path};
+use std::{cell::Cell, collections::BTreeSet, path::Path};
 
 ///
 #[derive(Copy, Clone, Debug)]
@@ -30,6 +30,7 @@ pub struct FileTree {
 	selection: Option<usize>,
 	// caches the absolute selection translated to visual index
 	visual_selection: Option<VisualSelection>,
+	pub window_height: Cell<Option<usize>>,
 }
 
 impl FileTree {
@@ -42,6 +43,7 @@ impl FileTree {
 			items: FileTreeItems::new(list, collapsed)?,
 			selection: if list.is_empty() { None } else { Some(0) },
 			visual_selection: None,
+			window_height: None.into(),
 		};
 		new_self.visual_selection = new_self.calc_visual_selection();
 
@@ -112,6 +114,18 @@ impl FileTree {
 		}
 	}
 
+	fn selection_page_updown(
+		&self,
+		range: impl Iterator<Item = usize>,
+	) -> Option<usize> {
+		let page_size = self.window_height.get().unwrap_or(0);
+
+		range
+			.filter(|index| self.is_visible_index(*index))
+			.take(page_size)
+			.last()
+	}
+
 	///
 	pub fn move_selection(&mut self, dir: MoveSelection) -> bool {
 		self.selection.is_some_and(|selection| {
@@ -130,9 +144,13 @@ impl FileTree {
 					Self::selection_start(selection)
 				}
 				MoveSelection::End => self.selection_end(selection),
-				MoveSelection::PageDown | MoveSelection::PageUp => {
-					None
+				MoveSelection::PageUp => {
+					self.selection_page_updown((0..=selection).rev())
 				}
+				MoveSelection::PageDown => self
+					.selection_page_updown(
+						selection..(self.items.len()),
+					),
 			};
 
 			let changed_index =
@@ -513,5 +531,37 @@ mod test {
 
 		assert_eq!(s.count, 3);
 		assert_eq!(s.index, 2);
+	}
+
+	#[test]
+	fn test_selection_page_updown() {
+		let items = vec![
+			Path::new("a/b/c"),  //
+			Path::new("a/b/c2"), //
+			Path::new("a/d"),    //
+			Path::new("a/e"),    //
+		];
+
+		//0 a/
+		//1   b/
+		//2     c
+		//3     c2
+		//4   d
+		//5   e
+
+		let mut tree =
+			FileTree::new(&items, &BTreeSet::new()).unwrap();
+
+		tree.window_height.set(Some(3));
+
+		tree.selection = Some(0);
+		assert!(tree.move_selection(MoveSelection::PageDown));
+		assert_eq!(tree.selection, Some(2));
+		assert!(tree.move_selection(MoveSelection::PageDown));
+		assert_eq!(tree.selection, Some(4));
+		assert!(tree.move_selection(MoveSelection::PageUp));
+		assert_eq!(tree.selection, Some(2));
+		assert!(tree.move_selection(MoveSelection::PageUp));
+		assert_eq!(tree.selection, Some(0));
 	}
 }

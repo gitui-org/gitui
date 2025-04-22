@@ -49,6 +49,18 @@ impl CommitId {
 		let commit_obj = repo.revparse_single(revision)?;
 		Ok(commit_obj.id().into())
 	}
+
+	/// Tries to convert a &str representation of a commit id into
+	/// a `CommitId`
+	pub fn from_str_unchecked(commit_id_str: &str) -> Result<Self> {
+		match Oid::from_str(commit_id_str) {
+			Err(e) => Err(crate::Error::Generic(format!(
+				"Could not convert {}",
+				e.message()
+			))),
+			Ok(v) => Ok(Self::new(v)),
+		}
+	}
 }
 
 impl Display for CommitId {
@@ -73,7 +85,7 @@ impl From<Oid> for CommitId {
 }
 
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommitInfo {
 	///
 	pub message: String,

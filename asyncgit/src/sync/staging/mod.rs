@@ -68,9 +68,9 @@ impl NewFromOldContent {
 	}
 }
 
-// this is the heart of the per line discard,stage,unstage. heavily inspired by the great work in nodegit: https://github.com/nodegit/nodegit
-#[allow(clippy::redundant_pub_crate)]
-pub(crate) fn apply_selection(
+// this is the heart of the per line discard,stage,unstage. heavily inspired by the great work in
+// nodegit: https://github.com/nodegit/nodegit
+pub fn apply_selection(
 	lines: &[DiffLinePosition],
 	hunks: &[HunkLines],
 	old_lines: &[&str],

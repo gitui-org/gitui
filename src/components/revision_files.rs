@@ -275,6 +275,8 @@ impl RevisionFilesComponent {
 		let tree_height = usize::from(area.height.saturating_sub(2));
 		let tree_width = usize::from(area.width);
 
+		self.tree.window_height.set(Some(tree_height));
+
 		self.tree.visual_selection().map_or_else(
 			|| {
 				self.scroll.reset();

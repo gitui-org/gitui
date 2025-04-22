@@ -38,7 +38,6 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.get_one::<String>("directory")
 		.map_or_else(|| PathBuf::from("."), PathBuf::from);
 
-	#[allow(clippy::option_if_let_else)]
 	let repo_path = if let Some(w) = workdir {
 		RepoPath::Workdir { gitdir, workdir: w }
 	} else {
@@ -139,7 +138,7 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 		path
 	};
 
-	println!("Logging enabled. Log written to: {path:?}");
+	println!("Logging enabled. Log written to: {}", path.display());
 
 	WriteLogger::init(
 		LevelFilter::Trace,
