@@ -159,15 +159,42 @@ fn get_app_cache_path() -> Result<PathBuf> {
 }
 
 pub fn get_app_config_path() -> Result<PathBuf> {
-	let mut path = if cfg!(target_os = "macos") {
-		dirs::home_dir().map(|h| h.join(".config"))
-	} else {
-		dirs::config_dir()
-	}
-	.ok_or_else(|| anyhow!("failed to find os config dir."))?;
+	// List of potential config directories in order of priority
+	let potential_config_dirs = [
+		env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+		// This is in the list since it was the hardcoded behavior on macos before
+		// I expect this to be what most people have XDG_CONFIG_HOME set to already
+		// But explicitly including this will avoid breaking anyone's existing config
+		dirs::home_dir().map(|p| p.join(".config")),
+		dirs::config_dir(),
+	]
+	.into_iter()
+	// Remove any that resulted in None from unset env vars
+	.flatten()
+	// Remove any paths that aren't found on the system
+	.filter(|path| path.is_dir());
 
-	path.push("gitui");
-	Ok(path)
+	let mut target_config_dir = None;
+
+	for potential_dir in potential_config_dirs {
+		let search_path = potential_dir.join("gitui");
+
+		// Prefer any preexisting gitui config dir
+		if search_path.is_dir() {
+			target_config_dir = Some(search_path);
+			break;
+		}
+
+		// Set fallback to first existing directory
+		if target_config_dir.is_none() {
+			target_config_dir = Some(search_path);
+		}
+	}
+
+	let config_dir = target_config_dir
+		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
+
+	Ok(config_dir)
 }
 
 #[test]
