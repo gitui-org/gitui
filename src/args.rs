@@ -150,16 +150,14 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 }
 
 fn get_path_from_candidates(
-	candidates: Vec<Option<PathBuf>>,
+	candidates: impl IntoIterator<Item = Option<PathBuf>>,
 ) -> Result<PathBuf> {
-	let valid_candidates = candidates
-		.into_iter()
-		.flatten()
-		.filter(|path| path.is_dir());
-
 	let mut target_dir = None;
 
-	for potential_dir in valid_candidates {
+	// Filter into existing directories
+	for potential_dir in
+		candidates.into_iter().flatten().filter(|p| p.is_dir())
+	{
 		let search_path = potential_dir.join("gitui");
 
 		// Prefer preexisting gitui directory
@@ -172,31 +170,27 @@ fn get_path_from_candidates(
 		target_dir.get_or_insert(search_path);
 	}
 
-	let dir = target_dir.ok_or_else(|| {
+	target_dir.ok_or_else(|| {
 		anyhow!("failed to find valid path within candidates")
-	})?;
-
-	Ok(dir)
+	})
 }
 
 fn get_app_cache_path() -> Result<PathBuf> {
-	let cache_dir_candidates = vec![
+	let cache_dir_candidates = [
 		env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
 		dirs::cache_dir(),
 	];
 
-	match get_path_from_candidates(cache_dir_candidates) {
-		Ok(cache_dir) => {
-			fs::create_dir_all(&cache_dir)?;
-			Ok(cache_dir)
-		}
-		Err(_) => Err(anyhow!("failed to find os cache dir.")),
-	}
+	let cache_dir = get_path_from_candidates(cache_dir_candidates)
+		.map_err(|_| anyhow!("failed to find os cache dir."))?;
+
+	fs::create_dir_all(&cache_dir)?;
+	Ok(cache_dir)
 }
 
 pub fn get_app_config_path() -> Result<PathBuf> {
 	// List of potential config directories in order of priority
-	let config_dir_candidates = vec![
+	let config_dir_candidates = [
 		env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
 		// This is in the list since it was the hardcoded behavior on macos before
 		// I expect this to be what most people have XDG_CONFIG_HOME set to already
