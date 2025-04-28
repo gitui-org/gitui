@@ -149,76 +149,62 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 	Ok(())
 }
 
-fn get_app_cache_path() -> Result<PathBuf> {
-	let potential_cache_dirs = [
-		env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
-		dirs::cache_dir(),
-	]
-	.into_iter()
-	.flatten()
-	.filter(|path| path.is_dir());
+fn get_path_from_canidates(
+	canidates: Vec<Option<PathBuf>>,
+) -> Result<PathBuf> {
+	let valid_canidates =
+		canidates.into_iter().flatten().filter(|path| path.is_dir());
 
-	let mut target_cache_dir = None;
+	let mut target_dir = None;
 
-	for potential_dir in potential_cache_dirs {
+	for potential_dir in valid_canidates {
 		let search_path = potential_dir.join("gitui");
 
-		// Prefer any preexisting gitui cache dir
+		// Prefer preexisting gitui directory
 		if search_path.is_dir() {
-			target_cache_dir = Some(search_path);
+			target_dir = Some(search_path);
 			break;
 		}
 
-		// Set fallback to first existing directory
-		if target_cache_dir.is_none() {
-			target_cache_dir = Some(search_path);
-		}
+		// Fallback to first existing directory
+		target_dir.get_or_insert(search_path);
 	}
 
-	let cache_dir = target_cache_dir
-		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
+	let dir = target_dir.ok_or_else(|| {
+		anyhow!("failed to find valid path within canidates")
+	})?;
 
-	fs::create_dir_all(&cache_dir)?;
-	Ok(cache_dir)
+	Ok(dir)
+}
+
+fn get_app_cache_path() -> Result<PathBuf> {
+	let cache_dir_canidates = vec![
+		env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
+		dirs::cache_dir(),
+	];
+
+	match get_path_from_canidates(cache_dir_canidates) {
+		Ok(cache_dir) => {
+			fs::create_dir_all(&cache_dir)?;
+			Ok(cache_dir)
+		}
+		Err(_) => Err(anyhow!("failed to find os cache dir.")),
+	}
 }
 
 pub fn get_app_config_path() -> Result<PathBuf> {
 	// List of potential config directories in order of priority
-	let potential_config_dirs = [
+	let config_dir_canidates = vec![
 		env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
 		// This is in the list since it was the hardcoded behavior on macos before
 		// I expect this to be what most people have XDG_CONFIG_HOME set to already
 		// But explicitly including this will avoid breaking anyone's existing config
 		dirs::home_dir().map(|p| p.join(".config")),
 		dirs::config_dir(),
-	]
-	.into_iter()
-	// Remove any that resulted in None from unset env vars
-	.flatten()
-	// Remove any paths that aren't found on the system
-	.filter(|path| path.is_dir());
+	];
 
-	let mut target_config_dir = None;
-
-	for potential_dir in potential_config_dirs {
-		let search_path = potential_dir.join("gitui");
-
-		// Prefer any preexisting gitui config dir
-		if search_path.is_dir() {
-			target_config_dir = Some(search_path);
-			break;
-		}
-
-		// Set fallback to first existing directory
-		if target_config_dir.is_none() {
-			target_config_dir = Some(search_path);
-		}
-	}
-
-	let config_dir = target_config_dir
-		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
-
-	Ok(config_dir)
+	get_path_from_canidates(config_dir_canidates)
+		.map_err(|_| anyhow!("failed to find os config dir."))
 }
 
 #[test]
