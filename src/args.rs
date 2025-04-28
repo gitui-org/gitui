@@ -202,7 +202,50 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 		.map_err(|_| anyhow!("failed to find os config dir."))
 }
 
-#[test]
-fn verify_app() {
-	app().debug_assert();
+#[cfg(test)]
+mod tests {
+	use std::fs;
+
+	use super::{app, get_path_from_candidates};
+	use tempfile::tempdir;
+
+	#[test]
+	fn verify_app() {
+		app().debug_assert();
+	}
+
+	#[test]
+	fn test_config_dir_candidates_from_preexisting() {
+		let temp_dummy_1 = tempdir().expect("should create temp dir");
+		let temp_dummy_2 = tempdir().expect("should create temp dir");
+		let temp_target = tempdir().expect("should create temp dir");
+		let temp_goal = temp_target.path().join("gitui");
+
+		fs::create_dir_all(&temp_goal)
+			.expect("should create temp target directory");
+
+		let candidates = [
+			Some(temp_dummy_1.path().to_path_buf()),
+			Some(temp_target.path().to_path_buf()),
+			Some(temp_dummy_2.path().to_path_buf()),
+		];
+		let result = get_path_from_candidates(candidates)
+			.expect("should find the included target");
+		assert_eq!(result, temp_goal);
+	}
+
+	#[test]
+	fn test_config_dir_candidates_no_preexisting() {
+		let temp_dummy_1 = tempdir().expect("should create temp dir");
+		let temp_dummy_2 = tempdir().expect("should create temp dir");
+
+		let candidates = [
+			Some(temp_dummy_1.path().to_path_buf()),
+			Some(temp_dummy_2.path().to_path_buf()),
+		];
+
+		let result = get_path_from_candidates(candidates)
+			.expect("should return first candidate");
+		assert_eq!(result, temp_dummy_1.path().join("gitui"));
+	}
 }
