@@ -19,12 +19,17 @@ Create a `key_bindings.ron` file like this:
 )
 ```
 
-The config file format based on the [Ron file format](https://github.com/ron-rs/ron).
+The keybinding config file uses the [Ron file format](https://github.com/ron-rs/ron).
 The location of the file depends on your OS:
-* `$HOME/.config/gitui/key_bindings.ron` (mac)
-* `$XDG_CONFIG_HOME/gitui/key_bindings.ron` (linux using XDG)
-* `$HOME/.config/gitui/key_bindings.ron` (linux)
-* `%APPDATA%/gitui/key_bindings.ron` (Windows)
+`gitui` will look for an existing `/gitui` in the following order:
+* `$XDG_CONFIG_HOME/gitui/` (with `XDG_CONFIG_HOME` set)
+* `$HOME/.config/gitui/`
+* Default OS Location:
+    * `$HOME/Library/Application Support/` (mac)
+    * `$HOME/.config/gitui/` (linux)
+    * `%APPDATA%/gitui/` (Windows)
+
+Key bindings are configured in `key_bindings.ron` within your first found `gitui` config folder.
 
 See all possible keys to overwrite in gitui: [here](https://github.com/gitui-org/gitui/blob/master/src/keys/key_list.rs#L83)
 
