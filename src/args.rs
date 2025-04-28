@@ -150,12 +150,36 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 }
 
 fn get_app_cache_path() -> Result<PathBuf> {
-	let mut path = dirs::cache_dir()
+	let potential_cache_dirs = [
+		env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
+		dirs::cache_dir(),
+	]
+	.into_iter()
+	.flatten()
+	.filter(|path| path.is_dir());
+
+	let mut target_cache_dir = None;
+
+	for potential_dir in potential_cache_dirs {
+		let search_path = potential_dir.join("gitui");
+
+		// Prefer any preexisting gitui cache dir
+		if search_path.is_dir() {
+			target_cache_dir = Some(search_path);
+			break;
+		}
+
+		// Set fallback to first existing directory
+		if target_cache_dir.is_none() {
+			target_cache_dir = Some(search_path);
+		}
+	}
+
+	let cache_dir = target_cache_dir
 		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
 
-	path.push("gitui");
-	fs::create_dir_all(&path)?;
-	Ok(path)
+	fs::create_dir_all(&cache_dir)?;
+	Ok(cache_dir)
 }
 
 pub fn get_app_config_path() -> Result<PathBuf> {
