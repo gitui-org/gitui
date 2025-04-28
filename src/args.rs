@@ -49,7 +49,6 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
 
 	let confpath = get_app_config_path()?;
-	fs::create_dir_all(&confpath)?;
 	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
