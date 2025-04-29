@@ -45,6 +45,8 @@ pub struct CommitList {
 	items: ItemBatch,
 	highlights: Option<Rc<IndexSet<CommitId>>>,
 	commits: IndexSet<CommitId>,
+	/// Commits that are marked. The .0 is used to provide a sort order.
+	/// It contains an index into self.items.items
 	marked: Vec<(usize, CommitId)>,
 	scroll_state: (Instant, f32),
 	tags: Option<Tags>,
