@@ -154,8 +154,10 @@ fn get_path_from_candidates(
 	let mut target_dir = None;
 
 	// Filter into existing directories
-	for potential_dir in
-		candidates.into_iter().flatten().filter(|p| p.is_dir())
+	for potential_dir in candidates
+		.into_iter()
+		.flatten()
+		.filter(|p| p.is_dir() && p.is_absolute())
 	{
 		let search_path = potential_dir.join("gitui");
 
