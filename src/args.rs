@@ -183,7 +183,7 @@ fn get_app_cache_path() -> Result<PathBuf> {
 	];
 
 	let cache_dir = get_path_from_candidates(cache_dir_candidates)
-		.map_err(|_| anyhow!("failed to find os cache dir."))?;
+		.map_err(|_| anyhow!("failed to find valid cache dir."))?;
 
 	fs::create_dir_all(&cache_dir)?;
 	Ok(cache_dir)
@@ -201,7 +201,7 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 	];
 
 	get_path_from_candidates(config_dir_candidates)
-		.map_err(|_| anyhow!("failed to find os config dir."))
+		.map_err(|_| anyhow!("failed to find valid config dir."))
 }
 
 #[cfg(test)]
