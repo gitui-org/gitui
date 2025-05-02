@@ -148,25 +148,14 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 	Ok(())
 }
 
-fn ensure_path_exists(path: Option<PathBuf>) -> Option<PathBuf> {
-	path.and_then(|p| {
-		if p.is_absolute() && fs::create_dir_all(&p).is_ok() {
-			return Some(p);
-		}
-		None
-	})
-}
-
 fn get_path_from_candidates(
 	candidates: impl IntoIterator<Item = Option<PathBuf>>,
 ) -> Result<PathBuf> {
 	let mut target_dir = None;
 
 	// Filter into existing directories
-	for potential_dir in candidates
-		.into_iter()
-		.flatten()
-		.filter(|p| p.is_dir() && p.is_absolute())
+	for potential_dir in
+		candidates.into_iter().flatten().filter(|p| p.is_dir())
 	{
 		let search_path = potential_dir.join("gitui");
 
@@ -185,13 +174,17 @@ fn get_path_from_candidates(
 	})
 }
 
+// "If an implementation encounters a relative path in any of these variables it should consider the path invalid and ignore it."
+fn get_xdg_path(xdg_var: &str) -> Option<PathBuf> {
+	env::var_os(xdg_var)
+		.filter(|var| !var.is_empty())
+		.map(PathBuf::from)
+		.filter(|p| p.is_absolute())
+}
+
 fn get_app_cache_path() -> Result<PathBuf> {
-	let cache_dir_candidates = [
-		ensure_path_exists(
-			env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
-		),
-		dirs::cache_dir(),
-	];
+	let cache_dir_candidates =
+		[get_xdg_path("XDG_CACHE_HOME"), dirs::cache_dir()];
 
 	let cache_dir = get_path_from_candidates(cache_dir_candidates)
 		.map_err(|_| anyhow!("failed to find valid cache dir."))?;
@@ -203,7 +196,7 @@ fn get_app_cache_path() -> Result<PathBuf> {
 pub fn get_app_config_path() -> Result<PathBuf> {
 	// List of potential config directories in order of priority
 	let config_dir_candidates = [
-		env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+		get_xdg_path("XDG_CONFIG_HOME"),
 		// This is in the list since it was the hardcoded behavior on macos before
 		// I expect this to be what most people have XDG_CONFIG_HOME set to already
 		// But explicitly including this will avoid breaking anyone's existing config
