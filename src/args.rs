@@ -148,6 +148,15 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 	Ok(())
 }
 
+fn ensure_path_exists(path: Option<PathBuf>) -> Option<PathBuf> {
+	path.and_then(|p| {
+		if p.is_absolute() && fs::create_dir_all(&p).is_ok() {
+			return Some(p);
+		}
+		None
+	})
+}
+
 fn get_path_from_candidates(
 	candidates: impl IntoIterator<Item = Option<PathBuf>>,
 ) -> Result<PathBuf> {
@@ -178,7 +187,9 @@ fn get_path_from_candidates(
 
 fn get_app_cache_path() -> Result<PathBuf> {
 	let cache_dir_candidates = [
-		env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
+		ensure_path_exists(
+			env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
+		),
 		dirs::cache_dir(),
 	];
 
