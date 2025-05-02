@@ -19,7 +19,7 @@ Create a `key_bindings.ron` file like this:
 )
 ```
 
-The keybinding config file uses the [Ron file format](https://github.com/ron-rs/ron).
+The key binding config file uses the [Ron file format](https://github.com/ron-rs/ron).
 The location of the file depends on your OS:
 `gitui` will look for an existing `/gitui` in the following order:
 * `$XDG_CONFIG_HOME/gitui/` (with `XDG_CONFIG_HOME` set)
