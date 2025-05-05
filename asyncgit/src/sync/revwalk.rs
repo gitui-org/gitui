@@ -5,11 +5,10 @@ use git2::{Commit, Oid};
 
 use super::{repo, CommitId, RepoPath};
 
-/// Performs a Git revision walk on `repo_path`, optionally bounded by `start` and `end` commits,
-/// sorted according to `sort`. The revwalk iterator bound by repository's lifetime is exposed through
-/// the `iter_fn`.
+/// Performs a Git revision walk.
 ///
-///
+/// The revwalk is optionally bounded by `start` and `end` commits, sorted according to `sort`.
+/// The revwalk iterator bound by repository's lifetime is exposed through the `iter_fn`.
 pub fn revwalk<R>(
 	repo_path: &RepoPath,
 	start: Bound<&CommitId>,
@@ -31,10 +30,13 @@ pub fn revwalk<R>(
 	if let Some(e) = end {
 		revwalk.push(e.id())?;
 	}
-	let ret = iter_fn(&mut revwalk.map(|r| {
-		r.map_err(|x| crate::Error::Generic(x.to_string()))
-	}));
-	ret
+	{
+		#![allow(clippy::let_and_return)]
+		let ret = iter_fn(&mut revwalk.map(|r| {
+			r.map_err(|x| crate::Error::Generic(x.to_string()))
+		}));
+		ret
+	}
 }
 
 fn resolve<'r>(
