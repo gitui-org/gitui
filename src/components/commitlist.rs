@@ -29,8 +29,8 @@ use ratatui::{
 	Frame,
 };
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, ops::Bound,
-	rc::Rc, time::Instant,
+	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
+	time::Instant,
 };
 
 const ELEMENTS_PER_LINE: usize = 9;
@@ -132,45 +132,32 @@ impl CommitList {
 
 	/// Build string of marked or selected (if none are marked) commit ids
 	fn concat_selected_commit_ids(&self) -> Result<Option<String>> {
-		match self.marked.as_slice() {
-			[] => Ok(self
+		let ret = match self.marked.as_slice() {
+			[] => self
 				.items
 				.iter()
 				.nth(
 					self.selection
 						.saturating_sub(self.items.index_offset()),
 				)
-				.map(|e| e.id.to_string())),
-			[(_idx, commit)] => Ok(Some(commit.to_string())),
-			[latest, .., earliest] => {
-				let marked_rev = self.marked.iter().rev();
-				let marked_topo_consecutive = revwalk(
+				.map(|e| e.id.to_string()),
+			[latest, .., earliest]
+				if revwalk::is_continuous(
 					&self.repo.borrow(),
-					Bound::Excluded(&earliest.1),
-					Bound::Included(&latest.1),
-					Sort::TOPOLOGICAL | Sort::REVERSE,
-					|revwalk| {
-						revwalk.zip(marked_rev).try_fold(
-							true,
-							|acc, (r, m)| {
-								let revwalked = CommitId::new(r?);
-								let marked = m.1;
-								Ok(acc && (revwalked == marked))
-							},
-						)
-					},
-				)?;
-				let yank = if marked_topo_consecutive {
-					format!("{}^..{}", earliest.1, latest.1)
-				} else {
-					self.marked
-						.iter()
-						.map(|(_idx, commit)| commit.to_string())
-						.join(" ")
-				};
-				Ok(Some(yank))
+					Sort::TOPOLOGICAL,
+					&self.marked.iter().map(|x| x.1).collect_vec(),
+				)? =>
+			{
+				Some(format!("{}^..{}", earliest.1, latest.1))
 			}
-		}
+			marked => Some(
+				marked
+					.iter()
+					.map(|(_idx, commit)| commit.to_string())
+					.join(" "),
+			),
+		};
+		Ok(ret)
 	}
 
 	/// Copy currently marked or selected (if none are marked) commit ids

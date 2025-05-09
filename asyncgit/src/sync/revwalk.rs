@@ -1,4 +1,5 @@
-use std::ops::Bound;
+//! git revwalk utils
+use std::ops::{Bound, ControlFlow};
 
 use crate::Result;
 use git2::{Commit, Oid};
@@ -56,5 +57,34 @@ fn resolve<'r>(
 			Ok(res)
 		}
 		Bound::Unbounded => Ok(None),
+	}
+}
+
+/// Checks if `commits` range is continuous under `sort` flags.
+pub fn is_continuous(
+	repo_path: &RepoPath,
+	sort: git2::Sort,
+	commits: &[CommitId],
+) -> Result<bool> {
+	match commits {
+		[] | [_] => Ok(true),
+		[start, .., end] => revwalk(
+			repo_path,
+			Bound::Excluded(start),
+			Bound::Included(end),
+			sort,
+			|revwalk| match revwalk.zip(commits).try_fold(
+				Ok(true),
+				|acc, (r, c)| match r
+					.map(CommitId::new)
+					.and_then(|r| acc.map(|acc| acc && (&r == c)))
+				{
+					Ok(true) => ControlFlow::Continue(Ok(true)),
+					otherwise => ControlFlow::Break(otherwise),
+				},
+			) {
+				ControlFlow::Continue(v) | ControlFlow::Break(v) => v,
+			},
+		),
 	}
 }
