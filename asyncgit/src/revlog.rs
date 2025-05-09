@@ -1,4 +1,5 @@
 use crate::{
+	asyncjob::{AsyncJob, AsyncSingleJob, RunParams},
 	error::Result,
 	sync::{
 		repo, CommitId, LogWalker, LogWalkerWithoutFilter, RepoPath,
@@ -39,8 +40,9 @@ pub struct AsyncLogResult {
 pub struct AsyncLog {
 	current: Arc<Mutex<AsyncLogResult>>,
 	current_head: Arc<Mutex<Option<CommitId>>>,
+	last: Option<()>,
 	sender: Sender<AsyncGitNotification>,
-	pending: Arc<AtomicBool>,
+	job: AsyncSingleJob<AsyncFileLogJob>,
 	background: Arc<AtomicBool>,
 	filter: Option<SharedCommitFilterFn>,
 	partial_extract: AtomicBool,
@@ -65,8 +67,9 @@ impl AsyncLog {
 				duration: Duration::default(),
 			})),
 			current_head: Arc::new(Mutex::new(None)),
+			last: None,
 			sender: sender.clone(),
-			pending: Arc::new(AtomicBool::new(false)),
+			job: AsyncSingleJob::new(sender.clone()),
 			background: Arc::new(AtomicBool::new(false)),
 			filter,
 			partial_extract: AtomicBool::new(false),
@@ -122,7 +125,7 @@ impl AsyncLog {
 
 	///
 	pub fn is_pending(&self) -> bool {
-		self.pending.load(Ordering::Relaxed)
+		self.job.is_pending()
 	}
 
 	///
@@ -163,7 +166,6 @@ impl AsyncLog {
 
 		let arc_current = Arc::clone(&self.current);
 		let sender = self.sender.clone();
-		let arc_pending = Arc::clone(&self.pending);
 		let arc_background = Arc::clone(&self.background);
 		let filter = self.filter.clone();
 		let repo_path = self.repo.clone();
@@ -184,8 +186,6 @@ impl AsyncLog {
 				filter,
 			)
 			.expect("failed to fetch");
-
-			arc_pending.store(false, Ordering::Relaxed);
 
 			Self::notify(&sender);
 		});
@@ -321,6 +321,107 @@ impl AsyncLog {
 		sender
 			.send(AsyncGitNotification::Log)
 			.expect("error sending");
+	}
+
+	///
+	pub fn request(&mut self) -> Result<()> {
+		self.job.spawn(AsyncFileLogJob::new(
+			self.repo.clone(),
+			self.filter.clone(),
+		));
+
+		if let Some(job) = self.job.take_last() {
+			if let Some(Ok(result)) = job.result() {
+				self.last = Some(result);
+			}
+		}
+
+		Ok(())
+	}
+}
+
+enum JobState {
+	Request(RepoPath, Option<LogWalkerFilter>),
+	Response(()),
+}
+
+///
+#[derive(Clone, Default)]
+pub struct AsyncFileLogJob {
+	state: Arc<Mutex<Option<JobState>>>,
+}
+
+impl AsyncFileLogJob {
+	///
+	pub fn new(
+		repo: RepoPath,
+		filter: Option<LogWalkerFilter>,
+	) -> Self {
+		Self {
+			state: Arc::new(Mutex::new(Some(JobState::Request(
+				repo, filter,
+			)))),
+		}
+	}
+
+	///
+	pub fn result(&self) -> Option<Result<()>> {
+		if let Ok(mut state) = self.state.lock() {
+			if let Some(state) = state.take() {
+				return match state {
+					JobState::Request(_, _) => None,
+					JobState::Response(_) => None,
+				};
+			}
+		}
+
+		None
+	}
+
+	fn fetch_log(repo_path: &RepoPath) -> Result<()> {
+		let mut entries = Vec::with_capacity(LIMIT_COUNT);
+		let repo = repo(&repo_path)?;
+		let mut walker =
+			LogWalker::new(&repo, LIMIT_COUNT)?.filter(None);
+
+		loop {
+			entries.clear();
+			let _res_is_err = walker.read(&mut entries).is_err();
+
+			break;
+		}
+
+		Ok(())
+	}
+}
+
+impl AsyncJob for AsyncFileLogJob {
+	type Notification = AsyncGitNotification;
+	type Progress = ();
+
+	fn run(
+		&mut self,
+		_params: RunParams<Self::Notification, Self::Progress>,
+	) -> Result<Self::Notification> {
+		let mut notification = AsyncGitNotification::FinishUnchanged;
+
+		if let Ok(mut state) = self.state.lock() {
+			*state = state.take().map(|state| match state {
+				JobState::Request(repo_path, _) => {
+					Self::fetch_log(&repo_path)
+						.expect("failed to fetch");
+
+					notification = AsyncGitNotification::Log;
+
+					JobState::Response(())
+				}
+				JobState::Response(result) => {
+					JobState::Response(result)
+				}
+			});
+		}
+
+		Ok(notification)
 	}
 }
 
