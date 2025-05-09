@@ -24,7 +24,7 @@ mod rebase;
 pub mod remotes;
 mod repository;
 mod reset;
-mod revwalk;
+pub mod revwalk;
 mod reword;
 pub mod sign;
 mod staging;
@@ -91,7 +91,6 @@ pub use remotes::{
 pub(crate) use repository::{gix_repo, repo};
 pub use repository::{RepoPath, RepoPathRef};
 pub use reset::{reset_repo, reset_stage, reset_workdir};
-pub use revwalk::revwalk;
 pub use reword::reword;
 pub use staging::{discard_lines, stage_lines};
 pub use stash::{
