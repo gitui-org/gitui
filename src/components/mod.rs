@@ -1,3 +1,7 @@
+/*!
+Components are the visible building blocks of tabs.
+*/
+
 mod changes;
 mod command;
 mod commit_details;
