@@ -3324,18 +3324,18 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "struct-patch"
-version = "0.9.2"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38a8aef6d40b8eda588b2036cf3519526894fdd49305063ee43233c2942136b6"
+checksum = "157c4161ecd2bdb6fac38c4c627b5b3adc62a0ad53d0ba8b984f1df9631ebef0"
 dependencies = [
  "struct-patch-derive",
 ]
 
 [[package]]
 name = "struct-patch-derive"
-version = "0.9.2"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b3e885afd59c2097c651763bf9cc2cd09703f2cff1d7ad6bf6dbcc19e1d0317"
+checksum = "403a2a4b4fae123baa030e9a13f1d366647164fa6222a92c49730d10e8df1b93"
 dependencies = [
  "proc-macro2",
  "quote",
