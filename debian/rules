@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+export DH_VERBOSE=1
+
+%:
+	dh $@
+
+export CARGO_HOME=debian/cargo_home
+
+export CARGO_PROFILE_RELEASE_LTO=thin
+
+override_dh_auto_clean:
+	cargo clean
+	rm -rf $(CARGO_HOME)
+
+override_dh_auto_test:
+	cargo test --release
+
+override_dh_auto_build:
+#	cargo build --release
+
+override_dh_auto_install:
+	cargo install --path=. --root=debian/tmp/usr
