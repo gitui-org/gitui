@@ -2,11 +2,11 @@ name: CI
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: "0 2 * * *"
   push:
-    branches: [ '*' ]
+    branches: ["*"]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,287 +17,287 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [nightly, stable, '1.81']
+        rust: [nightly, stable, "1.81"]
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.rust == 'nightly' }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        shared-key: ${{ matrix.os }}-${{ env.cache-name }}-${{ matrix.rust }}
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          shared-key: ${{ matrix.os }}-${{ env.cache-name }}-${{ matrix.rust }}
 
-    - name: MacOS Workaround
-      if: matrix.os == 'macos-latest'
-      run: cargo clean -p serde_derive -p thiserror
+      - name: MacOS Workaround
+        if: matrix.os == 'macos-latest'
+        run: cargo clean -p serde_derive -p thiserror
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-        components: clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: clippy
 
-    - name: Override rust toolchain
-      run: rustup override set ${{ matrix.rust }}
+      - name: Override rust toolchain
+        run: rustup override set ${{ matrix.rust }}
 
-    - name: Rustup Show
-      run: rustup show
+      - name: Rustup Show
+        run: rustup show
 
-    - name: Build Debug
-      run: |
-        cargo build
+      - name: Build Debug
+        run: |
+          cargo build
 
-    - name: Run tests
-      run: make test
+      - name: Run tests
+        run: make test
 
-    - name: Run clippy
-      run: |
-        make clippy
+      - name: Run clippy
+        run: |
+          make clippy
 
-    - name: Build Release
-      run: make build-release
+      - name: Build Release
+        run: make build-release
 
-    - name: Test Install
-      run: cargo install --path "." --force --locked
+      - name: Test Install
+        run: cargo install --path "." --force --locked
 
-    - name: Binary Size (unix)
-      if: matrix.os != 'windows-latest'
-      run: |
-        ls -l ./target/release/gitui
+      - name: Binary Size (unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          ls -l ./target/release/gitui
 
-    - name: Binary Size (win)
-      if: matrix.os == 'windows-latest'
-      run: |
-        ls -l ./target/release/gitui.exe
+      - name: Binary Size (win)
+        if: matrix.os == 'windows-latest'
+        run: |
+          ls -l ./target/release/gitui.exe
 
-    - name: Binary dependencies (mac)
-      if: matrix.os == 'macos-latest'
-      run: |
-        otool -L ./target/release/gitui
+      - name: Binary dependencies (mac)
+        if: matrix.os == 'macos-latest'
+        run: |
+          otool -L ./target/release/gitui
 
-    - name: Build MSI (windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cargo install cargo-wix --version 0.3.3
-        cargo wix --version
-        cargo wix -p gitui --no-build --nocapture --output ./target/wix/gitui-win.msi
-        ls -l ./target/wix/gitui-win.msi
+      - name: Build MSI (windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cargo install cargo-wix --version 0.3.3 --locked
+          cargo wix --version
+          cargo wix -p gitui --no-build --nocapture --output ./target/wix/gitui-win.msi
+          ls -l ./target/wix/gitui-win.msi
 
   build-linux-musl:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, '1.81']
+        rust: [nightly, stable, "1.81"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        key: ubuntu-latest-${{ env.cache-name }}-${{ matrix.rust }}
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          key: ubuntu-latest-${{ env.cache-name }}-${{ matrix.rust }}
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-        targets: x86_64-unknown-linux-musl
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: x86_64-unknown-linux-musl
 
-    # The build would fail without manually installing the target.
-    # https://github.com/dtolnay/rust-toolchain/issues/83
-    - name: Manually install target
-      run: rustup target add x86_64-unknown-linux-musl
+      # The build would fail without manually installing the target.
+      # https://github.com/dtolnay/rust-toolchain/issues/83
+      - name: Manually install target
+        run: rustup target add x86_64-unknown-linux-musl
 
-    - name: Override rust toolchain
-      run: rustup override set ${{ matrix.rust }}
+      - name: Override rust toolchain
+        run: rustup override set ${{ matrix.rust }}
 
-    - name: Rustup Show
-      run: rustup show
+      - name: Rustup Show
+        run: rustup show
 
-    - name: Setup MUSL
-      run: |
-        sudo apt-get -qq install musl-tools
-    - name: Build Debug
-      run: |
-        make build-linux-musl-debug
-        ./target/x86_64-unknown-linux-musl/debug/gitui --version
-    - name: Build Release
-      run: |
-        make build-linux-musl-release
-        ./target/x86_64-unknown-linux-musl/release/gitui --version
-        ls -l ./target/x86_64-unknown-linux-musl/release/gitui
-    - name: Test
-      run: |
-        make test-linux-musl
-    - name: Test Install
-      run: cargo install --path "." --force --locked
+      - name: Setup MUSL
+        run: |
+          sudo apt-get -qq install musl-tools
+      - name: Build Debug
+        run: |
+          make build-linux-musl-debug
+          ./target/x86_64-unknown-linux-musl/debug/gitui --version
+      - name: Build Release
+        run: |
+          make build-linux-musl-release
+          ./target/x86_64-unknown-linux-musl/release/gitui --version
+          ls -l ./target/x86_64-unknown-linux-musl/release/gitui
+      - name: Test
+        run: |
+          make test-linux-musl
+      - name: Test Install
+        run: cargo install --path "." --force --locked
 
   build-linux-arm:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, '1.81']
+        rust: [nightly, stable, "1.81"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        key: ubuntu-latest-${{ env.cache-name }}-${{ matrix.rust }}
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          key: ubuntu-latest-${{ env.cache-name }}-${{ matrix.rust }}
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-    - name: Override rust toolchain
-      run: rustup override set ${{ matrix.rust }}
+      - name: Override rust toolchain
+        run: rustup override set ${{ matrix.rust }}
 
-    - name: Setup ARM toolchain
-      run: |
-        rustup target add aarch64-unknown-linux-gnu
-        rustup target add armv7-unknown-linux-gnueabihf
-        rustup target add arm-unknown-linux-gnueabihf
+      - name: Setup ARM toolchain
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+          rustup target add arm-unknown-linux-gnueabihf
 
-        curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
-        curl -o $GITHUB_WORKSPACE/arm.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf.tar.xz
+          curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
+          curl -o $GITHUB_WORKSPACE/arm.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf.tar.xz
 
-        tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
-        tar xf $GITHUB_WORKSPACE/arm.tar.xz
+          tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
+          tar xf $GITHUB_WORKSPACE/arm.tar.xz
 
-        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
-        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
 
-    - name: Rustup Show
-      run: rustup show
+      - name: Rustup Show
+        run: rustup show
 
-    - name: Build Debug
-      run: |
-        make build-linux-arm-debug
-    - name: Build Release
-      run: |
-        make build-linux-arm-release
-        ls -l ./target/aarch64-unknown-linux-gnu/release/gitui || ls -l ./target/armv7-unknown-linux-gnueabihf/release/gitui || ls -l ./target/arm-unknown-linux-gnueabihf/release/gitui
+      - name: Build Debug
+        run: |
+          make build-linux-arm-debug
+      - name: Build Release
+        run: |
+          make build-linux-arm-release
+          ls -l ./target/aarch64-unknown-linux-gnu/release/gitui || ls -l ./target/armv7-unknown-linux-gnueabihf/release/gitui || ls -l ./target/arm-unknown-linux-gnueabihf/release/gitui
 
   build-apple-x86:
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, '1.81']
+        rust: [nightly, stable, "1.81"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        key: apple-x86-${{ env.cache-name }}-${{ matrix.rust }}
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          key: apple-x86-${{ env.cache-name }}-${{ matrix.rust }}
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-    - name: Override rust toolchain
-      run: rustup override set ${{ matrix.rust }}
+      - name: Override rust toolchain
+        run: rustup override set ${{ matrix.rust }}
 
-    - name: Setup target
-      run: rustup target add x86_64-apple-darwin
+      - name: Setup target
+        run: rustup target add x86_64-apple-darwin
 
-    - name: Rustup Show
-      run: rustup show
+      - name: Rustup Show
+        run: rustup show
 
-    - name: Build Debug
-      run: |
-        make build-apple-x86-debug
-    - name: Build Release
-      run: |
-        make build-apple-x86-release
-        ls -l ./target/x86_64-apple-darwin/release/gitui
+      - name: Build Debug
+        run: |
+          make build-apple-x86-debug
+      - name: Build Release
+        run: |
+          make build-apple-x86-release
+          ls -l ./target/x86_64-apple-darwin/release/gitui
 
   linting:
     name: Lints
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        key: ubuntu-latest-${{ env.cache-name }}-stable
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          key: ubuntu-latest-${{ env.cache-name }}-stable
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
-    - run: cargo fmt -- --check
+      - run: cargo fmt -- --check
 
-    - name: cargo-sort
-      run: |
-        cargo install cargo-sort --force
-        cargo sort -c -w
+      - name: cargo-sort
+        run: |
+          cargo install cargo-sort --force
+          cargo sort -c -w
 
-    - name: cargo-deny install
-      run: |
-        cargo install --locked cargo-deny
+      - name: cargo-deny install
+        run: |
+          cargo install --locked cargo-deny
 
-    - name: cargo-deny checks
-      run: |
-        cargo deny check
+      - name: cargo-deny checks
+        run: |
+          cargo deny check
 
   udeps:
     name: udeps
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        key: ubuntu-latest-${{ env.cache-name }}-nightly
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          key: ubuntu-latest-${{ env.cache-name }}-nightly
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
 
-    - name: build cargo-udeps
-      run: cargo install --git https://github.com/est31/cargo-udeps --locked
+      - name: build cargo-udeps
+        run: cargo install --git https://github.com/est31/cargo-udeps --locked
 
-    - name: run cargo-udeps
-      run: cargo +nightly udeps --all-targets
+      - name: run cargo-udeps
+        run: cargo +nightly udeps --all-targets
 
   log-test:
     name: Changelog Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Extract release notes
-      id: extract_release_notes
-      uses: ffurrer2/extract-release-notes@v2
-      with:
-        release_notes_file: ./release-notes.txt
-    - uses: actions/upload-artifact@v4
-      with:
-        name: release-notes.txt
-        path: ./release-notes.txt
+      - uses: actions/checkout@v4
+      - name: Extract release notes
+        id: extract_release_notes
+        uses: ffurrer2/extract-release-notes@v2
+        with:
+          release_notes_file: ./release-notes.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes.txt
+          path: ./release-notes.txt
 
   test-homebrew:
     name: Test Homebrew Formula (macOS)
