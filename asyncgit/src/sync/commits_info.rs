@@ -84,6 +84,15 @@ impl From<Oid> for CommitId {
 	}
 }
 
+impl From<gix::ObjectId> for CommitId {
+	fn from(object_id: gix::ObjectId) -> Self {
+		#[allow(clippy::expect_used)]
+		let oid = Oid::from_bytes(object_id.as_bytes()).expect("`Oid::from_bytes(object_id.as_bytes())` is expected to never fail");
+
+		Self::new(oid)
+	}
+}
+
 ///
 #[derive(Debug, Clone)]
 pub struct CommitInfo {
