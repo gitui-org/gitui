@@ -1224,6 +1224,7 @@ dependencies = [
  "gix-hashtable",
  "gix-index",
  "gix-lock",
+ "gix-mailmap",
  "gix-object",
  "gix-odb",
  "gix-pack",
@@ -1483,6 +1484,18 @@ checksum = "df47b8f11c34520db5541bc5fc9fbc8e4b0bdfcec3736af89ccb1a5728a0126f"
 dependencies = [
  "gix-tempfile",
  "gix-utils",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "gix-mailmap"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff80d086d2684d30c5785cc37eba9d2cf817cfb33797ed999db9a359d16ab393"
+dependencies = [
+ "bstr",
+ "gix-actor",
+ "gix-date",
  "thiserror 2.0.12",
 ]
 
