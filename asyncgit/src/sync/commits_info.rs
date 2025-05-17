@@ -3,12 +3,9 @@ use std::fmt::Display;
 use super::RepoPath;
 use crate::{
 	error::Result,
-	sync::{
-		commit_details::get_author_of_commit,
-		repository::{gix_repo, repo},
-	},
+	sync::repository::{gix_repo, repo},
 };
-use git2::{Commit, Error, Oid};
+use git2::Oid;
 use scopetime::scope_time;
 use unicode_truncate::UnicodeTruncateStr;
 
@@ -132,34 +129,34 @@ pub fn get_commits_info(
 ) -> Result<Vec<CommitInfo>> {
 	scope_time!("get_commits_info");
 
-	let repo = repo(repo_path)?;
-	let mailmap = repo.mailmap()?;
+	let repo: gix::Repository = gix_repo(repo_path)?;
+	let mailmap = repo.open_mailmap();
 
-	let commits = ids
-		.iter()
-		.map(|id| repo.find_commit((*id).into()))
-		.collect::<std::result::Result<Vec<Commit>, Error>>()?
-		.into_iter();
+	ids.iter()
+		.map(|id| -> Result<_> {
+			let commit = repo.find_commit(*id)?;
+			let commit_ref = commit.decode()?;
 
-	let res = commits
-		.map(|c: Commit| {
-			let message = get_message(&c, Some(message_length_limit));
-			let author = get_author_of_commit(&c, &mailmap)
-				.name()
-				.map_or_else(
-					|| String::from("<unknown>"),
-					String::from,
-				);
-			CommitInfo {
+			let message = gix_get_message(
+				&commit_ref,
+				Some(message_length_limit),
+			);
+
+			let author = commit_ref.author();
+
+			let author = mailmap.try_resolve(author).map_or_else(
+				|| author.name.into(),
+				|signature| signature.name,
+			);
+
+			Ok(CommitInfo {
 				message,
-				author,
-				time: c.time().seconds(),
-				id: CommitId(c.id()),
-			}
+				author: author.to_string(),
+				time: commit_ref.time().seconds,
+				id: *id,
+			})
 		})
-		.collect::<Vec<_>>();
-
-	Ok(res)
+		.collect()
 }
 
 ///
