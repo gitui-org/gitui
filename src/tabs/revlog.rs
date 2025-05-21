@@ -586,19 +586,19 @@ impl Component for Revlog {
 						self.queue.push(InternalEvent::OpenPopup(
 							StackablePopupOpen::CompareCommits(
 								InspectCommitOpen::new(
-									self.list.marked()[0].1,
+									self.list.marked_commits()[0],
 								),
 							),
 						));
 						return Ok(EventState::Consumed);
 					} else if self.list.marked_count() == 2 {
 						//compare two marked commits
-						let marked = self.list.marked();
+						let marked = self.list.marked_commits();
 						self.queue.push(InternalEvent::OpenPopup(
 							StackablePopupOpen::CompareCommits(
 								InspectCommitOpen {
-									commit_id: marked[0].1,
-									compare_id: Some(marked[1].1),
+									commit_id: marked[0],
+									compare_id: Some(marked[1]),
 									tags: None,
 								},
 							),
