@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{
 	app::Environment,
 	components::{
@@ -27,6 +29,7 @@ pub enum AppOption {
 	DiffIgnoreWhitespaces,
 	DiffContextLines,
 	DiffInterhunkLines,
+	HookTimeout,
 }
 
 pub struct OptionsPopup {
@@ -99,6 +102,19 @@ impl OptionsPopup {
 			&diff.interhunk_lines.to_string(),
 			self.is_select(AppOption::DiffInterhunkLines),
 		);
+		Self::add_header(txt, "");
+
+		Self::add_header(txt, "Hooks");
+		self.add_entry(
+			txt,
+			width,
+			"Timeout",
+			&self.options.borrow().hook_timeout().map_or_else(
+				|| "None".to_string(),
+				|d| format!("{d:?}"),
+			),
+			self.is_select(AppOption::HookTimeout),
+		);
 	}
 
 	fn is_select(&self, kind: AppOption) -> bool {
@@ -138,7 +154,7 @@ impl OptionsPopup {
 		if up {
 			self.selection = match self.selection {
 				AppOption::StatusShowUntracked => {
-					AppOption::DiffInterhunkLines
+					AppOption::HookTimeout
 				}
 				AppOption::DiffIgnoreWhitespaces => {
 					AppOption::StatusShowUntracked
@@ -148,6 +164,9 @@ impl OptionsPopup {
 				}
 				AppOption::DiffInterhunkLines => {
 					AppOption::DiffContextLines
+				}
+				AppOption::HookTimeout => {
+					AppOption::DiffInterhunkLines
 				}
 			};
 		} else {
@@ -162,6 +181,9 @@ impl OptionsPopup {
 					AppOption::DiffInterhunkLines
 				}
 				AppOption::DiffInterhunkLines => {
+					AppOption::HookTimeout
+				}
+				AppOption::HookTimeout => {
 					AppOption::StatusShowUntracked
 				}
 			};
@@ -207,6 +229,14 @@ impl OptionsPopup {
 						.borrow_mut()
 						.diff_hunk_lines_change(true);
 				}
+				AppOption::HookTimeout => {
+					let current =
+						self.options.borrow().hook_timeout();
+					let inc = Duration::from_secs(1);
+					let new = current.map(|d| d + inc).or(Some(inc));
+
+					self.options.borrow_mut().set_hook_timeout(new);
+				}
 			}
 		} else {
 			match self.selection {
@@ -246,6 +276,21 @@ impl OptionsPopup {
 						.borrow_mut()
 						.diff_hunk_lines_change(false);
 				}
+				AppOption::HookTimeout => {
+					let current =
+						self.options.borrow().hook_timeout();
+					let dec = Duration::from_secs(1);
+
+					let new = current.and_then(|d| {
+						if d > dec {
+							Some(d - dec)
+						} else {
+							None
+						}
+					});
+
+					self.options.borrow_mut().set_hook_timeout(new);
+				}
 			}
 		}
 
@@ -257,7 +302,7 @@ impl OptionsPopup {
 impl DrawableComponent for OptionsPopup {
 	fn draw(&self, f: &mut Frame, area: Rect) -> Result<()> {
 		if self.is_visible() {
-			const SIZE: (u16, u16) = (50, 10);
+			const SIZE: (u16, u16) = (50, 12);
 			let area =
 				ui::centered_rect_absolute(SIZE.0, SIZE.1, area);
 
