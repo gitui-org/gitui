@@ -1,3 +1,8 @@
+/*!
+The [`CommitList`] shows a list of commits. It is used by
+the [revlog](crate::tabs::Revlog) tab
+and the [stashlist](crate::tabs::StashList) tab.
+*/
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
 	app::Environment,

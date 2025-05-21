@@ -1,3 +1,13 @@
+/*!
+The cmdbar module manages the [`CommandBar`] sitting at the bottom of the
+screen.
+
+It shows a list of available keyboard commands. The full list can cover
+several lines, so `CommandBar` has a "more/less" feature to toggle between
+showing just one line or expanding.
+Commands can be shown as disabled, if they are not enabled in the
+current context.
+*/
 use crate::{
 	components::CommandInfo, keys::SharedKeyConfig, strings,
 	ui::style::SharedTheme,
