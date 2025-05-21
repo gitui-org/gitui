@@ -611,10 +611,10 @@ mod tests {
 
 		tree.collapse(1, false);
 
-		let visibles = get_visible(&tree);
+		let visible = get_visible(&tree);
 
 		assert_eq!(
-			visibles,
+			visible,
 			vec![
 				true,  //
 				true,  //
@@ -625,10 +625,10 @@ mod tests {
 
 		tree.expand(1, false);
 
-		let visibles = get_visible(&tree);
+		let visible = get_visible(&tree);
 
 		assert_eq!(
-			visibles,
+			visible,
 			vec![
 				true, //
 				true, //
@@ -699,10 +699,10 @@ mod tests {
 
 		tree.collapse(0, false);
 
-		let visibles = get_visible(&tree);
+		let visible = get_visible(&tree);
 
 		assert_eq!(
-			visibles,
+			visible,
 			vec![
 				true,  //
 				false, //
@@ -729,10 +729,10 @@ mod tests {
 
 		tree.collapse(1, false);
 
-		let visibles = get_visible(&tree);
+		let visible = get_visible(&tree);
 
 		assert_eq!(
-			visibles,
+			visible,
 			vec![
 				true,  //
 				true,  //
@@ -743,10 +743,10 @@ mod tests {
 
 		tree.collapse(0, false);
 
-		let visibles = get_visible(&tree);
+		let visible = get_visible(&tree);
 
 		assert_eq!(
-			visibles,
+			visible,
 			vec![
 				true,  //
 				false, //
