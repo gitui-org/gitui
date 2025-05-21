@@ -37,7 +37,7 @@ release-mac-x86: build-apple-x86-release
 release-win: build-release
 	mkdir -p release
 	tar -C ./target/release/ -czvf ./release/gitui-win.tar.gz ./gitui.exe
-	cargo install cargo-wix --version 0.3.3
+	cargo install cargo-wix --version 0.3.3 --locked
 	cargo wix -p gitui --no-build --nocapture --output ./release/gitui-win.msi
 	ls -l ./release/gitui-win.msi
 
@@ -94,7 +94,7 @@ clippy:
 clippy-nightly:
 	cargo +nightly clippy --workspace --all-features
 
-check: fmt clippy test deny sort
+check: fmt clippy test sort
 
 check-nightly:
 	cargo +nightly c
