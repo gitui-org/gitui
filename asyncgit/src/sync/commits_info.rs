@@ -1,11 +1,8 @@
 use std::fmt::Display;
 
 use super::RepoPath;
-use crate::{
-	error::Result,
-	sync::{commit_details::get_author_of_commit, repository::repo},
-};
-use git2::{Commit, Error, Oid};
+use crate::{error::Result, sync::repository::repo};
+use git2::Oid;
 use scopetime::scope_time;
 use unicode_truncate::UnicodeTruncateStr;
 
@@ -84,6 +81,21 @@ impl From<Oid> for CommitId {
 	}
 }
 
+impl From<gix::ObjectId> for CommitId {
+	fn from(object_id: gix::ObjectId) -> Self {
+		#[allow(clippy::expect_used)]
+		let oid = Oid::from_bytes(object_id.as_bytes()).expect("`Oid::from_bytes(object_id.as_bytes())` is expected to never fail");
+
+		Self::new(oid)
+	}
+}
+
+impl From<CommitId> for gix::ObjectId {
+	fn from(id: CommitId) -> Self {
+		Self::from_bytes_or_panic(id.0.as_bytes())
+	}
+}
+
 ///
 #[derive(Debug, Clone)]
 pub struct CommitInfo {
@@ -105,34 +117,36 @@ pub fn get_commits_info(
 ) -> Result<Vec<CommitInfo>> {
 	scope_time!("get_commits_info");
 
-	let repo = repo(repo_path)?;
-	let mailmap = repo.mailmap()?;
+	let repo: gix::Repository =
+				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
+						.map(Into::into)?;
+	let mailmap = repo.open_mailmap();
 
-	let commits = ids
-		.iter()
-		.map(|id| repo.find_commit((*id).into()))
-		.collect::<std::result::Result<Vec<Commit>, Error>>()?
-		.into_iter();
+	ids.iter()
+		.map(|id| -> Result<_> {
+			let commit = repo.find_commit(*id)?;
+			let commit_ref = commit.decode()?;
 
-	let res = commits
-		.map(|c: Commit| {
-			let message = get_message(&c, Some(message_length_limit));
-			let author = get_author_of_commit(&c, &mailmap)
-				.name()
-				.map_or_else(
-					|| String::from("<unknown>"),
-					String::from,
-				);
-			CommitInfo {
+			let message = gix_get_message(
+				&commit_ref,
+				Some(message_length_limit),
+			);
+
+			let author = commit_ref.author();
+
+			let author = mailmap.try_resolve(author).map_or_else(
+				|| author.name.into(),
+				|signature| signature.name,
+			);
+
+			Ok(CommitInfo {
 				message,
-				author,
-				time: c.time().seconds(),
-				id: CommitId(c.id()),
-			}
+				author: author.to_string(),
+				time: commit_ref.time().seconds,
+				id: *id,
+			})
 		})
-		.collect::<Vec<_>>();
-
-	Ok(res)
+		.collect()
 }
 
 ///
@@ -142,24 +156,35 @@ pub fn get_commit_info(
 ) -> Result<CommitInfo> {
 	scope_time!("get_commit_info");
 
-	let repo = repo(repo_path)?;
-	let mailmap = repo.mailmap()?;
+	let repo: gix::Repository =
+				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
+						.map(Into::into)?;
+	let mailmap = repo.open_mailmap();
 
-	let commit = repo.find_commit((*commit_id).into())?;
-	let author = get_author_of_commit(&commit, &mailmap);
+	let commit = repo.find_commit(*commit_id)?;
+	let commit_ref = commit.decode()?;
+
+	let message = gix_get_message(&commit_ref, None);
+
+	let author = commit_ref.author();
+
+	let author = mailmap.try_resolve(author).map_or_else(
+		|| author.name.into(),
+		|signature| signature.name,
+	);
 
 	Ok(CommitInfo {
-		message: commit.message().unwrap_or("").into(),
-		author: author.name().unwrap_or("<unknown>").into(),
-		time: commit.time().seconds(),
-		id: CommitId(commit.id()),
+		message,
+		author: author.to_string(),
+		time: commit_ref.time().seconds,
+		id: commit.id().detach().into(),
 	})
 }
 
 /// if `message_limit` is set the message will be
 /// limited to the first line and truncated to fit
 pub fn get_message(
-	c: &Commit,
+	c: &git2::Commit,
 	message_limit: Option<usize>,
 ) -> String {
 	let msg = String::from_utf8_lossy(c.message_bytes());
@@ -170,6 +195,24 @@ pub fn get_message(
 		|limit| {
 			let msg = msg.lines().next().unwrap_or_default();
 			msg.unicode_truncate(limit).0.to_string()
+		},
+	)
+}
+
+/// if `message_limit` is set the message will be
+/// limited to the first line and truncated to fit
+pub fn gix_get_message(
+	commit_ref: &gix::objs::CommitRef,
+	message_limit: Option<usize>,
+) -> String {
+	let message = commit_ref.message.to_string();
+	let message = message.trim();
+
+	message_limit.map_or_else(
+		|| message.to_string(),
+		|limit| {
+			let message = message.lines().next().unwrap_or_default();
+			message.unicode_truncate(limit).0.to_string()
 		},
 	)
 }
