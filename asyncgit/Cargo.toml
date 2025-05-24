@@ -11,6 +11,11 @@ license = "MIT"
 categories = ["concurrency", "asynchronous"]
 keywords = ["git"]
 
+[features]
+default = ["trace-libgit"]
+trace-libgit = []
+vendor-openssl = ["openssl-sys"]
+
 [dependencies]
 bitflags = "2"
 crossbeam-channel = "0.5"
@@ -43,8 +48,3 @@ invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
 serial_test = "3.2"
 tempfile = "3"
-
-[features]
-default = ["trace-libgit"]
-trace-libgit = []
-vendor-openssl = ["openssl-sys"]
