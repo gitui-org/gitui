@@ -93,6 +93,12 @@ impl From<gix::ObjectId> for CommitId {
 	}
 }
 
+impl From<CommitId> for gix::ObjectId {
+	fn from(id: CommitId) -> Self {
+		Self::from_bytes_or_panic(id.0.as_bytes())
+	}
+}
+
 ///
 #[derive(Debug, Clone)]
 pub struct CommitInfo {
@@ -151,24 +157,35 @@ pub fn get_commit_info(
 ) -> Result<CommitInfo> {
 	scope_time!("get_commit_info");
 
-	let repo = repo(repo_path)?;
-	let mailmap = repo.mailmap()?;
+	let repo: gix::Repository =
+				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
+						.map(Into::into)?;
+	let mailmap = repo.open_mailmap();
 
-	let commit = repo.find_commit((*commit_id).into())?;
-	let author = get_author_of_commit(&commit, &mailmap);
+	let commit = repo.find_commit(*commit_id)?;
+	let commit_ref = commit.decode()?;
+
+	let message = gix_get_message(&commit_ref, None);
+
+	let author = commit_ref.author();
+
+	let author = mailmap.try_resolve(author).map_or_else(
+		|| author.name.into(),
+		|signature| signature.name,
+	);
 
 	Ok(CommitInfo {
-		message: commit.message().unwrap_or("").into(),
-		author: author.name().unwrap_or("<unknown>").into(),
-		time: commit.time().seconds(),
-		id: CommitId(commit.id()),
+		message,
+		author: author.to_string(),
+		time: commit_ref.time().seconds,
+		id: commit.id().detach().into(),
 	})
 }
 
 /// if `message_limit` is set the message will be
 /// limited to the first line and truncated to fit
 pub fn get_message(
-	c: &Commit,
+	c: &git2::Commit,
 	message_limit: Option<usize>,
 ) -> String {
 	let msg = String::from_utf8_lossy(c.message_bytes());
@@ -179,6 +196,24 @@ pub fn get_message(
 		|limit| {
 			let msg = msg.lines().next().unwrap_or_default();
 			msg.unicode_truncate(limit).0.to_string()
+		},
+	)
+}
+
+/// if `message_limit` is set the message will be
+/// limited to the first line and truncated to fit
+pub fn gix_get_message(
+	commit_ref: &gix::objs::CommitRef,
+	message_limit: Option<usize>,
+) -> String {
+	let message = commit_ref.message.to_string();
+	let message = message.trim();
+
+	message_limit.map_or_else(
+		|| message.to_string(),
+		|limit| {
+			let message = message.lines().next().unwrap_or_default();
+			message.unicode_truncate(limit).0.to_string()
 		},
 	)
 }
