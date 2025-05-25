@@ -27,6 +27,7 @@ git2-hooks = { path = "../git2-hooks", version = ">=0.4" }
 gix = { version = "0.71.0", default-features = false, features = [
     "max-performance",
     "revision",
+    "mailmap"
 ] }
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}

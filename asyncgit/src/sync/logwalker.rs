@@ -161,10 +161,7 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 		let mut count = 0_usize;
 
 		while let Some(Ok(info)) = self.walk.next() {
-			let bytes = info.id.as_bytes();
-			let commit_id: CommitId = Oid::from_bytes(bytes)?.into();
-
-			out.push(commit_id);
+			out.push(info.id.into());
 
 			count += 1;
 

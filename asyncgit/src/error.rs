@@ -114,6 +114,16 @@ pub enum Error {
 	GixRevisionWalk(#[from] gix::revision::walk::Error),
 
 	///
+	#[error("gix::objs::decode::Error error: {0}")]
+	GixObjsDecode(#[from] gix::objs::decode::Error),
+
+	///
+	#[error("gix::object::find::existing::with_conversion::Error error: {0}")]
+	GixObjectFindExistingWithConversionError(
+		#[from] gix::object::find::existing::with_conversion::Error,
+	),
+
+	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
 	SignAmendNonLastCommit,
 
