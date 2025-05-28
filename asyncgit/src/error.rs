@@ -147,7 +147,7 @@ pub enum Error {
 
 	///
 	#[error("gix_blame error: {0}")]
-	GixBlame(#[from] gix_blame::Error),
+	GixBlame(#[from] Box<gix_blame::Error>),
 
 	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
@@ -188,5 +188,11 @@ impl From<gix::repository::diff_resource_cache::Error> for Error {
 		error: gix::repository::diff_resource_cache::Error,
 	) -> Self {
 		Self::GixRepositoryDiffResourceCache(Box::new(error))
+	}
+}
+
+impl From<gix_blame::Error> for Error {
+	fn from(error: gix_blame::Error) -> Self {
+		Self::GixBlame(Box::new(error))
 	}
 }
