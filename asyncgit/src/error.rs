@@ -140,6 +140,12 @@ pub enum Error {
 	),
 
 	///
+	#[error("gix::config::diff::algorithm error: {0}")]
+	GixConfigDiffAlgorithm(
+		#[from] gix::config::diff::algorithm::Error,
+	),
+
+	///
 	#[error("gix_blame error: {0}")]
 	GixBlame(#[from] gix_blame::Error),
 

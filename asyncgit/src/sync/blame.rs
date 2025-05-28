@@ -61,7 +61,13 @@ pub fn blame_file(
 	let mut resource_cache =
 		repo.diff_resource_cache_for_tree_diff()?;
 
-	let options: gix_blame::Options = Default::default();
+	let diff_algorithm = repo.diff_algorithm()?;
+
+	let options: gix_blame::Options = gix_blame::Options {
+		diff_algorithm,
+		range: None,
+		since: None,
+	};
 
 	let outcome = gix_blame::file(
 		&repo.objects,
