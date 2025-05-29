@@ -82,7 +82,7 @@ impl ExternalEditorPopup {
 
 		// deal with "editor name with spaces" p1 p2 p3
 		// and with "editor_no_spaces" p1 p2 p3
-		// does not address spaces in pn
+		// does not address spaces in on
 		let mut echars = editor.chars().peekable();
 
 		let first_char = *echars.peek().ok_or_else(|| {
