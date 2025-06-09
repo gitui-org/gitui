@@ -1,3 +1,36 @@
+//!
+//! The gitui program is a text-based UI for working with a Git repository.
+//! The main navigation occurs between a number of tabs.
+//! When you execute commands, the program may use popups to communicate
+//! with the user. It is possible to customize the keybindings.
+//!
+//!
+//! ## Internal Modules
+//! The top-level modules of gitui can be grouped as follows:
+//!
+//! - User Interface
+//!   - [tabs] for main navigation
+//!   - [components] for visual elements used on tabs
+//!   - [popups] for temporary dialogs
+//!   - [ui] for tooling like scrollbars
+//! - Git Interface
+//!   - [asyncgit] (crate) for async operations on repository
+//! - Distribution and Documentation
+//!   - Project files
+//!   - Github CI
+//!   - Installation files
+//!   - Usage guides
+//!
+//! ## Included Crates
+//! Some crates are part of the gitui repository:
+//! - [asyncgit] for Git operations in the background.
+//!   - git2-hooks (used by asyncgit).
+//!     - git2-testing (used by git2-hooks).
+//!   - invalidstring used by asyncgit for testing with invalid strings.
+//! - [filetreelist] for a tree view of files.
+//! - [scopetime] for measuring execution time.
+//!
+
 #![forbid(unsafe_code)]
 #![deny(
 	unused_imports,
