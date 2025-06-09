@@ -1,13 +1,7 @@
 use super::{get_commits_info, CommitId, RepoPath};
-use crate::{
-	error::Result,
-	sync::{repository::repo, utils::bytes2string},
-};
+use crate::{error::Result, sync::repository::repo};
 use scopetime::scope_time;
-use std::{
-	collections::{BTreeMap, HashMap, HashSet},
-	ops::Not,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 ///
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -64,52 +58,31 @@ pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 		}
 	};
 
-	let repo = repo(repo_path)?;
+	let gix_repo: gix::Repository =
+				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
+						.map(Into::into)?;
+	let platform = gix_repo.references()?;
+	for mut reference in (platform.tags()?).flatten() {
+		let commit = reference.peel_to_commit().ok();
+		let tag = reference.peel_to_tag().ok();
+		let reference_name = reference.name().as_bstr();
 
-	repo.tag_foreach(|id, name| {
-		if let Ok(name) =
-			// skip the `refs/tags/` part
-			String::from_utf8(name[10..name.len()].into())
-		{
-			//NOTE: find_tag (using underlying git_tag_lookup) only
-			// works on annotated tags lightweight tags `id` already
-			// points to the target commit
-			// see https://github.com/libgit2/libgit2/issues/5586
-			let commit = repo
-				.find_tag(id)
-				.and_then(|tag| tag.target())
-				.and_then(|target| target.peel_to_commit())
-				.map_or_else(
-					|_| {
-						if repo.find_commit(id).is_ok() {
-							Some(CommitId::new(id))
-						} else {
-							None
-						}
-					},
-					|commit| Some(CommitId::new(commit.id())),
-				);
-
-			let annotation = repo
-				.find_tag(id)
-				.ok()
+		if let Some(commit) = commit {
+			let name = tag
 				.as_ref()
-				.and_then(git2::Tag::message_bytes)
-				.and_then(|msg| {
-					msg.is_empty()
-						.not()
-						.then(|| bytes2string(msg).ok())
-						.flatten()
-				});
+				.and_then(|tag| {
+					let tag_ref = tag.decode().ok();
+					tag_ref.map(|tag_ref| tag_ref.name.to_string())
+				})
+				.unwrap_or_else(|| reference_name[10..].to_string());
+			let annotation = tag.and_then(|tag| {
+				let tag_ref = tag.decode().ok();
+				tag_ref.map(|tag_ref| tag_ref.message.to_string())
+			});
 
-			if let Some(commit) = commit {
-				adder(commit, Tag { name, annotation });
-			}
-
-			return true;
+			adder(commit.into(), Tag { name, annotation });
 		}
-		false
-	})?;
+	}
 
 	Ok(res)
 }
