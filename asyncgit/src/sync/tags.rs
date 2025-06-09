@@ -63,23 +63,20 @@ pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 						.map(Into::into)?;
 	let platform = gix_repo.references()?;
 	for mut reference in (platform.tags()?).flatten() {
-		let commit = reference.peel_to_commit().ok();
-		let tag = reference.peel_to_tag().ok();
+		let commit = reference.peel_to_commit();
+		let tag = reference.peel_to_tag();
 
-		if let Some(commit) = commit {
-			let name = tag
-				.as_ref()
-				.and_then(|tag| {
-					let tag_ref = tag.decode().ok();
-					tag_ref.map(|tag_ref| tag_ref.name.to_string())
-				})
-				.unwrap_or_else(|| {
-					reference.name().shorten().to_string()
-				});
-			let annotation = tag.and_then(|tag| {
-				let tag_ref = tag.decode().ok();
-				tag_ref.map(|tag_ref| tag_ref.message.to_string())
-			});
+		if let Ok(commit) = commit {
+			let tag_ref = tag.as_ref().map(gix::Tag::decode);
+
+			let name = match tag_ref {
+				Ok(Ok(tag)) => tag.name.to_string(),
+				_ => reference.name().shorten().to_string(),
+			};
+			let annotation = match tag_ref {
+				Ok(Ok(tag)) => Some(tag.message.to_string()),
+				_ => None,
+			};
 
 			adder(commit.into(), Tag { name, annotation });
 		}
