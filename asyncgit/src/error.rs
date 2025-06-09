@@ -124,6 +124,20 @@ pub enum Error {
 	),
 
 	///
+	#[error("gix::reference::iter::Error error: {0}")]
+	GixReferenceIter(#[from] gix::reference::iter::Error),
+
+	///
+	#[error("gix::reference::iter::init::Error error: {0}")]
+	GixReferenceIterInit(#[from] gix::reference::iter::init::Error),
+
+	///
+	#[error("gix::reference::peel::to_kind::Error error: {0}")]
+	GixReferencePeelToKind(
+		#[from] gix::reference::peel::to_kind::Error,
+	),
+
+	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
 	SignAmendNonLastCommit,
 
