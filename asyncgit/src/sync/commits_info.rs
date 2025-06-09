@@ -96,6 +96,15 @@ impl From<gix::ObjectId> for CommitId {
 	}
 }
 
+impl From<gix::Commit<'_>> for CommitId {
+	fn from(commit: gix::Commit<'_>) -> Self {
+		#[allow(clippy::expect_used)]
+		let oid = Oid::from_bytes(commit.id().as_bytes()).expect("`Oid::from_bytes(commit.id().as_bytes())` is expected to never fail");
+
+		Self::new(oid)
+	}
+}
+
 impl From<CommitId> for gix::ObjectId {
 	fn from(id: CommitId) -> Self {
 		Self::from_bytes_or_panic(id.0.as_bytes())

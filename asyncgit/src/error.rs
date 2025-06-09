@@ -17,7 +17,7 @@ pub enum GixError {
 
 	///
 	#[error("gix::object::find::existing::with_conversion::Error error: {0}")]
-	ObjectFindExistingWithConversionError(
+	ObjectFindExistingWithConversion(
 		#[from] gix::object::find::existing::with_conversion::Error,
 	),
 
@@ -38,6 +38,14 @@ pub enum GixError {
 	///
 	#[error("gix::reference::head_tree_id::Error error: {0}")]
 	ReferenceHeadTreeId(#[from] gix::reference::head_tree_id::Error),
+
+	///
+	#[error("gix::reference::iter::Error error: {0}")]
+	ReferenceIter(#[from] gix::reference::iter::Error),
+
+	///
+	#[error("gix::reference::iter::init::Error error: {0}")]
+	ReferenceIterInit(#[from] gix::reference::iter::init::Error),
 
 	///
 	#[error("gix::revision::walk error: {0}")]
@@ -247,6 +255,18 @@ impl From<gix::reference::find::existing::Error> for Error {
 
 impl From<gix::reference::head_tree_id::Error> for Error {
 	fn from(error: gix::reference::head_tree_id::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::reference::iter::Error> for Error {
+	fn from(error: gix::reference::iter::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::reference::iter::init::Error> for Error {
+	fn from(error: gix::reference::iter::init::Error) -> Self {
 		Self::Gix(GixError::from(error))
 	}
 }
