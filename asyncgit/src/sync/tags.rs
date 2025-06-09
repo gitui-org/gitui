@@ -65,7 +65,6 @@ pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 	for mut reference in (platform.tags()?).flatten() {
 		let commit = reference.peel_to_commit().ok();
 		let tag = reference.peel_to_tag().ok();
-		let reference_name = reference.name().as_bstr();
 
 		if let Some(commit) = commit {
 			let name = tag
@@ -74,7 +73,9 @@ pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 					let tag_ref = tag.decode().ok();
 					tag_ref.map(|tag_ref| tag_ref.name.to_string())
 				})
-				.unwrap_or_else(|| reference_name[10..].to_string());
+				.unwrap_or_else(|| {
+					reference.name().shorten().to_string()
+				});
 			let annotation = tag.and_then(|tag| {
 				let tag_ref = tag.decode().ok();
 				tag_ref.map(|tag_ref| tag_ref.message.to_string())
