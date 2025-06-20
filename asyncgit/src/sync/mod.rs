@@ -66,8 +66,6 @@ pub use config::{
 };
 pub use diff::get_diff_commit;
 pub use git2::BranchType;
-pub use git2::ResetType;
-pub use git2::Sort;
 pub use hooks::{
 	hooks_commit_msg, hooks_post_commit, hooks_pre_commit,
 	hooks_pre_push, hooks_prepare_commit_msg, HookResult,
@@ -111,6 +109,8 @@ pub use utils::{
 	get_head, get_head_tuple, repo_dir, repo_open_error,
 	stage_add_all, stage_add_file, stage_addremoved, Head,
 };
+
+pub use git2::ResetType;
 
 /// test utils
 #[cfg(test)]
