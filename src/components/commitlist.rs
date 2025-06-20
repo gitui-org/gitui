@@ -1046,35 +1046,4 @@ mod tests {
 			))
 		);
 	}
-
-	#[test]
-	#[ignore = "needs real repository to run test. Will be moved to revwalk module."]
-	fn test_copy_commit_range_marked() {
-		let cl = build_commit_list_with_some_commits();
-		let cl = CommitList {
-			marked: build_marked_from_indices(&cl, &[4, 5, 6, 7]),
-			..cl
-		};
-		assert_eq!(
-			cl.concat_selected_commit_ids().unwrap(),
-			Some(String::from("0000000000000000000000000000000000000005^..0000000000000000000000000000000000000002"))
-		);
-	}
-
-	#[test]
-	#[ignore = "needs real repository to run test. Will be moved to revwalk module."]
-	fn test_copy_commit_random_marked() {
-		let cl = build_commit_list_with_some_commits();
-		let cl = CommitList {
-			marked: build_marked_from_indices(&cl, &[4, 7]),
-			..cl
-		};
-		assert_eq!(
-			cl.concat_selected_commit_ids().unwrap(),
-			Some(String::from(concat!(
-				"0000000000000000000000000000000000000002 ",
-				"0000000000000000000000000000000000000005"
-			)))
-		);
-	}
 }
