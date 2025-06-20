@@ -17,7 +17,6 @@ pub fn is_continuous(
 			let repo = repo(repo_path)?;
 			let mut revwalk = repo.revwalk()?;
 			revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
-			revwalk.simplify_first_parent()?;
 			revwalk.push(commits[0].get_oid())?;
 			let revwalked: Vec<Oid> =
 				revwalk
@@ -90,7 +89,7 @@ mod tests_is_continuous {
 		let repo_path: &RepoPath =
 			&root.as_os_str().to_str().unwrap().into();
 
-		let _c0 = commit(repo_path, "commit 0").unwrap();
+		let c0 = commit(repo_path, "commit 0").unwrap();
 		let c1 = commit(repo_path, "commit 1").unwrap();
 		let c2 = commit(repo_path, "commit 2").unwrap();
 
@@ -106,7 +105,13 @@ mod tests_is_continuous {
 			"range including merge should not be continuous"
 		);
 
-		let result = is_continuous(repo_path, &[c2, c1]).unwrap();
+		let result = is_continuous(repo_path, &[c4, c3, c1]).unwrap();
+		assert!(
+			!result,
+			"range including merge should not be continuous (following second parent commit)"
+		);
+
+		let result = is_continuous(repo_path, &[c2, c1, c0]).unwrap();
 		assert!(
 			result,
 			"linear range before merge should be continuous"
