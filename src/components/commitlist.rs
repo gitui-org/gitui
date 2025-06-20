@@ -15,7 +15,7 @@ use crate::{
 use anyhow::Result;
 use asyncgit::sync::{
 	self, checkout_commit, revwalk, BranchDetails, BranchInfo,
-	CommitId, RepoPathRef, Sort, Tags,
+	CommitId, RepoPathRef, Tags,
 };
 use chrono::{DateTime, Local};
 use crossterm::event::Event;
@@ -144,7 +144,6 @@ impl CommitList {
 			[latest, .., earliest]
 				if revwalk::is_continuous(
 					&self.repo.borrow(),
-					Sort::TOPOLOGICAL,
 					&self.marked.iter().map(|x| x.1).collect_vec(),
 				)? =>
 			{
