@@ -289,6 +289,8 @@ mod tests {
 		File::create(root.join(Path::new("a/f3.txt")))?
 			.write_all(b"foo")?;
 
+		repo.config()?.set_str("status.showUntrackedFiles", "all")?;
+
 		assert_eq!(status_count(StatusType::WorkingDir), 3);
 
 		stage_add_all(repo_path, "a/d", None).unwrap();
@@ -350,6 +352,8 @@ mod tests {
 			.write_all(b"foo")?;
 		File::create(root.join(Path::new("f3.txt")))?
 			.write_all(b"foo")?;
+
+		repo.config()?.set_str("status.showUntrackedFiles", "all")?;
 
 		assert_eq!(get_statuses(repo_path), (3, 0));
 
