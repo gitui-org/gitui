@@ -124,6 +124,24 @@ pub enum Error {
 	),
 
 	///
+	#[error("gix::status::Error error: {0}")]
+	GixStatus(#[from] Box<gix::status::Error>),
+
+	///
+	#[error("gix::status::iter::Error error: {0}")]
+	GixStatusIter(#[from] Box<gix::status::iter::Error>),
+
+	///
+	#[error("gix::status::into_iter::Error error: {0}")]
+	GixStatusIntoIter(#[from] Box<gix::status::into_iter::Error>),
+
+	///
+	#[error("gix::status::index_worktree::Error error: {0}")]
+	GixStatusIndexWorktree(
+		#[from] Box<gix::status::index_worktree::Error>,
+	),
+
+	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
 	SignAmendNonLastCommit,
 
@@ -154,5 +172,29 @@ impl<T> From<crossbeam_channel::SendError<T>> for Error {
 impl From<gix::discover::Error> for Error {
 	fn from(error: gix::discover::Error) -> Self {
 		Self::GixDiscover(Box::new(error))
+	}
+}
+
+impl From<gix::status::Error> for Error {
+	fn from(error: gix::status::Error) -> Self {
+		Self::GixStatus(Box::new(error))
+	}
+}
+
+impl From<gix::status::iter::Error> for Error {
+	fn from(error: gix::status::iter::Error) -> Self {
+		Self::GixStatusIter(Box::new(error))
+	}
+}
+
+impl From<gix::status::into_iter::Error> for Error {
+	fn from(error: gix::status::into_iter::Error) -> Self {
+		Self::GixStatusIntoIter(Box::new(error))
+	}
+}
+
+impl From<gix::status::index_worktree::Error> for Error {
+	fn from(error: gix::status::index_worktree::Error) -> Self {
+		Self::GixStatusIndexWorktree(Box::new(error))
 	}
 }

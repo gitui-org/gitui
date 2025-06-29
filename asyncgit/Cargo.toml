@@ -28,6 +28,7 @@ gix = { version = "0.71.0", default-features = false, features = [
     "max-performance",
     "revision",
     "mailmap",
+    "status",
 ] }
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
