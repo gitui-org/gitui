@@ -56,6 +56,13 @@ pub fn untracked_files_config_repo(
 		}
 	}
 
+	// This does not reflect how git works according to its docs that say: "If this variable is not
+	// specified, it defaults to `normal`."
+	//
+	// https://git-scm.com/docs/git-config#Documentation/git-config.txt-statusshowUntrackedFiles
+	//
+	// Note that this might become less relevant over time as more code gets migrated to `gitoxide`
+	// because `gitoxide` respects `status.showUntrackedFiles` by default.
 	Ok(ShowUntrackedFilesConfig::All)
 }
 

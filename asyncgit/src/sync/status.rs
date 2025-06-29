@@ -159,24 +159,33 @@ pub fn is_workdir_clean(
 	Ok(statuses.is_empty())
 }
 
+impl From<ShowUntrackedFilesConfig> for gix::status::UntrackedFiles {
+	fn from(value: ShowUntrackedFilesConfig) -> Self {
+		match value {
+			ShowUntrackedFilesConfig::All => Self::Files,
+			ShowUntrackedFilesConfig::Normal => Self::Collapsed,
+			ShowUntrackedFilesConfig::No => Self::None,
+		}
+	}
+}
+
 /// guarantees sorting
 pub fn get_status(
 	repo_path: &RepoPath,
 	status_type: StatusType,
-	_show_untracked: Option<ShowUntrackedFilesConfig>,
+	show_untracked: Option<ShowUntrackedFilesConfig>,
 ) -> Result<Vec<StatusItem>> {
 	scope_time!("get_status");
-
-	// TODO: take parameter `show_untracked` into account, trying to replicate the existing
-	// behaviour.
 
 	let repo: gix::Repository =
 				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
 						.map(Into::into)?;
 
-	let status = repo
-		.status(gix::progress::Discard)?
-		.untracked_files(gix::status::UntrackedFiles::Files);
+	let mut status = repo.status(gix::progress::Discard)?;
+
+	if let Some(config) = show_untracked {
+		status = status.untracked_files(config.into());
+	}
 
 	let mut res = Vec::new();
 
