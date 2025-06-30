@@ -7,14 +7,19 @@ default on light terminal:
 
 To change the colors of the default theme you need to add a `theme.ron` file that contains the colors you want to override. Note that you don’t have to specify the full theme anymore (as of 0.23). Instead, it is sufficient to override just the values that you want to differ from their default values.
 
-The file uses the [Ron format](https://github.com/ron-rs/ron) and is located at one of the following paths, depending on your operating system:
+The theme file uses the [Ron file format](https://github.com/ron-rs/ron).
+The location of the file depends on your OS:
+`gitui` will look for an existing `/gitui` in the following order:
+* `$XDG_CONFIG_HOME/gitui/` (with `XDG_CONFIG_HOME` set)
+* `$HOME/.config/gitui/`
+* Default OS Location:
+    * `$HOME/Library/Application Support/` (mac)
+    * `$HOME/.config/gitui/` (linux)
+    * `%APPDATA%/gitui/` (Windows)
 
-* `$HOME/.config/gitui/theme.ron` (mac)
-* `$XDG_CONFIG_HOME/gitui/theme.ron` (linux using XDG)
-* `$HOME/.config/gitui/theme.ron` (linux)
-* `%APPDATA%/gitui/theme.ron` (Windows)
+The theme is configured in `theme.ron` within your first found `gitui` config folder.
 
-Alternatively, you can create a theme in the same directory mentioned above and use it with the `-t` flag followed by the name of the file in the directory. E.g. If you are on linux calling `gitui -t arc.ron`, this will load the theme in `$XDG_CONFIG_HOME/gitui/arc.ron` or `$HOME/.config/gitui/arc.ron`.
+Alternatively, you can create a theme in the same directory mentioned above and use it with the `-t` flag followed by the name of the file in the directory. E.g. Calling `gitui -t arc.ron` will load the `arc.ron` theme from your first found `/gitui` config folder using the logic above.
 
 Example theme override:
 
