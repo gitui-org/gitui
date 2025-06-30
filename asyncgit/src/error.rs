@@ -124,6 +124,12 @@ pub enum Error {
 	),
 
 	///
+	#[error("gix::reference::head_tree_id::Error error: {0}")]
+	GixReferenceHeadTreeId(
+		#[from] gix::reference::head_tree_id::Error,
+	),
+
+	///
 	#[error("gix::status::Error error: {0}")]
 	GixStatus(#[from] Box<gix::status::Error>),
 
@@ -139,6 +145,16 @@ pub enum Error {
 	#[error("gix::status::index_worktree::Error error: {0}")]
 	GixStatusIndexWorktree(
 		#[from] Box<gix::status::index_worktree::Error>,
+	),
+
+	///
+	#[error("gix::status::tree_index::Error error: {0}")]
+	GixStatusTreeIndex(#[from] Box<gix::status::tree_index::Error>),
+
+	///
+	#[error("gix::worktree::open_index::Error error: {0}")]
+	GixWorktreeOpenIndex(
+		#[from] Box<gix::worktree::open_index::Error>,
 	),
 
 	///
@@ -196,5 +212,17 @@ impl From<gix::status::into_iter::Error> for Error {
 impl From<gix::status::index_worktree::Error> for Error {
 	fn from(error: gix::status::index_worktree::Error) -> Self {
 		Self::GixStatusIndexWorktree(Box::new(error))
+	}
+}
+
+impl From<gix::status::tree_index::Error> for Error {
+	fn from(error: gix::status::tree_index::Error) -> Self {
+		Self::GixStatusTreeIndex(Box::new(error))
+	}
+}
+
+impl From<gix::worktree::open_index::Error> for Error {
+	fn from(error: gix::worktree::open_index::Error) -> Self {
+		Self::GixWorktreeOpenIndex(Box::new(error))
 	}
 }

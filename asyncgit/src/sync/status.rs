@@ -206,23 +206,33 @@ pub fn get_status(
 			}
 		}
 		StatusType::Stage => {
-			let iter = status.into_iter(Vec::new())?;
+			let tree_id: gix::ObjectId =
+				repo.head_tree_id_or_empty()?.into();
+			let worktree_index =
+				gix::worktree::IndexPersistedOrInMemory::Persisted(
+					repo.index_or_empty()?,
+				);
 
-			for item in iter {
-				let item = item?;
+			let cb =
+				|change_ref: gix::diff::index::ChangeRef<'_, '_>,
+				 _: &gix::index::State,
+				 _: &gix::index::State|
+				 -> Result<gix::diff::index::Action> {
+					let path = change_ref.fields().0.to_string();
+					let status = change_ref.into();
 
-				let path = item.location().to_string();
+					res.push(StatusItem { path, status });
 
-				match item {
-					gix::status::Item::IndexWorktree(_) => {}
-					gix::status::Item::TreeIndex(change_ref) => {
-						res.push(StatusItem {
-							path,
-							status: change_ref.into(),
-						});
-					}
-				}
-			}
+					Ok(gix::diff::index::Action::Continue)
+				};
+
+			repo.tree_index_status(
+				&tree_id,
+				&worktree_index,
+				None,
+				gix::status::tree_index::TrackRenames::default(),
+				cb,
+			)?;
 		}
 		StatusType::Both => {
 			let iter = status.into_iter(Vec::new())?;
