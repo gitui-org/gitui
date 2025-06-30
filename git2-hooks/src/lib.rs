@@ -31,6 +31,7 @@ use std::{
 	fs::File,
 	io::{Read, Write},
 	path::{Path, PathBuf},
+	time::Duration,
 };
 
 pub use error::HooksError;
@@ -59,7 +60,16 @@ pub enum HookResult {
 	RunNotSuccessful {
 		/// exit code as reported back from process calling the hook
 		code: Option<i32>,
+		/// stdout output emitted by hook
+		stdout: String,
 		/// stderr output emitted by hook
+		stderr: String,
+		/// path of the hook that was run
+		hook: PathBuf,
+	},
+	/// Hook took too long to execute and was killed
+	TimedOut {
+		/// stdout output emitted by hook
 		stdout: String,
 		/// stderr output emitted by hook
 		stderr: String,
@@ -77,6 +87,11 @@ impl HookResult {
 	/// helper to check if result was run and not rejected
 	pub const fn is_not_successful(&self) -> bool {
 		matches!(self, Self::RunNotSuccessful { .. })
+	}
+
+	/// helper to check if result was a timeout
+	pub const fn is_timeout(&self) -> bool {
+		matches!(self, Self::TimedOut { .. })
 	}
 }
 
@@ -112,6 +127,16 @@ fn create_hook_in_path(path: &Path, hook_script: &[u8]) {
 	}
 }
 
+macro_rules! find_hook {
+	($repo:expr, $other_paths:expr, $hook_type:expr) => {{
+		let hook = HookPaths::new($repo, $other_paths, $hook_type)?;
+		if !hook.found() {
+			return Ok(HookResult::NoHookFound);
+		}
+		hook
+	}};
+}
+
 /// Git hook: `commit_msg`
 ///
 /// This hook is documented here <https://git-scm.com/docs/githooks#_commit_msg>.
@@ -123,16 +148,25 @@ pub fn hooks_commit_msg(
 	other_paths: Option<&[&str]>,
 	msg: &mut String,
 ) -> Result<HookResult> {
-	let hook = HookPaths::new(repo, other_paths, HOOK_COMMIT_MSG)?;
+	hooks_commit_msg_with_timeout(repo, other_paths, msg, None)
+}
 
-	if !hook.found() {
-		return Ok(HookResult::NoHookFound);
-	}
+/// Git hook: `commit_msg`
+///
+/// See [`hooks_commit_msg`] for more details.
+pub fn hooks_commit_msg_with_timeout(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+	msg: &mut String,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
+	let hook = find_hook!(repo, other_paths, HOOK_COMMIT_MSG);
 
 	let temp_file = hook.git.join(HOOK_COMMIT_MSG_TEMP_FILE);
 	File::create(&temp_file)?.write_all(msg.as_bytes())?;
 
-	let res = hook.run_hook_os_str([&temp_file])?;
+	let res =
+		hook.run_hook_with_timeout_os_str(&temp_file, timeout)?;
 
 	// load possibly altered msg
 	msg.clear();
@@ -146,13 +180,18 @@ pub fn hooks_pre_commit(
 	repo: &Repository,
 	other_paths: Option<&[&str]>,
 ) -> Result<HookResult> {
-	let hook = HookPaths::new(repo, other_paths, HOOK_PRE_COMMIT)?;
+	hooks_pre_commit_with_timeout(repo, other_paths, None)
+}
 
-	if !hook.found() {
-		return Ok(HookResult::NoHookFound);
-	}
+/// this hook is documented here <https://git-scm.com/docs/githooks#_pre_commit>
+pub fn hooks_pre_commit_with_timeout(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
+	let hook = find_hook!(repo, other_paths, HOOK_PRE_COMMIT);
 
-	hook.run_hook(&[])
+	hook.run_hook_with_timeout(&[], timeout)
 }
 
 /// this hook is documented here <https://git-scm.com/docs/githooks#_post_commit>
@@ -160,15 +199,21 @@ pub fn hooks_post_commit(
 	repo: &Repository,
 	other_paths: Option<&[&str]>,
 ) -> Result<HookResult> {
-	let hook = HookPaths::new(repo, other_paths, HOOK_POST_COMMIT)?;
-
-	if !hook.found() {
-		return Ok(HookResult::NoHookFound);
-	}
-
-	hook.run_hook(&[])
+	hooks_post_commit_with_timeout(repo, other_paths, None)
 }
 
+/// this hook is documented here <https://git-scm.com/docs/githooks#_post_commit>
+pub fn hooks_post_commit_with_timeout(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
+	let hook = find_hook!(repo, other_paths, HOOK_POST_COMMIT);
+
+	hook.run_hook_with_timeout(&[], timeout)
+}
+
+#[derive(Clone, Copy)]
 pub enum PrepareCommitMsgSource {
 	Message,
 	Template,
@@ -185,12 +230,24 @@ pub fn hooks_prepare_commit_msg(
 	source: PrepareCommitMsgSource,
 	msg: &mut String,
 ) -> Result<HookResult> {
-	let hook =
-		HookPaths::new(repo, other_paths, HOOK_PREPARE_COMMIT_MSG)?;
+	hooks_prepare_commit_msg_with_timeout(
+		repo,
+		other_paths,
+		source,
+		msg,
+		None,
+	)
+}
 
-	if !hook.found() {
-		return Ok(HookResult::NoHookFound);
-	}
+/// this hook is documented here <https://git-scm.com/docs/githooks#_prepare_commit_msg>
+pub fn hooks_prepare_commit_msg_with_timeout(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+	source: PrepareCommitMsgSource,
+	msg: &mut String,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
+	let hook = find_hook!(repo, other_paths, HOOK_PREPARE_COMMIT_MSG);
 
 	let temp_file = hook.git.join(HOOK_COMMIT_MSG_TEMP_FILE);
 	File::create(&temp_file)?.write_all(msg.as_bytes())?;
@@ -219,7 +276,7 @@ pub fn hooks_prepare_commit_msg(
 		args.push(id);
 	}
 
-	let res = hook.run_hook(args.as_slice())?;
+	let res = hook.run_hook_with_timeout(args.as_slice(), timeout)?;
 
 	// load possibly altered msg
 	msg.clear();
@@ -233,7 +290,7 @@ mod tests {
 	use super::*;
 	use git2_testing::{repo_init, repo_init_bare};
 	use pretty_assertions::assert_eq;
-	use tempfile::TempDir;
+	use tempfile::{tempdir, TempDir};
 
 	#[test]
 	fn test_smoke() {
@@ -372,7 +429,7 @@ exit 0
 	}
 
 	#[test]
-	fn test_other_path_precendence() {
+	fn test_other_path_precedence() {
 		let (td, repo) = repo_init();
 
 		{
@@ -493,7 +550,7 @@ exit 1
 	fn test_pre_commit_py() {
 		let (_td, repo) = repo_init();
 
-		// mirror how python pre-commmit sets itself up
+		// mirror how python pre-commit sets itself up
 		#[cfg(not(windows))]
 		let hook = b"#!/usr/bin/env python
 import sys
@@ -514,7 +571,7 @@ sys.exit(0)
 	fn test_pre_commit_fail_py() {
 		let (_td, repo) = repo_init();
 
-		// mirror how python pre-commmit sets itself up
+		// mirror how python pre-commit sets itself up
 		#[cfg(not(windows))]
 		let hook = b"#!/usr/bin/env python
 import sys
@@ -656,5 +713,74 @@ exit 2
 				"commit,0000000000000000000000000000000000000000\n"
 			)
 		);
+	}
+
+	#[test]
+	fn test_hooks_timeout_kills() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/usr/bin/env sh
+sleep 0.25
+        ";
+
+		create_hook(&repo, HOOK_PRE_COMMIT, hook);
+
+		let res = hooks_pre_commit_with_timeout(
+			&repo,
+			None,
+			Some(Duration::from_millis(200)),
+		)
+		.unwrap();
+
+		assert!(res.is_timeout());
+	}
+
+	#[test]
+	fn test_hooks_timeout_with_zero() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/usr/bin/env sh
+sleep 0.25
+        ";
+
+		create_hook(&repo, HOOK_PRE_COMMIT, hook);
+
+		let res = hooks_pre_commit_with_timeout(
+			&repo,
+			None,
+			Some(Duration::ZERO),
+		);
+
+		assert!(res.is_ok());
+	}
+
+	#[test]
+	fn test_hooks_timeout_faster_than_timeout() {
+		let (_td, repo) = repo_init();
+
+		let temp_dir = tempdir().expect("temp dir");
+		let file = temp_dir.path().join("test");
+		let hook = format!(
+			"#!/usr/bin/env sh
+sleep 0.1
+echo 'after sleep' > {}
+        ",
+			file.to_str().unwrap()
+		);
+
+		create_hook(&repo, HOOK_PRE_COMMIT, hook.as_bytes());
+
+		let res = hooks_pre_commit_with_timeout(
+			&repo,
+			None,
+			Some(Duration::from_millis(150)),
+		);
+
+		assert!(res.is_ok());
+		assert!(file.exists());
+
+		let mut str = String::new();
+		File::open(file).unwrap().read_to_string(&mut str).unwrap();
+		assert!(str == "after sleep\n");
 	}
 }

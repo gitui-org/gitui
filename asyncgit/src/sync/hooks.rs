@@ -2,6 +2,7 @@ use super::{repository::repo, RepoPath};
 use crate::error::Result;
 pub use git2_hooks::PrepareCommitMsgSource;
 use scopetime::scope_time;
+use std::time::Duration;
 
 ///
 #[derive(Debug, PartialEq, Eq)]
@@ -10,6 +11,13 @@ pub enum HookResult {
 	Ok,
 	/// Hook returned error
 	NotOk(String),
+	/// Hook timed out
+	TimedOut {
+		/// Stdout
+		stdout: String,
+		/// Stderr
+		stderr: String,
+	},
 }
 
 impl From<git2_hooks::HookResult> for HookResult {
@@ -22,6 +30,11 @@ impl From<git2_hooks::HookResult> for HookResult {
 				stderr,
 				..
 			} => Self::NotOk(format!("{stdout}{stderr}")),
+			git2_hooks::HookResult::TimedOut {
+				stdout,
+				stderr,
+				..
+			} => Self::TimedOut { stdout, stderr },
 		}
 	}
 }
@@ -31,29 +44,65 @@ pub fn hooks_commit_msg(
 	repo_path: &RepoPath,
 	msg: &mut String,
 ) -> Result<HookResult> {
+	hooks_commit_msg_with_timeout(repo_path, msg, None)
+}
+
+/// see `git2_hooks::hooks_commit_msg`
+#[allow(unused)]
+pub fn hooks_commit_msg_with_timeout(
+	repo_path: &RepoPath,
+	msg: &mut String,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
 	scope_time!("hooks_commit_msg");
 
 	let repo = repo(repo_path)?;
-
-	Ok(git2_hooks::hooks_commit_msg(&repo, None, msg)?.into())
+	Ok(git2_hooks::hooks_commit_msg_with_timeout(
+		&repo, None, msg, timeout,
+	)?
+	.into())
 }
 
 /// see `git2_hooks::hooks_pre_commit`
 pub fn hooks_pre_commit(repo_path: &RepoPath) -> Result<HookResult> {
+	hooks_pre_commit_with_timeout(repo_path, None)
+}
+
+/// see `git2_hooks::hooks_pre_commit`
+#[allow(unused)]
+pub fn hooks_pre_commit_with_timeout(
+	repo_path: &RepoPath,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
 	scope_time!("hooks_pre_commit");
 
 	let repo = repo(repo_path)?;
 
-	Ok(git2_hooks::hooks_pre_commit(&repo, None)?.into())
+	Ok(git2_hooks::hooks_pre_commit_with_timeout(
+		&repo, None, timeout,
+	)?
+	.into())
 }
 
 /// see `git2_hooks::hooks_post_commit`
 pub fn hooks_post_commit(repo_path: &RepoPath) -> Result<HookResult> {
+	hooks_post_commit_with_timeout(repo_path, None)
+}
+
+/// see `git2_hooks::hooks_post_commit`
+#[allow(unused)]
+pub fn hooks_post_commit_with_timeout(
+	repo_path: &RepoPath,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
 	scope_time!("hooks_post_commit");
 
 	let repo = repo(repo_path)?;
 
-	Ok(git2_hooks::hooks_post_commit(&repo, None)?.into())
+	Ok(git2_hooks::hooks_post_commit_with_timeout(
+		&repo, None, timeout,
+	)?
+	.into())
 }
 
 /// see `git2_hooks::hooks_prepare_commit_msg`
@@ -66,8 +115,26 @@ pub fn hooks_prepare_commit_msg(
 
 	let repo = repo(repo_path)?;
 
-	Ok(git2_hooks::hooks_prepare_commit_msg(
-		&repo, None, source, msg,
+	Ok(git2_hooks::hooks_prepare_commit_msg_with_timeout(
+		&repo, None, source, msg, None,
+	)?
+	.into())
+}
+
+/// see `git2_hooks::hooks_prepare_commit_msg`
+#[allow(unused)]
+pub fn hooks_prepare_commit_msg_with_timeout(
+	repo_path: &RepoPath,
+	source: PrepareCommitMsgSource,
+	msg: &mut String,
+	timeout: Option<Duration>,
+) -> Result<HookResult> {
+	scope_time!("hooks_prepare_commit_msg");
+
+	let repo = repo(repo_path)?;
+
+	Ok(git2_hooks::hooks_prepare_commit_msg_with_timeout(
+		&repo, None, source, msg, timeout,
 	)?
 	.into())
 }
@@ -77,7 +144,7 @@ mod tests {
 	use std::{ffi::OsString, io::Write as _, path::Path};
 
 	use git2::Repository;
-	use tempfile::TempDir;
+	use tempfile::{tempdir, TempDir};
 
 	use super::*;
 	use crate::sync::tests::repo_init_with_prefix;
@@ -125,7 +192,7 @@ mod tests {
 		let (_td, repo) = repo_init().unwrap();
 		let root = repo.workdir().unwrap();
 
-		let hook = b"#!/bin/sh
+		let hook = b"#!/usr/bin/env sh
 	echo 'rejected'
 	exit 1
 			";
@@ -238,5 +305,145 @@ mod tests {
 		);
 
 		assert_eq!(msg, String::from("msg\n"));
+	}
+
+	#[test]
+	fn test_hooks_respect_timeout() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+
+		let hook = b"#!/usr/bin/env sh
+    sleep 0.250
+        ";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_COMMIT,
+			hook,
+		);
+
+		let res = hooks_pre_commit_with_timeout(
+			&root.to_str().unwrap().into(),
+			Some(Duration::from_millis(200)),
+		)
+		.unwrap();
+
+		assert_eq!(
+			res,
+			HookResult::TimedOut {
+				stdout: String::new(),
+				stderr: String::new()
+			}
+		);
+	}
+
+	#[test]
+	fn test_hooks_faster_than_timeout() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+
+		let hook = b"#!/usr/bin/env sh
+    sleep 0.1
+        ";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_COMMIT,
+			hook,
+		);
+
+		let res = hooks_pre_commit_with_timeout(
+			&root.to_str().unwrap().into(),
+			Some(Duration::from_millis(150)),
+		)
+		.unwrap();
+
+		assert_eq!(res, HookResult::Ok);
+	}
+
+	#[test]
+	fn test_hooks_timeout_zero() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+
+		let hook = b"#!/usr/bin/env sh
+    sleep 1
+        ";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_POST_COMMIT,
+			hook,
+		);
+
+		let res = hooks_post_commit_with_timeout(
+			&root.to_str().unwrap().into(),
+			Some(Duration::ZERO),
+		)
+		.unwrap();
+
+		assert_eq!(res, HookResult::Ok);
+	}
+
+	#[test]
+	fn test_run_with_timeout_kills() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+
+		let temp_dir = tempdir().expect("temp dir");
+		let file = temp_dir.path().join("test");
+		let hook = format!(
+			"#!/usr/bin/env sh
+sleep 5
+echo 'after sleep' > {}
+        ",
+			file.as_path().to_str().unwrap()
+		);
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_COMMIT,
+			hook.as_bytes(),
+		);
+
+		let res = hooks_pre_commit_with_timeout(
+			&root.to_str().unwrap().into(),
+			Some(Duration::from_millis(100)),
+		);
+
+		assert!(res.is_ok());
+		assert!(!file.exists());
+	}
+
+	#[test]
+	#[cfg(unix)]
+	fn test_ensure_group_kill_works() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+
+		let hook = b"#!/usr/bin/env sh
+sleep 30
+		";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_COMMIT,
+			hook,
+		);
+
+		let time_start = std::time::Instant::now();
+		let res = hooks_pre_commit_with_timeout(
+			&root.to_str().unwrap().into(),
+			Some(Duration::from_millis(150)),
+		)
+		.unwrap();
+		let time_end = std::time::Instant::now();
+		let elapsed = time_end.duration_since(time_start);
+
+		log::info!("elapsed: {:?}", elapsed);
+		// If the children didn't get killed this would
+		// have taken the full 30 seconds.
+		assert!(elapsed.as_secs() < 15);
+		assert!(matches!(res, HookResult::TimedOut { .. }))
 	}
 }
