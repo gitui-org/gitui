@@ -213,6 +213,14 @@ pub fn get_status(
 					repo.index_or_empty()?,
 				);
 
+			let mut pathspec = repo.pathspec(
+				false, /* empty patterns match prefix */
+				None::<&str>,
+				true, /* inherit ignore case */
+				&gix::index::State::new(repo.object_hash()),
+				gix::worktree::stack::state::attributes::Source::WorktreeThenIdMapping
+			)?;
+
 			let cb =
 				|change_ref: gix::diff::index::ChangeRef<'_, '_>,
 				 _: &gix::index::State,
@@ -229,7 +237,7 @@ pub fn get_status(
 			repo.tree_index_status(
 				&tree_id,
 				&worktree_index,
-				None,
+				Some(&mut pathspec),
 				gix::status::tree_index::TrackRenames::default(),
 				cb,
 			)?;

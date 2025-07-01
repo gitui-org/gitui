@@ -124,6 +124,10 @@ pub enum Error {
 	),
 
 	///
+	#[error("gix::pathspec::init::Error error: {0}")]
+	GixPathspecInit(#[from] Box<gix::pathspec::init::Error>),
+
+	///
 	#[error("gix::reference::head_tree_id::Error error: {0}")]
 	GixReferenceHeadTreeId(
 		#[from] gix::reference::head_tree_id::Error,
@@ -188,6 +192,12 @@ impl<T> From<crossbeam_channel::SendError<T>> for Error {
 impl From<gix::discover::Error> for Error {
 	fn from(error: gix::discover::Error) -> Self {
 		Self::GixDiscover(Box::new(error))
+	}
+}
+
+impl From<gix::pathspec::init::Error> for Error {
+	fn from(error: gix::pathspec::init::Error) -> Self {
+		Self::GixPathspecInit(Box::new(error))
 	}
 }
 
