@@ -3,7 +3,10 @@ use std::fmt::Display;
 use super::RepoPath;
 use crate::{
 	error::Result,
-	sync::{commit_details::get_author_of_commit, repository::repo},
+	sync::{
+		commit_details::get_author_of_commit,
+		repository::{gix_repo, repo},
+	},
 };
 use git2::{Commit, Error, Oid};
 use scopetime::scope_time;
@@ -157,9 +160,7 @@ pub fn get_commit_info(
 ) -> Result<CommitInfo> {
 	scope_time!("get_commit_info");
 
-	let repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)?;
+	let repo: gix::Repository = gix_repo(repo_path)?;
 	let mailmap = repo.open_mailmap();
 
 	let commit = repo.find_commit(*commit_id)?;

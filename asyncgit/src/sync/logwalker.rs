@@ -181,6 +181,7 @@ mod tests {
 	use super::*;
 	use crate::error::Result;
 	use crate::sync::commit_filter::{SearchFields, SearchOptions};
+	use crate::sync::repository::gix_repo;
 	use crate::sync::tests::write_commit_file;
 	use crate::sync::{
 		commit, get_commits_info, stage_add_file,
@@ -266,10 +267,7 @@ mod tests {
 		stage_add_file(repo_path, file_path).unwrap();
 		let oid2 = commit(repo_path, "commit2").unwrap();
 
-		let mut repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)
-						.unwrap();
+		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walk = LogWalkerWithoutFilter::new(&mut repo, 100)?;
 		let mut items = Vec::new();
 		assert!(matches!(walk.read(&mut items), Ok(2)));

@@ -67,3 +67,12 @@ pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
 
 	Ok(repo)
 }
+
+pub fn gix_repo(repo_path: &RepoPath) -> Result<gix::Repository> {
+	let repo = gix::ThreadSafeRepository::discover_with_environment_overrides(
+		repo_path.gitpath(),
+	)
+	.map(Into::into)?;
+
+	Ok(repo)
+}

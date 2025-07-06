@@ -2,7 +2,10 @@
 
 use crate::{
 	error::Result,
-	sync::{config::untracked_files_config_repo, repository::repo},
+	sync::{
+		config::untracked_files_config_repo,
+		repository::{gix_repo, repo},
+	},
 };
 use git2::{Delta, Status, StatusOptions, StatusShow};
 use scopetime::scope_time;
@@ -177,9 +180,7 @@ pub fn get_status(
 ) -> Result<Vec<StatusItem>> {
 	scope_time!("get_status");
 
-	let repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)?;
+	let repo: gix::Repository = gix_repo(repo_path)?;
 
 	let mut status = repo.status(gix::progress::Discard)?;
 
