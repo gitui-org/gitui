@@ -360,7 +360,11 @@ pub fn get_diff(
 		),
 	);
 
-	let old_revspec = format!("HEAD:{p}");
+	let old_revspec = if stage {
+		format!("HEAD:{p}")
+	} else {
+		format!(":{p}")
+	};
 	let (old_blob_id, old_root) =
 		resolve_revspec(&gix_repo, &old_revspec);
 
