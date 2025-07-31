@@ -263,6 +263,26 @@ impl ConsumeHunk for FileDiff {
 	}
 }
 
+fn resolve_revspec(
+	gix_repo: &gix::Repository,
+	revspec: &str,
+) -> (ObjectId, Option<std::path::PathBuf>) {
+	gix_repo.rev_parse(revspec).map_or_else(
+		|_| {
+			(
+				ObjectId::null(gix::hash::Kind::Sha1),
+				gix_repo.workdir().map(ToOwned::to_owned),
+			)
+		},
+		|resolved_revspec| {
+			resolved_revspec.single().map_or_else(
+				|| (ObjectId::null(gix::hash::Kind::Sha1), None),
+				|id| (id.into(), None),
+			)
+		},
+	)
+}
+
 /// returns diff of a specific file either in `stage` or workdir
 pub fn get_diff(
 	repo_path: &RepoPath,
@@ -285,24 +305,8 @@ pub fn get_diff(
 	);
 
 	let old_revspec = format!("HEAD:{p}");
-
-	// TODO:
-	// This is identical to the corresponding block that gets `(new_blob_id, new_root)`.
 	let (old_blob_id, old_root) =
-		gix_repo.rev_parse(&*old_revspec).map_or_else(
-			|_| {
-				(
-					ObjectId::null(gix::hash::Kind::Sha1),
-					gix_repo.workdir().map(ToOwned::to_owned),
-				)
-			},
-			|resolved_revspec| {
-				resolved_revspec.single().map_or_else(
-					|| (ObjectId::null(gix::hash::Kind::Sha1), None),
-					|id| (id.into(), None),
-				)
-			},
-		);
+		resolve_revspec(&gix_repo, &old_revspec);
 
 	// TODO:
 	// Make sure that the revspec logic is correct, i. e. uses the correct syntax for all the
@@ -314,20 +318,7 @@ pub fn get_diff(
 	};
 
 	let (new_blob_id, new_root) =
-		gix_repo.rev_parse(&*new_revspec).map_or_else(
-			|_| {
-				(
-					ObjectId::null(gix::hash::Kind::Sha1),
-					gix_repo.workdir().map(ToOwned::to_owned),
-				)
-			},
-			|resolved_revspec| {
-				resolved_revspec.single().map_or_else(
-					|| (ObjectId::null(gix::hash::Kind::Sha1), None),
-					|id| (id.into(), None),
-				)
-			},
-		);
+		resolve_revspec(&gix_repo, &new_revspec);
 
 	let worktree_roots = gix::diff::blob::pipeline::WorktreeRoots {
 		old_root,
