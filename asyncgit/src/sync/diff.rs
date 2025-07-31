@@ -227,13 +227,11 @@ impl ConsumeHunk for FileDiff {
 	) -> std::io::Result<()> {
 		let lines = hunk
 			.lines()
-			.enumerate()
-			.map(|(index, line)| DiffLine {
+			.zip(0..)
+			.map(|(line, index)| DiffLine {
 				position: DiffLinePosition {
-					old_lineno: Some(
-						before_hunk_start + index as u32,
-					),
-					new_lineno: Some(after_hunk_start + index as u32),
+					old_lineno: Some(before_hunk_start + index),
+					new_lineno: Some(after_hunk_start + index),
 				},
 				content: String::from_utf8_lossy(line)
 					.trim_matches(is_newline)
