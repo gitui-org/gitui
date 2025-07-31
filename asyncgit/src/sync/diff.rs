@@ -227,21 +227,74 @@ impl ConsumeHunk for FileDiff {
 	) -> std::io::Result<()> {
 		let lines = hunk
 			.lines()
-			.zip(0..)
-			.map(|(line, index)| DiffLine {
-				position: DiffLinePosition {
-					old_lineno: Some(before_hunk_start + index),
-					new_lineno: Some(after_hunk_start + index),
+			.scan(
+				(before_hunk_start, after_hunk_start),
+				|(old_lineno, new_lineno), line| {
+					let (line_type, content, old_lineno, new_lineno) =
+						match line {
+							[b'+', rest @ ..] => {
+								let result = (
+									DiffLineType::Add,
+									rest,
+									None,
+									Some(*new_lineno),
+								);
+								*new_lineno += 1;
+								result
+							}
+							[b'-', rest @ ..] => {
+								let result = (
+									DiffLineType::Delete,
+									rest,
+									Some(*old_lineno),
+									None,
+								);
+								*old_lineno += 1;
+								result
+							}
+							[b' ', rest @ ..] => {
+								let result = (
+									DiffLineType::None,
+									rest,
+									Some(*old_lineno),
+									Some(*new_lineno),
+								);
+								*old_lineno += 1;
+								*new_lineno += 1;
+								result
+							}
+							[b'@', ..] => (
+								DiffLineType::Header,
+								line,
+								None,
+								None,
+							),
+							_ => {
+								// Empty lines or unknown prefixes are treated as context.
+								let result = (
+									DiffLineType::None,
+									line,
+									Some(*old_lineno),
+									Some(*new_lineno),
+								);
+								*old_lineno += 1;
+								*new_lineno += 1;
+								result
+							}
+						};
+
+					Some(DiffLine {
+						position: DiffLinePosition {
+							old_lineno,
+							new_lineno,
+						},
+						content: String::from_utf8_lossy(content)
+							.trim_matches(is_newline)
+							.into(),
+						line_type,
+					})
 				},
-				content: String::from_utf8_lossy(line)
-					.trim_matches(is_newline)
-					.into(),
-				// TODO:
-				// Get correct `line_type`. We could potentially do this by looking at the line's first
-				// character. We probably want to split it anyway as `gitui` takes care of that character
-				// itself later in the UI.
-				line_type: DiffLineType::default(),
-			})
+			)
 			.collect();
 
 		let hunk_header = HunkHeader {
