@@ -219,9 +219,9 @@ impl ConsumeHunk for FileDiff {
 	fn consume_hunk(
 		&mut self,
 		before_hunk_start: u32,
-		_before_hunk_len: u32,
+		before_hunk_len: u32,
 		after_hunk_start: u32,
-		_after_hunk_len: u32,
+		after_hunk_len: u32,
 		header: &str,
 		hunk: &[u8],
 	) -> std::io::Result<()> {
@@ -246,10 +246,15 @@ impl ConsumeHunk for FileDiff {
 			})
 			.collect();
 
+		let hunk_header = HunkHeader {
+			old_start: before_hunk_start,
+			old_lines: before_hunk_len,
+			new_start: after_hunk_start,
+			new_lines: after_hunk_len,
+		};
+
 		self.hunks.push(Hunk {
-			// TODO:
-			// Get correct `header_hash`.
-			header_hash: 0,
+			header_hash: hash(&hunk_header),
 			lines,
 		});
 
