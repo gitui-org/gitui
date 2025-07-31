@@ -346,11 +346,6 @@ pub fn get_diff(
 	stage: bool,
 	options: Option<DiffOptions>,
 ) -> Result<FileDiff> {
-	// TODO:
-	// Maybe move this `use` statement` closer to where it is being used by extracting the relevant
-	// code into a function.
-	use gix::diff::blob::platform::prepare_diff::Operation;
-
 	scope_time!("get_diff");
 
 	let mut gix_repo = gix_repo(repo_path)?;
@@ -404,13 +399,17 @@ pub fn get_diff(
 
 	let outcome = resource_cache.prepare_diff()?;
 
-	let diff_algorithm = match outcome.operation {
-		Operation::InternalDiff { algorithm } => algorithm,
-		Operation::ExternalCommand { .. } => {
-			unreachable!("We disabled that")
-		}
-		Operation::SourceOrDestinationIsBinary => {
-			todo!();
+	let diff_algorithm = {
+		use gix::diff::blob::platform::prepare_diff::Operation;
+
+		match outcome.operation {
+			Operation::InternalDiff { algorithm } => algorithm,
+			Operation::ExternalCommand { .. } => {
+				unreachable!("We disabled that")
+			}
+			Operation::SourceOrDestinationIsBinary => {
+				todo!();
+			}
 		}
 	};
 
