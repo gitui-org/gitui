@@ -8,14 +8,21 @@ use super::{
 	CommitId, RepoPath,
 };
 use crate::{
-	error::Error,
-	error::Result,
+	error::{Error, Result},
 	hash,
-	sync::{get_stashes, repository::repo},
+	sync::{get_stashes, gix_repo, repository::repo},
 };
 use easy_cast::Conv;
 use git2::{
 	Delta, Diff, DiffDelta, DiffFormat, DiffHunk, Patch, Repository,
+};
+use gix::{
+	bstr::ByteSlice,
+	diff::blob::{
+		unified_diff::{ConsumeHunk, ContextSize, NewlineSeparator},
+		UnifiedDiff,
+	},
+	ObjectId,
 };
 use scopetime::scope_time;
 use serde::{Deserialize, Serialize};
@@ -200,6 +207,62 @@ pub(crate) fn get_diff_raw<'a>(
 	Ok(diff)
 }
 
+pub(crate) fn tokens_for_diffing(
+	data: &[u8],
+) -> impl gix::diff::blob::intern::TokenSource<Token = &[u8]> {
+	gix::diff::blob::sources::byte_lines(data)
+}
+
+impl ConsumeHunk for FileDiff {
+	type Out = Self;
+
+	fn consume_hunk(
+		&mut self,
+		before_hunk_start: u32,
+		_before_hunk_len: u32,
+		after_hunk_start: u32,
+		_after_hunk_len: u32,
+		header: &str,
+		hunk: &[u8],
+	) -> std::io::Result<()> {
+		let lines = hunk
+			.lines()
+			.enumerate()
+			.map(|(index, line)| DiffLine {
+				position: DiffLinePosition {
+					old_lineno: Some(
+						before_hunk_start + index as u32,
+					),
+					new_lineno: Some(after_hunk_start + index as u32),
+				},
+				content: String::from_utf8_lossy(line)
+					.trim_matches(is_newline)
+					.into(),
+				// TODO:
+				// Get correct `line_type`. We could potentially do this by looking at the line's first
+				// character. We probably want to split it anyway as `gitui` takes care of that character
+				// itself later in the UI.
+				line_type: DiffLineType::default(),
+			})
+			.collect();
+
+		self.hunks.push(Hunk {
+			// TODO:
+			// Get correct `header_hash`.
+			header_hash: 0,
+			lines,
+		});
+
+		self.lines += hunk.lines().count();
+
+		Ok(())
+	}
+
+	fn finish(self) -> Self::Out {
+		self
+	}
+}
+
 /// returns diff of a specific file either in `stage` or workdir
 pub fn get_diff(
 	repo_path: &RepoPath,
@@ -207,13 +270,121 @@ pub fn get_diff(
 	stage: bool,
 	options: Option<DiffOptions>,
 ) -> Result<FileDiff> {
+	// TODO:
+	// Maybe move this `use` statement` closer to where it is being used by extracting the relevant
+	// code into a function.
+	use gix::diff::blob::platform::prepare_diff::Operation;
+
 	scope_time!("get_diff");
 
-	let repo = repo(repo_path)?;
-	let work_dir = work_dir(&repo)?;
-	let diff = get_diff_raw(&repo, p, stage, false, options)?;
+	let mut gix_repo = gix_repo(repo_path)?;
+	gix_repo.object_cache_size_if_unset(
+		gix_repo.compute_object_cache_size_for_tree_diffs(
+			&**gix_repo.index_or_empty()?,
+		),
+	);
 
-	raw_diff_to_file_diff(&diff, work_dir)
+	let old_revspec = format!("HEAD:{p}");
+
+	// TODO:
+	// This is identical to the corresponding block that gets `(new_blob_id, new_root)`.
+	let (old_blob_id, old_root) =
+		gix_repo.rev_parse(&*old_revspec).map_or_else(
+			|_| {
+				(
+					ObjectId::null(gix::hash::Kind::Sha1),
+					gix_repo.workdir().map(ToOwned::to_owned),
+				)
+			},
+			|resolved_revspec| {
+				resolved_revspec.single().map_or_else(
+					|| (ObjectId::null(gix::hash::Kind::Sha1), None),
+					|id| (id.into(), None),
+				)
+			},
+		);
+
+	// TODO:
+	// Make sure that the revspec logic is correct, i. e. uses the correct syntax for all the
+	// relevant cases.
+	let new_revspec = if stage {
+		format!(":{p}")
+	} else {
+		p.to_string()
+	};
+
+	let (new_blob_id, new_root) =
+		gix_repo.rev_parse(&*new_revspec).map_or_else(
+			|_| {
+				(
+					ObjectId::null(gix::hash::Kind::Sha1),
+					gix_repo.workdir().map(ToOwned::to_owned),
+				)
+			},
+			|resolved_revspec| {
+				resolved_revspec.single().map_or_else(
+					|| (ObjectId::null(gix::hash::Kind::Sha1), None),
+					|id| (id.into(), None),
+				)
+			},
+		);
+
+	let worktree_roots = gix::diff::blob::pipeline::WorktreeRoots {
+		old_root,
+		new_root,
+	};
+
+	let mut resource_cache = gix_repo.diff_resource_cache(gix::diff::blob::pipeline::Mode::ToGitUnlessBinaryToTextIsPresent, worktree_roots)?;
+
+	resource_cache.set_resource(
+		old_blob_id,
+		gix::object::tree::EntryKind::Blob,
+		p.as_ref(),
+		gix::diff::blob::ResourceKind::OldOrSource,
+		&gix_repo.objects,
+	)?;
+	resource_cache.set_resource(
+		new_blob_id,
+		gix::object::tree::EntryKind::Blob,
+		p.as_ref(),
+		gix::diff::blob::ResourceKind::NewOrDestination,
+		&gix_repo.objects,
+	)?;
+
+	let outcome = resource_cache.prepare_diff()?;
+
+	let diff_algorithm = match outcome.operation {
+		Operation::InternalDiff { algorithm } => algorithm,
+		Operation::ExternalCommand { .. } => {
+			unreachable!("We disabled that")
+		}
+		Operation::SourceOrDestinationIsBinary => {
+			todo!();
+		}
+	};
+
+	let input = gix::diff::blob::intern::InternedInput::new(
+		tokens_for_diffing(
+			outcome.old.data.as_slice().unwrap_or_default(),
+		),
+		tokens_for_diffing(
+			outcome.new.data.as_slice().unwrap_or_default(),
+		),
+	);
+
+	let unified_diff = UnifiedDiff::new(
+		&input,
+		FileDiff::default(),
+		// TODO:
+		// Get values from `options` where necessary and possible.
+		NewlineSeparator::AfterHeaderAndLine("\n"),
+		ContextSize::symmetrical(3),
+	);
+
+	let file_diff =
+		gix::diff::blob::diff(diff_algorithm, &input, unified_diff)?;
+
+	Ok(file_diff)
 }
 
 /// returns diff of a specific file inside a commit

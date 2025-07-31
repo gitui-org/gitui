@@ -7,6 +7,25 @@ use thiserror::Error;
 ///
 #[derive(Error, Debug)]
 pub enum GixError {
+	#[error("gix::config::diff::algorithm::Error error: {0}")]
+	ConfigDiffAlgorithm(#[from] gix::config::diff::algorithm::Error),
+
+	///
+	#[error(
+		"gix::diff::blob::platform::prepare_diff::Error error: {0}"
+	)]
+	DiffBlobPlatformPrepareDiff(
+		#[from] gix::diff::blob::platform::prepare_diff::Error,
+	),
+
+	///
+	#[error(
+		"gix::diff::blob::platform::set_resource::Error error: {0}"
+	)]
+	DiffBlobPlatformSetResource(
+		#[from] gix::diff::blob::platform::set_resource::Error,
+	),
+
 	///
 	#[error("gix::discover error: {0}")]
 	Discover(#[from] Box<gix::discover::Error>),
@@ -46,6 +65,14 @@ pub enum GixError {
 	///
 	#[error("gix::reference::iter::init::Error error: {0}")]
 	ReferenceIterInit(#[from] gix::reference::iter::init::Error),
+
+	///
+	#[error(
+		"gix::repository::diff_resource_cache::Error error: {0}"
+	)]
+	RepositoryDiffResourceCache(
+		#[from] gix::repository::diff_resource_cache::Error,
+	),
 
 	///
 	#[error("gix::revision::walk error: {0}")]
@@ -207,6 +234,22 @@ impl From<gix::discover::Error> for GixError {
 	}
 }
 
+impl From<gix::diff::blob::platform::prepare_diff::Error> for Error {
+	fn from(
+		error: gix::diff::blob::platform::prepare_diff::Error,
+	) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::diff::blob::platform::set_resource::Error> for Error {
+	fn from(
+		error: gix::diff::blob::platform::set_resource::Error,
+	) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
 impl From<gix::discover::Error> for Error {
 	fn from(error: gix::discover::Error) -> Self {
 		Self::Gix(GixError::from(error))
@@ -267,6 +310,14 @@ impl From<gix::reference::iter::Error> for Error {
 
 impl From<gix::reference::iter::init::Error> for Error {
 	fn from(error: gix::reference::iter::init::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::repository::diff_resource_cache::Error> for Error {
+	fn from(
+		error: gix::repository::diff_resource_cache::Error,
+	) -> Self {
 		Self::Gix(GixError::from(error))
 	}
 }
