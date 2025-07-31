@@ -422,13 +422,13 @@ pub fn get_diff(
 		),
 	);
 
+	let context_size = options.map_or(3, |opts| opts.context);
+
 	let unified_diff = UnifiedDiff::new(
 		&input,
 		FileDiff::default(),
-		// TODO:
-		// Get values from `options` where necessary and possible.
 		NewlineSeparator::AfterHeaderAndLine("\n"),
-		ContextSize::symmetrical(3),
+		ContextSize::symmetrical(context_size),
 	);
 
 	let file_diff =
