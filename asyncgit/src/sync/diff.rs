@@ -355,23 +355,17 @@ pub fn get_diff(
 		),
 	);
 
-	let old_revspec = if stage {
-		format!("HEAD:{p}")
-	} else {
-		format!(":{p}")
-	};
-	let (old_blob_id, old_root) =
-		resolve_revspec(&gix_repo, &old_revspec);
-
 	// TODO:
 	// Make sure that the revspec logic is correct, i. e. uses the correct syntax for all the
 	// relevant cases.
-	let new_revspec = if stage {
-		format!(":{p}")
+	let (old_revspec, new_revspec) = if stage {
+		(format!("HEAD:{p}"), format!(":{p}"))
 	} else {
-		p.to_string()
+		(format!(":{p}"), p.to_string())
 	};
 
+	let (old_blob_id, old_root) =
+		resolve_revspec(&gix_repo, &old_revspec);
 	let (new_blob_id, new_root) =
 		resolve_revspec(&gix_repo, &new_revspec);
 
