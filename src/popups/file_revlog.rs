@@ -251,8 +251,8 @@ impl FileRevlogPopup {
 		};
 		let revisions = self.get_max_selection();
 
-		self.open_request.as_ref().map_or(
-			"<no history available>".into(),
+		self.open_request.as_ref().map_or_else(
+			|| "<no history available>".into(),
 			|open_request| {
 				strings::file_log_title(
 					&open_request.file_path,
