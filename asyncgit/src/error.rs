@@ -6,6 +6,72 @@ use thiserror::Error;
 
 ///
 #[derive(Error, Debug)]
+pub enum GixError {
+	///
+	#[error("gix::discover error: {0}")]
+	Discover(#[from] Box<gix::discover::Error>),
+
+	///
+	#[error("gix::head::peel::to_commit error: {0}")]
+	HeadPeelToCommit(#[from] gix::head::peel::to_commit::Error),
+
+	///
+	#[error("gix::object::find::existing::with_conversion::Error error: {0}")]
+	ObjectFindExistingWithConversionError(
+		#[from] gix::object::find::existing::with_conversion::Error,
+	),
+
+	///
+	#[error("gix::objs::decode::Error error: {0}")]
+	ObjsDecode(#[from] gix::objs::decode::Error),
+
+	///
+	#[error("gix::pathspec::init::Error error: {0}")]
+	PathspecInit(#[from] Box<gix::pathspec::init::Error>),
+
+	///
+	#[error("gix::reference::find::existing error: {0}")]
+	ReferenceFindExisting(
+		#[from] gix::reference::find::existing::Error,
+	),
+
+	///
+	#[error("gix::reference::head_tree_id::Error error: {0}")]
+	ReferenceHeadTreeId(#[from] gix::reference::head_tree_id::Error),
+
+	///
+	#[error("gix::revision::walk error: {0}")]
+	RevisionWalk(#[from] gix::revision::walk::Error),
+
+	///
+	#[error("gix::status::Error error: {0}")]
+	Status(#[from] Box<gix::status::Error>),
+
+	///
+	#[error("gix::status::index_worktree::Error error: {0}")]
+	StatusIndexWorktree(
+		#[from] Box<gix::status::index_worktree::Error>,
+	),
+
+	///
+	#[error("gix::status::into_iter::Error error: {0}")]
+	StatusIntoIter(#[from] Box<gix::status::into_iter::Error>),
+
+	///
+	#[error("gix::status::iter::Error error: {0}")]
+	StatusIter(#[from] Box<gix::status::iter::Error>),
+
+	///
+	#[error("gix::status::tree_index::Error error: {0}")]
+	StatusTreeIndex(#[from] Box<gix::status::tree_index::Error>),
+
+	///
+	#[error("gix::worktree::open_index::Error error: {0}")]
+	WorktreeOpenIndex(#[from] Box<gix::worktree::open_index::Error>),
+}
+
+///
+#[derive(Error, Debug)]
 pub enum Error {
 	///
 	#[error("`{0}`")]
@@ -96,70 +162,8 @@ pub enum Error {
 	Sign(#[from] crate::sync::sign::SignError),
 
 	///
-	#[error("gix::discover error: {0}")]
-	GixDiscover(#[from] Box<gix::discover::Error>),
-
-	///
-	#[error("gix::reference::find::existing error: {0}")]
-	GixReferenceFindExisting(
-		#[from] gix::reference::find::existing::Error,
-	),
-
-	///
-	#[error("gix::head::peel::to_commit error: {0}")]
-	GixHeadPeelToCommit(#[from] gix::head::peel::to_commit::Error),
-
-	///
-	#[error("gix::revision::walk error: {0}")]
-	GixRevisionWalk(#[from] gix::revision::walk::Error),
-
-	///
-	#[error("gix::objs::decode::Error error: {0}")]
-	GixObjsDecode(#[from] gix::objs::decode::Error),
-
-	///
-	#[error("gix::object::find::existing::with_conversion::Error error: {0}")]
-	GixObjectFindExistingWithConversionError(
-		#[from] gix::object::find::existing::with_conversion::Error,
-	),
-
-	///
-	#[error("gix::pathspec::init::Error error: {0}")]
-	GixPathspecInit(#[from] Box<gix::pathspec::init::Error>),
-
-	///
-	#[error("gix::reference::head_tree_id::Error error: {0}")]
-	GixReferenceHeadTreeId(
-		#[from] gix::reference::head_tree_id::Error,
-	),
-
-	///
-	#[error("gix::status::Error error: {0}")]
-	GixStatus(#[from] Box<gix::status::Error>),
-
-	///
-	#[error("gix::status::iter::Error error: {0}")]
-	GixStatusIter(#[from] Box<gix::status::iter::Error>),
-
-	///
-	#[error("gix::status::into_iter::Error error: {0}")]
-	GixStatusIntoIter(#[from] Box<gix::status::into_iter::Error>),
-
-	///
-	#[error("gix::status::index_worktree::Error error: {0}")]
-	GixStatusIndexWorktree(
-		#[from] Box<gix::status::index_worktree::Error>,
-	),
-
-	///
-	#[error("gix::status::tree_index::Error error: {0}")]
-	GixStatusTreeIndex(#[from] Box<gix::status::tree_index::Error>),
-
-	///
-	#[error("gix::worktree::open_index::Error error: {0}")]
-	GixWorktreeOpenIndex(
-		#[from] Box<gix::worktree::open_index::Error>,
-	),
+	#[error("gix error:{0}")]
+	Gix(#[from] GixError),
 
 	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
@@ -189,50 +193,138 @@ impl<T> From<crossbeam_channel::SendError<T>> for Error {
 	}
 }
 
+impl From<gix::discover::Error> for GixError {
+	fn from(error: gix::discover::Error) -> Self {
+		Self::Discover(Box::new(error))
+	}
+}
+
 impl From<gix::discover::Error> for Error {
 	fn from(error: gix::discover::Error) -> Self {
-		Self::GixDiscover(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::head::peel::to_commit::Error> for Error {
+	fn from(error: gix::head::peel::to_commit::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::object::find::existing::with_conversion::Error>
+	for Error
+{
+	fn from(
+		error: gix::object::find::existing::with_conversion::Error,
+	) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::objs::decode::Error> for Error {
+	fn from(error: gix::objs::decode::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::pathspec::init::Error> for GixError {
+	fn from(error: gix::pathspec::init::Error) -> Self {
+		Self::PathspecInit(Box::new(error))
 	}
 }
 
 impl From<gix::pathspec::init::Error> for Error {
 	fn from(error: gix::pathspec::init::Error) -> Self {
-		Self::GixPathspecInit(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::reference::find::existing::Error> for Error {
+	fn from(error: gix::reference::find::existing::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::reference::head_tree_id::Error> for Error {
+	fn from(error: gix::reference::head_tree_id::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::revision::walk::Error> for Error {
+	fn from(error: gix::revision::walk::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::status::Error> for GixError {
+	fn from(error: gix::status::Error) -> Self {
+		Self::Status(Box::new(error))
 	}
 }
 
 impl From<gix::status::Error> for Error {
 	fn from(error: gix::status::Error) -> Self {
-		Self::GixStatus(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::status::iter::Error> for GixError {
+	fn from(error: gix::status::iter::Error) -> Self {
+		Self::StatusIter(Box::new(error))
 	}
 }
 
 impl From<gix::status::iter::Error> for Error {
 	fn from(error: gix::status::iter::Error) -> Self {
-		Self::GixStatusIter(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::status::into_iter::Error> for GixError {
+	fn from(error: gix::status::into_iter::Error) -> Self {
+		Self::StatusIntoIter(Box::new(error))
 	}
 }
 
 impl From<gix::status::into_iter::Error> for Error {
 	fn from(error: gix::status::into_iter::Error) -> Self {
-		Self::GixStatusIntoIter(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::status::index_worktree::Error> for GixError {
+	fn from(error: gix::status::index_worktree::Error) -> Self {
+		Self::StatusIndexWorktree(Box::new(error))
 	}
 }
 
 impl From<gix::status::index_worktree::Error> for Error {
 	fn from(error: gix::status::index_worktree::Error) -> Self {
-		Self::GixStatusIndexWorktree(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::status::tree_index::Error> for GixError {
+	fn from(error: gix::status::tree_index::Error) -> Self {
+		Self::StatusTreeIndex(Box::new(error))
 	}
 }
 
 impl From<gix::status::tree_index::Error> for Error {
 	fn from(error: gix::status::tree_index::Error) -> Self {
-		Self::GixStatusTreeIndex(Box::new(error))
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::worktree::open_index::Error> for GixError {
+	fn from(error: gix::worktree::open_index::Error) -> Self {
+		Self::WorktreeOpenIndex(Box::new(error))
 	}
 }
 
 impl From<gix::worktree::open_index::Error> for Error {
 	fn from(error: gix::worktree::open_index::Error) -> Self {
-		Self::GixWorktreeOpenIndex(Box::new(error))
+		Self::Gix(GixError::from(error))
 	}
 }
