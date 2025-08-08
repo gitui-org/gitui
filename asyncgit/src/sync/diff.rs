@@ -371,25 +371,30 @@ pub fn get_diff(
 			gix_repo
 				.head_tree()?
 				.lookup_entry_by_path(p)
+				.map(|entry| {
+					entry.map_or_else(
+						|| ObjectId::null(gix::hash::Kind::Sha1),
+						|entry| entry.object_id(),
+					)
+				})
+				.unwrap_or(ObjectId::null(gix::hash::Kind::Sha1)),
 			None,
 		)
 	} else {
 		(
-			gix_repo
-				.index()?
-				.entry_by_path(p.into())
-				.expect("TODO")
-				.id,
+			gix_repo.index()?.entry_by_path(p.into()).map_or(
+				ObjectId::null(gix::hash::Kind::Sha1),
+				|entry| entry.id,
+			),
 			None,
 		)
 	};
 	let (new_blob_id, new_root) = if stage {
 		(
-			gix_repo
-				.index()?
-				.entry_by_path(p.into())
-				.expect("TODO")
-				.id,
+			gix_repo.index()?.entry_by_path(p.into()).map_or(
+				ObjectId::null(gix::hash::Kind::Sha1),
+				|entry| entry.id,
+			),
 			None,
 		)
 	} else {
