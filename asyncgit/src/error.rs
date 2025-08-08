@@ -55,6 +55,10 @@ pub enum GixError {
 	),
 
 	///
+	#[error("gix::reference::head_tree::Error error: {0}")]
+	ReferenceHeadTree(#[from] gix::reference::head_tree::Error),
+
+	///
 	#[error("gix::reference::head_tree_id::Error error: {0}")]
 	ReferenceHeadTreeId(#[from] gix::reference::head_tree_id::Error),
 
@@ -292,6 +296,12 @@ impl From<gix::pathspec::init::Error> for Error {
 
 impl From<gix::reference::find::existing::Error> for Error {
 	fn from(error: gix::reference::find::existing::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::reference::head_tree::Error> for Error {
+	fn from(error: gix::reference::head_tree::Error) -> Self {
 		Self::Gix(GixError::from(error))
 	}
 }
