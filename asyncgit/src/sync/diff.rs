@@ -26,7 +26,12 @@ use gix::{
 };
 use scopetime::scope_time;
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, fs, path::Path, rc::Rc};
+use std::{
+	cell::RefCell,
+	fs,
+	path::{Path, PathBuf},
+	rc::Rc,
+};
 
 /// type of diff of a single line
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
@@ -319,6 +324,38 @@ impl ConsumeHunk for FileDiff {
 	}
 }
 
+fn id_and_root_in_head(
+	gix_repo: &gix::Repository,
+	p: &str,
+) -> (ObjectId, Option<PathBuf>) {
+	let id = gix_repo
+		.head_tree()
+		.map_or(None, |head_tree| {
+			head_tree
+				.lookup_entry_by_path(p)
+				.ok()
+				.flatten()
+				.map(|entry| entry.object_id())
+		})
+		.unwrap_or(ObjectId::null(gix::hash::Kind::Sha1));
+
+	(id, None)
+}
+
+fn id_and_root_in_index(
+	gix_repo: &gix::Repository,
+	p: &str,
+) -> (ObjectId, Option<PathBuf>) {
+	let id = gix_repo
+		.index()
+		.map_or(None, |index| {
+			index.entry_by_path(p.into()).map(|entry| entry.id)
+		})
+		.unwrap_or(ObjectId::null(gix::hash::Kind::Sha1));
+
+	(id, None)
+}
+
 fn file_diff_for_binary_files(
 	old_data: gix::diff::blob::platform::resource::Data,
 	new_data: gix::diff::blob::platform::resource::Data,
@@ -367,36 +404,12 @@ pub fn get_diff(
 	// TODO:
 	// The lower tree is `stage == true`, the upper tree is `stage == false`.
 	let (old_blob_id, old_root) = if stage {
-		(
-			gix_repo
-				.head_tree()?
-				.lookup_entry_by_path(p)
-				.map(|entry| {
-					entry.map_or_else(
-						|| ObjectId::null(gix::hash::Kind::Sha1),
-						|entry| entry.object_id(),
-					)
-				})
-				.unwrap_or(ObjectId::null(gix::hash::Kind::Sha1)),
-			None,
-		)
+		id_and_root_in_head(&gix_repo, p)
 	} else {
-		(
-			gix_repo.index()?.entry_by_path(p.into()).map_or(
-				ObjectId::null(gix::hash::Kind::Sha1),
-				|entry| entry.id,
-			),
-			None,
-		)
+		id_and_root_in_index(&gix_repo, p)
 	};
 	let (new_blob_id, new_root) = if stage {
-		(
-			gix_repo.index()?.entry_by_path(p.into()).map_or(
-				ObjectId::null(gix::hash::Kind::Sha1),
-				|entry| entry.id,
-			),
-			None,
-		)
+		id_and_root_in_index(&gix_repo, p)
 	} else {
 		(
 			ObjectId::null(gix::hash::Kind::Sha1),
