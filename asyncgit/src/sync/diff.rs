@@ -319,6 +319,35 @@ impl ConsumeHunk for FileDiff {
 	}
 }
 
+fn file_diff_for_binary_files(
+	old_data: gix::diff::blob::platform::resource::Data,
+	new_data: gix::diff::blob::platform::resource::Data,
+) -> FileDiff {
+	use gix::diff::blob::platform::resource::Data;
+
+	let mut file_diff = FileDiff::default();
+
+	let old_size = match old_data {
+		Data::Missing => 0,
+		Data::Buffer { buf, .. } => u64::conv(buf.len()),
+		Data::Binary { size } => size,
+	};
+	let new_size = match new_data {
+		Data::Missing => 0,
+		Data::Buffer { buf, .. } => u64::conv(buf.len()),
+		Data::Binary { size } => size,
+	};
+
+	let sizes = (old_size, new_size);
+	let size_delta =
+		(i64::conv(new_size)).saturating_sub(i64::conv(old_size));
+
+	file_diff.sizes = sizes;
+	file_diff.size_delta = size_delta;
+
+	file_diff
+}
+
 /// returns diff of a specific file either in `stage` or workdir
 pub fn get_diff(
 	repo_path: &RepoPath,
@@ -342,9 +371,6 @@ pub fn get_diff(
 			gix_repo
 				.head_tree()?
 				.lookup_entry_by_path(p)
-				.expect("TODO")
-				.expect("TODO")
-				.object_id(),
 			None,
 		)
 	} else {
@@ -406,7 +432,10 @@ pub fn get_diff(
 				unreachable!("We disabled that")
 			}
 			Operation::SourceOrDestinationIsBinary => {
-				todo!();
+				return Ok(file_diff_for_binary_files(
+					outcome.old.data,
+					outcome.new.data,
+				));
 			}
 		}
 	};
