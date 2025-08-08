@@ -230,77 +230,78 @@ impl ConsumeHunk for FileDiff {
 		header: &str,
 		hunk: &[u8],
 	) -> std::io::Result<()> {
-		let lines = hunk
-			.lines()
-			.scan(
-				(before_hunk_start, after_hunk_start),
-				|(old_lineno, new_lineno), line| {
-					let (line_type, content, old_lineno, new_lineno) =
-						match line {
-							[b'+', rest @ ..] => {
-								let result = (
-									DiffLineType::Add,
-									rest,
-									None,
-									Some(*new_lineno),
-								);
-								*new_lineno += 1;
-								result
-							}
-							[b'-', rest @ ..] => {
-								let result = (
-									DiffLineType::Delete,
-									rest,
-									Some(*old_lineno),
-									None,
-								);
-								*old_lineno += 1;
-								result
-							}
-							[b' ', rest @ ..] => {
-								let result = (
-									DiffLineType::None,
-									rest,
-									Some(*old_lineno),
-									Some(*new_lineno),
-								);
-								*old_lineno += 1;
-								*new_lineno += 1;
-								result
-							}
-							[b'@', ..] => (
-								DiffLineType::Header,
+		let non_header_lines = hunk.lines().scan(
+			(before_hunk_start, after_hunk_start),
+			|(old_lineno, new_lineno), line| {
+				let (line_type, content, old_lineno, new_lineno) =
+					match line {
+						[b'+', rest @ ..] => {
+							let result = (
+								DiffLineType::Add,
+								rest,
+								None,
+								Some(*new_lineno),
+							);
+							*new_lineno += 1;
+							result
+						}
+						[b'-', rest @ ..] => {
+							let result = (
+								DiffLineType::Delete,
+								rest,
+								Some(*old_lineno),
+								None,
+							);
+							*old_lineno += 1;
+							result
+						}
+						[b' ', rest @ ..] => {
+							let result = (
+								DiffLineType::None,
+								rest,
+								Some(*old_lineno),
+								Some(*new_lineno),
+							);
+							*old_lineno += 1;
+							*new_lineno += 1;
+							result
+						}
+						_ => {
+							// Empty lines or unknown prefixes are treated as context.
+							let result = (
+								DiffLineType::None,
 								line,
-								None,
-								None,
-							),
-							_ => {
-								// Empty lines or unknown prefixes are treated as context.
-								let result = (
-									DiffLineType::None,
-									line,
-									Some(*old_lineno),
-									Some(*new_lineno),
-								);
-								*old_lineno += 1;
-								*new_lineno += 1;
-								result
-							}
-						};
+								Some(*old_lineno),
+								Some(*new_lineno),
+							);
+							*old_lineno += 1;
+							*new_lineno += 1;
+							result
+						}
+					};
 
-					Some(DiffLine {
-						position: DiffLinePosition {
-							old_lineno,
-							new_lineno,
-						},
-						content: String::from_utf8_lossy(content)
-							.trim_matches(is_newline)
-							.into(),
-						line_type,
-					})
-				},
-			)
-			.collect();
+				Some(DiffLine {
+					position: DiffLinePosition {
+						old_lineno,
+						new_lineno,
+					},
+					content: String::from_utf8_lossy(content)
+						.trim_matches(is_newline)
+						.into(),
+					line_type,
+				})
+			},
+		);
+
+		let mut lines = vec![DiffLine {
+			content: header.to_string().into(),
+			line_type: DiffLineType::Header,
+			position: DiffLinePosition {
+				old_lineno: None,
+				new_lineno: None,
+			},
+		}];
+		lines.extend(non_header_lines);
 
 		let hunk_header = HunkHeader {
 			old_start: before_hunk_start,
