@@ -50,7 +50,10 @@ pub fn process_cmdline() -> Result<CliArgs> {
 
 	let confpath = get_app_config_path()?;
 	fs::create_dir_all(&confpath).with_context(|| {
-		format!("failed to write config to {}", confpath.display())
+		format!(
+			"failed to create config directory: {}",
+			confpath.display()
+		)
 	})?;
 	let theme = confpath.join(arg_theme);
 
