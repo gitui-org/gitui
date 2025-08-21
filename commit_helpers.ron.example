@@ -1,0 +1,68 @@
+// Example configuration for GitUI commit helpers
+// Copy this file to your GitUI config directory as "commit_helpers.ron"
+// 
+// Config directory locations:
+// - Linux: ~/.config/gitui/
+// - macOS: ~/Library/Application Support/gitui/
+// - Windows: %APPDATA%/gitui/
+//
+// Template variables available in commands:
+// - {staged_diff}   - Output of 'git diff --staged --no-color'
+// - {staged_files}  - List of staged files from 'git diff --staged --name-only'
+// - {branch_name}   - Current branch name
+//
+// Helper navigation:
+// - Ctrl+G: Open helper selection (if multiple helpers configured)
+// - Arrow keys: Navigate between helpers in selection mode
+// - Enter: Execute selected helper
+// - Hotkeys: Press configured hotkey to run helper directly
+// - ESC: Cancel selection or running helper
+
+CommitHelpers(
+    helpers: [
+        // Claude AI helper example (using template variables)
+        CommitHelper(
+            name: "Claude AI",
+            command: "echo '{staged_diff}' | claude -p 'Based on the following git diff of staged changes, generate a concise, conventional commit message. Follow this format:\n\n<type>: <description>\n\nWhere <type> is one of: feat, fix, docs, style, refactor, test, chore\nThe <description> should be lowercase and concise (50 chars or less).\n\nFor multiple types of changes, use the most significant one.\nOutput ONLY the commit message, no explanation or quotes.'",
+            description: Some("Generate conventional commit messages using Claude AI"),
+            hotkey: Some('c'),
+            timeout_secs: Some(30),
+        ),
+        
+        // OpenAI ChatGPT helper example (using template variables)
+        CommitHelper(
+            name: "ChatGPT",
+            command: "echo '{staged_diff}' | chatgpt 'Generate a concise conventional commit message for this diff. Format: <type>: <description>. Types: feat, fix, docs, style, refactor, test, chore. Max 50 chars.'",
+            description: Some("Generate commit messages using ChatGPT"),
+            hotkey: Some('g'),
+            timeout_secs: Some(25),
+        ),
+        
+        // Local AI helper example (using template variables)
+        CommitHelper(
+            name: "Local AI",
+            command: "echo '{staged_diff}' | ollama run codellama 'Generate a conventional commit message for this git diff. Use format: type: description. Keep under 50 characters.'",
+            description: Some("Generate commit messages using local Ollama model"),
+            hotkey: Some('l'),
+            timeout_secs: Some(45),
+        ),
+        
+        // Branch-specific helper example
+        CommitHelper(
+            name: "Branch Fix",
+            command: "echo 'fix({branch_name}): address issues in {staged_files}'",
+            description: Some("Generate branch-specific fix message"),
+            hotkey: Some('b'),
+            timeout_secs: Some(5),
+        ),
+        
+        // Simple template-based helper
+        CommitHelper(
+            name: "Quick Fix",
+            command: "echo 'fix: address code issues'",
+            description: Some("Quick fix commit message"),
+            hotkey: Some('f'),
+            timeout_secs: Some(5),
+        ),
+    ]
+)
