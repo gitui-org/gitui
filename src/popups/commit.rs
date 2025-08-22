@@ -90,7 +90,8 @@ pub struct CommitPopup {
 const FIRST_LINE_LIMIT: usize = 50;
 
 // Spinner animation frames
-const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_FRAMES: &[&str] =
+	&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const SPINNER_INTERVAL_MS: u64 = 80;
 const HELPER_TIMEOUT_SECS: u64 = 30;
 
@@ -137,16 +138,20 @@ impl CommitPopup {
 				match result {
 					Ok(generated_msg) => {
 						let current_msg = self.input.get_text();
-						let new_msg = if current_msg.is_empty() {
-							generated_msg
-						} else {
-							format!("{}\n\n{}", current_msg, generated_msg)
-						};
+						let new_msg =
+							if current_msg.is_empty() {
+								generated_msg
+							} else {
+								format!("{current_msg}\n\n{generated_msg}")
+							};
 						self.input.set_text(new_msg);
-						self.helper_state = HelperState::Success("Generated successfully".to_string());
+						self.helper_state = HelperState::Success(
+							"Generated successfully".to_string(),
+						);
 					}
 					Err(error_msg) => {
-						self.helper_state = HelperState::Error(error_msg);
+						self.helper_state =
+							HelperState::Error(error_msg);
 					}
 				}
 				self.helper_receiver = None;
@@ -155,30 +160,45 @@ impl CommitPopup {
 	}
 
 	pub fn clear_helper_message(&mut self) {
-		if matches!(self.helper_state, HelperState::Success(_) | HelperState::Error(_) | HelperState::Selection { .. }) {
+		if matches!(
+			self.helper_state,
+			HelperState::Success(_)
+				| HelperState::Error(_)
+				| HelperState::Selection { .. }
+		) {
 			self.helper_state = HelperState::Idle;
 		}
 	}
 
 	pub fn cancel_helper(&mut self) {
 		if matches!(self.helper_state, HelperState::Running { .. }) {
-			self.helper_state = HelperState::Error("Cancelled by user".to_string());
+			self.helper_state =
+				HelperState::Error("Cancelled by user".to_string());
 			self.helper_receiver = None;
 		}
 	}
 
 	pub fn update_helper_animation(&mut self) -> bool {
-		if let HelperState::Running { frame_index, start_time, helper_name: _ } = &mut self.helper_state {
+		if let HelperState::Running {
+			frame_index,
+			start_time,
+			helper_name: _,
+		} = &mut self.helper_state
+		{
 			let elapsed = start_time.elapsed();
-			
+
 			// Check timeout
 			if elapsed.as_secs() > HELPER_TIMEOUT_SECS {
-				self.helper_state = HelperState::Error("Timeout: Helper took too long".to_string());
+				self.helper_state = HelperState::Error(
+					"Timeout: Helper took too long".to_string(),
+				);
 				return true;
 			}
-			
+
 			// Update frame
-			let new_frame = (elapsed.as_millis() / SPINNER_INTERVAL_MS as u128) as usize % SPINNER_FRAMES.len();
+			let new_frame = (elapsed.as_millis()
+				/ u128::from(SPINNER_INTERVAL_MS))
+				as usize % SPINNER_FRAMES.len();
 			if *frame_index != new_frame {
 				*frame_index = new_frame;
 				return true; // Animation frame changed, needs redraw
@@ -235,40 +255,46 @@ impl CommitPopup {
 	}
 
 	fn draw_helper_status(&self, f: &mut Frame) {
-		use ratatui::widgets::{Paragraph, Wrap};
 		use ratatui::style::Style;
-		
+		use ratatui::widgets::{Paragraph, Wrap};
+
 		let (msg, style) = match &self.helper_state {
 			HelperState::Idle => return,
 			HelperState::Selection { selected_index } => {
 				let helpers = self.commit_helpers.get_helpers();
-				if let Some(helper) = helpers.get(*selected_index) {
-					let hotkey_hint = helper.hotkey
-						.map(|h| format!(" [{}]", h))
-						.unwrap_or_default();
-					(format!("Select helper: {} ({}/{}){}. [↑↓] to navigate, [Enter] to run, [ESC] to cancel", 
-						helper.name, selected_index + 1, helpers.len(), hotkey_hint),
-					 Style::default().fg(ratatui::style::Color::Cyan))
-				} else {
-					(String::from("No helpers available"), self.theme.text_danger())
-				}
+				helpers.get(*selected_index).map_or_else(
+					|| (String::from("No helpers available"), self.theme.text_danger()),
+					|helper| {
+						let hotkey_hint = helper.hotkey
+							.map(|h| format!(" [{h}]"))
+							.unwrap_or_default();
+						(format!("Select helper: {} ({}/{}){}. [↑↓] to navigate, [Enter] to run, [ESC] to cancel", 
+							helper.name, selected_index + 1, helpers.len(), hotkey_hint),
+						 Style::default().fg(ratatui::style::Color::Cyan))
+					}
+				)
 			}
-			HelperState::Running { helper_name, frame_index, start_time } => {
+			HelperState::Running {
+				helper_name,
+				frame_index,
+				start_time,
+			} => {
 				let spinner = SPINNER_FRAMES[*frame_index];
 				let elapsed = start_time.elapsed().as_secs();
-				(format!("{} Generating with {}... ({}s) [ESC to cancel]", spinner, helper_name, elapsed), 
+				(format!("{spinner} Generating with {helper_name}... ({elapsed}s) [ESC to cancel]"), 
 				 Style::default().fg(ratatui::style::Color::Yellow))
 			}
-			HelperState::Success(msg) => {
-				(format!("✅ {}", msg), 
-				 Style::default().fg(ratatui::style::Color::Green))
-			}
+			HelperState::Success(msg) => (
+				format!("✅ {msg}"),
+				Style::default().fg(ratatui::style::Color::Green),
+			),
 			HelperState::Error(err) => {
-				(format!("❌ {}", err), self.theme.text_danger())
+				(format!("❌ {err}"), self.theme.text_danger())
 			}
 		};
 
-		let msg_length: u16 = msg.chars().count().try_into().unwrap_or(0);
+		let msg_length: u16 =
+			msg.chars().count().try_into().unwrap_or(0);
 		let paragraph = Paragraph::new(msg)
 			.style(style)
 			.wrap(Wrap { trim: true });
@@ -507,7 +533,7 @@ impl CommitPopup {
 				"~/.config/gitui/commit_helpers.ron"
 			};
 			self.helper_state = HelperState::Error(
-				format!("No commit helpers configured. Create {} (see .example file)", config_path)
+				format!("No commit helpers configured. Create {config_path} (see .example file)")
 			);
 			return Ok(());
 		}
@@ -517,23 +543,29 @@ impl CommitPopup {
 			self.execute_helper_by_index(0)
 		} else {
 			// Multiple helpers, show selection UI
-			self.helper_state = HelperState::Selection { selected_index: 0 };
+			self.helper_state =
+				HelperState::Selection { selected_index: 0 };
 			Ok(())
 		}
 	}
 
-	fn execute_helper_by_index(&mut self, helper_index: usize) -> Result<()> {
+	fn execute_helper_by_index(
+		&mut self,
+		helper_index: usize,
+	) -> Result<()> {
 		let helpers = self.commit_helpers.get_helpers();
 		if helper_index >= helpers.len() {
-			self.helper_state = HelperState::Error("Invalid helper index".to_string());
+			self.helper_state = HelperState::Error(
+				"Invalid helper index".to_string(),
+			);
 			return Ok(());
 		}
 
 		let helper = helpers[helper_index].clone();
-		
+
 		// Set running state with animation
 		self.helper_state = HelperState::Running {
-			helper_name: helper.name.clone(),
+			helper_name: helper.name,
 			frame_index: 0,
 			start_time: Instant::now(),
 		};
@@ -544,12 +576,13 @@ impl CommitPopup {
 
 		// Clone helpers for thread
 		let commit_helpers = self.commit_helpers.clone();
-		
+
 		// Execute helper in background thread
 		thread::spawn(move || {
-			let result = commit_helpers.execute_helper(helper_index)
-				.map_err(|e| format!("Failed: {}", e));
-			
+			let result = commit_helpers
+				.execute_helper(helper_index)
+				.map_err(|e| format!("Failed: {e}"));
+
 			// Send result back (ignore if receiver is dropped)
 			let _ = tx.send(result);
 		});
@@ -762,7 +795,9 @@ impl Component for CommitPopup {
 
 			if !self.commit_helpers.get_helpers().is_empty() {
 				out.push(CommandInfo::new(
-					strings::commands::commit_helper(&self.key_config),
+					strings::commands::commit_helper(
+						&self.key_config,
+					),
 					true,
 					true,
 				));
@@ -777,29 +812,45 @@ impl Component for CommitPopup {
 			// Handle helper selection navigation
 			if let Event::Key(key) = ev {
 				// Handle helper selection state
-				if let HelperState::Selection { selected_index } = &self.helper_state {
+				if let HelperState::Selection { selected_index } =
+					&self.helper_state
+				{
 					match key.code {
 						crossterm::event::KeyCode::Esc => {
 							self.helper_state = HelperState::Idle;
 							return Ok(EventState::Consumed);
 						}
 						crossterm::event::KeyCode::Up => {
-							let helpers_len = self.commit_helpers.get_helpers().len();
+							let helpers_len = self
+								.commit_helpers
+								.get_helpers()
+								.len();
 							if helpers_len > 0 {
-								let new_index = if *selected_index == 0 {
-									helpers_len - 1
-								} else {
-									*selected_index - 1
-								};
-								self.helper_state = HelperState::Selection { selected_index: new_index };
+								let new_index =
+									if *selected_index == 0 {
+										helpers_len - 1
+									} else {
+										*selected_index - 1
+									};
+								self.helper_state =
+									HelperState::Selection {
+										selected_index: new_index,
+									};
 							}
 							return Ok(EventState::Consumed);
 						}
 						crossterm::event::KeyCode::Down => {
-							let helpers_len = self.commit_helpers.get_helpers().len();
+							let helpers_len = self
+								.commit_helpers
+								.get_helpers()
+								.len();
 							if helpers_len > 0 {
-								let new_index = (*selected_index + 1) % helpers_len;
-								self.helper_state = HelperState::Selection { selected_index: new_index };
+								let new_index = (*selected_index + 1)
+									% helpers_len;
+								self.helper_state =
+									HelperState::Selection {
+										selected_index: new_index,
+									};
 							}
 							return Ok(EventState::Consumed);
 						}
@@ -808,17 +859,23 @@ impl Component for CommitPopup {
 							try_or_popup!(
 								self,
 								"helper execution error:",
-								self.execute_helper_by_index(selected)
+								self.execute_helper_by_index(
+									selected
+								)
 							);
 							return Ok(EventState::Consumed);
 						}
 						crossterm::event::KeyCode::Char(c) => {
 							// Check for hotkey match
-							if let Some(index) = self.commit_helpers.find_by_hotkey(c) {
+							if let Some(index) =
+								self.commit_helpers.find_by_hotkey(c)
+							{
 								try_or_popup!(
 									self,
 									"helper execution error:",
-									self.execute_helper_by_index(index)
+									self.execute_helper_by_index(
+										index
+									)
 								);
 								return Ok(EventState::Consumed);
 							}
@@ -828,16 +885,19 @@ impl Component for CommitPopup {
 				}
 
 				// Handle ESC to cancel running helper
-				if key.code == crossterm::event::KeyCode::Esc 
-					&& matches!(self.helper_state, HelperState::Running { .. }) {
+				if key.code == crossterm::event::KeyCode::Esc
+					&& matches!(
+						self.helper_state,
+						HelperState::Running { .. }
+					) {
 					self.cancel_helper();
 					return Ok(EventState::Consumed);
 				}
-				
+
 				// Clear success/error messages on key press
 				self.clear_helper_message();
 			}
-			
+
 			if let Event::Key(e) = ev {
 				let input_consumed =
 					if key_match(e, self.key_config.keys.commit)
