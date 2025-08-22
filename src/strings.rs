@@ -1175,6 +1175,18 @@ pub mod commands {
 			CMD_GROUP_COMMIT_POPUP,
 		)
 	}
+	pub fn commit_helper(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Generate [{}]",
+				key_config.get_hint(key_config.keys.commit_helper),
+			),
+			"generate commit message using helper",
+			CMD_GROUP_COMMIT_POPUP,
+		)
+	}
 	pub fn edit_item(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(

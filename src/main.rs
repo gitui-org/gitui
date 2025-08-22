@@ -64,6 +64,7 @@ mod args;
 mod bug_report;
 mod clipboard;
 mod cmdbar;
+mod commit_helpers;
 mod components;
 mod input;
 mod keys;
@@ -271,6 +272,8 @@ fn run_app(
 			if matches!(event, QueueEvent::SpinnerUpdate) {
 				spinner.update();
 				spinner.draw(terminal)?;
+				// Also update app for commit helper animations
+				app.update()?;
 				continue;
 			}
 
