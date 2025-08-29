@@ -449,7 +449,7 @@ impl SubmodulesListPopup {
 				theme.text(false, false),
 			)]),
 			Line::from(vec![Span::styled(
-				self.repo_path.to_string(),
+				self.repo_path.clone(),
 				theme.text(true, false),
 			)]),
 			Line::from(vec![Span::styled(
