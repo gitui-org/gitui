@@ -104,20 +104,15 @@ pub struct StatusItem {
 }
 
 ///
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Default, Hash, PartialEq, Eq, Debug)]
 pub enum StatusType {
 	///
+	#[default]
 	WorkingDir,
 	///
 	Stage,
 	///
 	Both,
-}
-
-impl Default for StatusType {
-	fn default() -> Self {
-		Self::WorkingDir
-	}
 }
 
 impl From<StatusType> for StatusShow {
