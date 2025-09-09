@@ -28,6 +28,7 @@ use ratatui::{
 	Frame,
 };
 
+use std::time::Duration;
 use std::{
 	fmt::Write as _,
 	fs::{read_to_string, File},
@@ -237,14 +238,32 @@ impl CommitPopup {
 
 		if verify {
 			// run pre commit hook - can reject commit
-			if let HookResult::NotOk(e) =
-				sync::hooks_pre_commit(&self.repo.borrow())?
-			{
-				log::error!("pre-commit hook error: {}", e);
-				self.queue.push(InternalEvent::ShowErrorMsg(
-					format!("pre-commit hook error:\n{e}"),
-				));
-				return Ok(CommitResult::Aborted);
+			match sync::hooks_pre_commit_with_timeout(
+				&self.repo.borrow(),
+				self.get_hook_timeout(),
+			)? {
+				HookResult::NotOk(e) => {
+					log::error!("pre-commit hook error: {}", e);
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!("pre-commit hook error:\n{e}"),
+					));
+					return Ok(CommitResult::Aborted);
+				}
+				HookResult::TimedOut { stdout, stderr } => {
+					log::error!("pre-commit hook timed out");
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!(
+						"pre-commit hook timed out after {} seconds, see output below.\n{}\n{}",
+						self.get_hook_timeout()
+							.unwrap_or(Duration::ZERO)
+							.as_secs(),
+						stdout,
+						stderr
+					),
+					));
+					return Ok(CommitResult::Aborted);
+				}
+				HookResult::Ok => {}
 			}
 		}
 
@@ -253,25 +272,61 @@ impl CommitPopup {
 
 		if verify {
 			// run commit message check hook - can reject commit
-			if let HookResult::NotOk(e) =
-				sync::hooks_commit_msg(&self.repo.borrow(), &mut msg)?
-			{
-				log::error!("commit-msg hook error: {}", e);
-				self.queue.push(InternalEvent::ShowErrorMsg(
-					format!("commit-msg hook error:\n{e}"),
-				));
-				return Ok(CommitResult::Aborted);
+			match sync::hooks_commit_msg_with_timeout(
+				&self.repo.borrow(),
+				&mut msg,
+				self.get_hook_timeout(),
+			)? {
+				HookResult::NotOk(e) => {
+					log::error!("commit-msg hook error: {}", e);
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!("commit-msg hook error:\n{e}"),
+					));
+					return Ok(CommitResult::Aborted);
+				}
+				HookResult::TimedOut { stdout, stderr } => {
+					log::error!("commit-msg hook timed out");
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!(
+						"commit-msg hook timed out after {} seconds, see output below.\n{}\n{}",
+						self.get_hook_timeout()
+							.unwrap_or(Duration::ZERO)
+							.as_secs(),
+						stdout,
+						stderr
+					),
+					));
+					return Ok(CommitResult::Aborted);
+				}
+				HookResult::Ok => {}
 			}
 		}
 		self.do_commit(&msg)?;
 
-		if let HookResult::NotOk(e) =
-			sync::hooks_post_commit(&self.repo.borrow())?
-		{
-			log::error!("post-commit hook error: {}", e);
-			self.queue.push(InternalEvent::ShowErrorMsg(format!(
-				"post-commit hook error:\n{e}"
-			)));
+		match sync::hooks_post_commit_with_timeout(
+			&self.repo.borrow(),
+			self.get_hook_timeout(),
+		)? {
+			HookResult::NotOk(e) => {
+				log::error!("post-commit hook error: {}", e);
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("post-commit hook error:\n{e}"),
+				));
+			}
+			HookResult::TimedOut { stdout, stderr } => {
+				log::error!("post-commit hook timed out");
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!(
+						"post-commit hook timed out after {} seconds, see output below.\n{}\n{}",
+						self.get_hook_timeout()
+							.unwrap_or(Duration::ZERO)
+							.as_secs(),
+						stdout,
+						stderr
+					),
+				));
+			}
+			HookResult::Ok => {}
 		}
 
 		Ok(CommitResult::CommitDone)
@@ -441,11 +496,13 @@ impl CommitPopup {
 		self.mode = mode;
 
 		let mut msg = self.input.get_text().to_string();
-		if let HookResult::NotOk(e) = sync::hooks_prepare_commit_msg(
-			&self.repo.borrow(),
-			msg_source,
-			&mut msg,
-		)? {
+		if let HookResult::NotOk(e) =
+			sync::hooks_prepare_commit_msg_with_timeout(
+				&self.repo.borrow(),
+				msg_source,
+				&mut msg,
+				self.get_hook_timeout(),
+			)? {
 			log::error!("prepare-commit-msg hook rejection: {e}",);
 		}
 		self.input.set_text(msg);
@@ -476,6 +533,10 @@ impl CommitPopup {
 		}
 
 		Ok(msg)
+	}
+
+	fn get_hook_timeout(&self) -> Option<Duration> {
+		self.options.borrow().hook_timeout()
 	}
 }
 

@@ -14,6 +14,7 @@ use std::{
 	io::{Read, Write},
 	path::PathBuf,
 	rc::Rc,
+	time::Duration,
 };
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -22,6 +23,7 @@ struct OptionsData {
 	pub diff: DiffOptions,
 	pub status_show_untracked: Option<ShowUntrackedFilesConfig>,
 	pub commit_msgs: Vec<String>,
+	pub hook_timeout: Option<Duration>,
 }
 
 const COMMIT_MSG_HISTORY_LENGTH: usize = 20;
@@ -64,6 +66,11 @@ impl Options {
 
 	pub const fn diff_options(&self) -> DiffOptions {
 		self.data.diff
+	}
+
+	#[allow(unused)]
+	pub const fn hook_timeout(&self) -> Option<Duration> {
+		self.data.hook_timeout
 	}
 
 	pub const fn status_show_untracked(
@@ -135,6 +142,12 @@ impl Options {
 
 			Some(self.data.commit_msgs[index].clone())
 		}
+	}
+
+	#[allow(unused)]
+	pub fn set_hook_timeout(&mut self, timeout: Option<Duration>) {
+		self.data.hook_timeout = timeout;
+		self.save();
 	}
 
 	fn save(&self) {
