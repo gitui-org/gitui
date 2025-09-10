@@ -1,5 +1,5 @@
 use crate::bug_report;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use asyncgit::sync::RepoPath;
 use clap::{
 	builder::ArgPredicate, crate_authors, crate_description,
@@ -49,7 +49,12 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
 
 	let confpath = get_app_config_path()?;
-	fs::create_dir_all(&confpath)?;
+	fs::create_dir_all(&confpath).with_context(|| {
+		format!(
+			"failed to create config directory: {}",
+			confpath.display()
+		)
+	})?;
 	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
