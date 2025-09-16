@@ -129,7 +129,7 @@ pub fn push_branch(
 	)
 }
 
-//TODO: clenaup
+//TODO: cleanup
 #[allow(clippy::too_many_arguments)]
 pub fn push_raw(
 	repo_path: &RepoPath,

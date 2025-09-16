@@ -372,7 +372,7 @@ exit 0
 	}
 
 	#[test]
-	fn test_other_path_precendence() {
+	fn test_other_path_precedence() {
 		let (td, repo) = repo_init();
 
 		{
@@ -493,7 +493,7 @@ exit 1
 	fn test_pre_commit_py() {
 		let (_td, repo) = repo_init();
 
-		// mirror how python pre-commmit sets itself up
+		// mirror how python pre-commit sets itself up
 		#[cfg(not(windows))]
 		let hook = b"#!/usr/bin/env python
 import sys
@@ -514,7 +514,7 @@ sys.exit(0)
 	fn test_pre_commit_fail_py() {
 		let (_td, repo) = repo_init();
 
-		// mirror how python pre-commmit sets itself up
+		// mirror how python pre-commit sets itself up
 		#[cfg(not(windows))]
 		let hook = b"#!/usr/bin/env python
 import sys
