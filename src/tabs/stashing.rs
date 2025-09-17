@@ -199,6 +199,13 @@ impl Component for Stashing {
 				self.visible,
 				self.visible || force_all,
 			));
+			out.push(CommandInfo::new(
+				strings::commands::open_branch_select_popup(
+					&self.key_config,
+				),
+				true,
+				true,
+			));
 		}
 
 		visibility_blocking(self)
@@ -242,6 +249,12 @@ impl Component for Stashing {
 						!self.options.stash_untracked;
 					self.update()?;
 					Ok(EventState::Consumed)
+				} else if key_match(
+					k,
+					self.key_config.keys.select_branch,
+				) {
+					self.queue.push(InternalEvent::SelectBranch);
+					return Ok(EventState::Consumed);
 				} else {
 					Ok(EventState::NotConsumed)
 				};

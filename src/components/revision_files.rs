@@ -446,6 +446,13 @@ impl Component for RevisionFilesComponent {
 				)
 				.order(order::RARE_ACTION),
 			);
+			out.push(CommandInfo::new(
+				strings::commands::open_branch_select_popup(
+					&self.key_config,
+				),
+				true,
+				self.is_visible() || force_all,
+			));
 			tree_nav_cmds(&self.tree, &self.key_config, out);
 		} else {
 			self.current_file.commands(out, force_all);
@@ -522,6 +529,12 @@ impl Component for RevisionFilesComponent {
 						crate::clipboard::copy_string(&file)
 					);
 				}
+				return Ok(EventState::Consumed);
+			} else if key_match(
+				key,
+				self.key_config.keys.select_branch,
+			) {
+				self.queue.push(InternalEvent::SelectBranch);
 				return Ok(EventState::Consumed);
 			} else if !is_tree_focused {
 				return self.current_file.event(event);
