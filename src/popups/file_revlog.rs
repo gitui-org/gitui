@@ -171,7 +171,7 @@ impl FileRevlogPopup {
 					{
 						if params == diff_params {
 							self.diff.update(
-								open_request.file_path.to_string(),
+								open_request.file_path.clone(),
 								false,
 								last,
 							);

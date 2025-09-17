@@ -557,7 +557,7 @@ impl BranchListPopup {
 				theme.commit_hash(selected),
 			);
 			let span_msg = Span::styled(
-				commit_message.to_string(),
+				commit_message.clone(),
 				theme.text(true, selected),
 			);
 			let span_name = Span::styled(

@@ -8,21 +8,16 @@ use super::{repository::repo, RepoPath};
 // see https://git-scm.com/docs/git-config#Documentation/git-config.txt-statusshowUntrackedFiles
 /// represents the `status.showUntrackedFiles` git config state
 #[derive(
-	Hash, Copy, Clone, PartialEq, Eq, Serialize, Deserialize,
+	Hash, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize,
 )]
 pub enum ShowUntrackedFilesConfig {
 	///
+	#[default]
 	No,
 	///
 	Normal,
 	///
 	All,
-}
-
-impl Default for ShowUntrackedFilesConfig {
-	fn default() -> Self {
-		Self::No
-	}
 }
 
 impl ShowUntrackedFilesConfig {
@@ -68,19 +63,14 @@ pub fn untracked_files_config_repo(
 
 // see https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
 /// represents `push.default` git config
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Default, Eq)]
 pub enum PushDefaultStrategyConfig {
 	Nothing,
 	Current,
 	Upstream,
+	#[default]
 	Simple,
 	Matching,
-}
-
-impl Default for PushDefaultStrategyConfig {
-	fn default() -> Self {
-		Self::Simple
-	}
 }
 
 impl<'a> TryFrom<&'a str> for PushDefaultStrategyConfig {

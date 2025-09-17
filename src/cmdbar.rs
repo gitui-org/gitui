@@ -104,7 +104,7 @@ impl CommandBar {
 			line_width += entry_w + 1;
 
 			self.draw_list.push(DrawListEntry::Command(Command {
-				txt: c.text.name.to_string(),
+				txt: c.text.name.clone(),
 				enabled: c.enabled,
 				line: lines.saturating_sub(1) as usize,
 			}));
