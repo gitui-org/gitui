@@ -313,7 +313,7 @@ impl Theme {
 		let mut theme = Self::default();
 
 		if let Ok(patch) = Self::load_patch(theme_path).map_err(|e| {
-			log::error!("theme error [{:?}]: {e}", theme_path);
+			log::error!("theme error [{theme_path:?}]: {e}");
 			e
 		}) {
 			theme.apply(patch);
@@ -323,13 +323,11 @@ impl Theme {
 
 			if theme.save_patch(theme_path).is_ok() {
 				log::info!(
-					"Converted old theme to new format. ({:?})",
-					theme_path
+					"Converted old theme to new format. ({theme_path:?})"
 				);
 			} else {
 				log::warn!(
-					"Failed to save theme in new format. ({:?})",
-					theme_path
+					"Failed to save theme in new format. ({theme_path:?})"
 				);
 			}
 		}

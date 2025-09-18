@@ -89,7 +89,7 @@ impl AsyncCommitFiles {
 			return Ok(());
 		}
 
-		log::trace!("request: {:?}", params);
+		log::trace!("request: {params:?}");
 
 		{
 			let current = self.current.lock()?;

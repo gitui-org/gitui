@@ -139,7 +139,7 @@ impl Options {
 
 	fn save(&self) {
 		if let Err(e) = self.save_failable() {
-			log::error!("options save error: {}", e);
+			log::error!("options save error: {e}");
 		}
 	}
 

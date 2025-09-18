@@ -98,7 +98,7 @@ impl AsyncDiff {
 		&self,
 		params: DiffParams,
 	) -> Result<Option<FileDiff>> {
-		log::trace!("request {:?}", params);
+		log::trace!("request {params:?}");
 
 		let hash = hash(&params);
 
@@ -132,7 +132,7 @@ impl AsyncDiff {
 
 			let notify = match notify {
 				Err(err) => {
-					log::error!("get_diff_helper error: {}", err);
+					log::error!("get_diff_helper error: {err}");
 					true
 				}
 				Ok(notify) => notify,

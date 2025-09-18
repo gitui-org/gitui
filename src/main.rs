@@ -343,7 +343,7 @@ fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
 
 	terminal.draw(|f| {
 		if let Err(e) = app.draw(f) {
-			log::error!("failed to draw: {:?}", e);
+			log::error!("failed to draw: {e:?}");
 		}
 	})?;
 

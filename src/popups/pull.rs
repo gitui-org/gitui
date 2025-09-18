@@ -153,7 +153,7 @@ impl PullPopup {
 				&self.branch,
 			);
 			if let Err(err) = ff_res {
-				log::trace!("ff failed: {}", err);
+				log::trace!("ff failed: {err}");
 				self.confirm_merge(branch_compare.behind);
 			}
 		}
