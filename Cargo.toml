@@ -36,7 +36,9 @@ vendor-openssl = ["asyncgit/vendor-openssl"]
 [dependencies]
 anyhow = "1.0"
 asyncgit = { path = "./asyncgit", version = "0.27.0", default-features = false }
-backtrace = "0.3"
+# 2025-09-18 backtrace >=0.3.75 requires Rust 1.82.0 while we’re still at
+# 1.81.0.
+backtrace = "=0.3.74"
 base64 = "0.22"
 bitflags = "2.9"
 bugreport = "0.5.1"
