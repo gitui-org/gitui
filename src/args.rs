@@ -49,7 +49,6 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
 
 	let confpath = get_app_config_path()?;
-	fs::create_dir_all(&confpath)?;
 	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
@@ -149,28 +148,110 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 	Ok(())
 }
 
-fn get_app_cache_path() -> Result<PathBuf> {
-	let mut path = dirs::cache_dir()
-		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
+fn get_path_from_candidates(
+	candidates: impl IntoIterator<Item = Option<PathBuf>>,
+) -> Result<PathBuf> {
+	let mut target_dir = None;
 
-	path.push("gitui");
-	fs::create_dir_all(&path)?;
-	Ok(path)
+	// Filter into existing directories
+	for potential_dir in
+		candidates.into_iter().flatten().filter(|p| p.is_dir())
+	{
+		let search_path = potential_dir.join("gitui");
+
+		// Prefer preexisting gitui directory
+		if search_path.is_dir() {
+			target_dir = Some(search_path);
+			break;
+		}
+
+		// Fallback to first existing directory
+		target_dir.get_or_insert(search_path);
+	}
+
+	target_dir.ok_or_else(|| {
+		anyhow!("failed to find valid path within candidates")
+	})
+}
+
+// "If an implementation encounters a relative path in any of these variables it should consider the path invalid and ignore it."
+fn get_xdg_path(xdg_var: &str) -> Option<PathBuf> {
+	env::var_os(xdg_var)
+		.filter(|var| !var.is_empty())
+		.map(PathBuf::from)
+		.filter(|p| p.is_absolute())
+}
+
+fn get_app_cache_path() -> Result<PathBuf> {
+	let cache_dir_candidates =
+		[get_xdg_path("XDG_CACHE_HOME"), dirs::cache_dir()];
+
+	let cache_dir = get_path_from_candidates(cache_dir_candidates)
+		.map_err(|_| anyhow!("failed to find valid cache dir."))?;
+
+	fs::create_dir_all(&cache_dir)?;
+	Ok(cache_dir)
 }
 
 pub fn get_app_config_path() -> Result<PathBuf> {
-	let mut path = if cfg!(target_os = "macos") {
-		dirs::home_dir().map(|h| h.join(".config"))
-	} else {
-		dirs::config_dir()
-	}
-	.ok_or_else(|| anyhow!("failed to find os config dir."))?;
+	// List of potential config directories in order of priority
+	let config_dir_candidates = [
+		get_xdg_path("XDG_CONFIG_HOME"),
+		// This is in the list since it was the hardcoded behavior on macos before
+		// I expect this to be what most people have XDG_CONFIG_HOME set to already
+		// But explicitly including this will avoid breaking anyone's existing config
+		dirs::home_dir().map(|p| p.join(".config")),
+		dirs::config_dir(),
+	];
 
-	path.push("gitui");
-	Ok(path)
+	get_path_from_candidates(config_dir_candidates)
+		.map_err(|_| anyhow!("failed to find valid config dir."))
 }
 
-#[test]
-fn verify_app() {
-	app().debug_assert();
+#[cfg(test)]
+mod tests {
+	use std::fs;
+
+	use super::{app, get_path_from_candidates};
+	use tempfile::tempdir;
+
+	#[test]
+	fn verify_app() {
+		app().debug_assert();
+	}
+
+	#[test]
+	fn test_config_dir_candidates_from_preexisting() {
+		let temp_dummy_1 = tempdir().expect("should create temp dir");
+		let temp_dummy_2 = tempdir().expect("should create temp dir");
+		let temp_target = tempdir().expect("should create temp dir");
+		let temp_goal = temp_target.path().join("gitui");
+
+		fs::create_dir_all(&temp_goal)
+			.expect("should create temp target directory");
+
+		let candidates = [
+			Some(temp_dummy_1.path().to_path_buf()),
+			Some(temp_target.path().to_path_buf()),
+			Some(temp_dummy_2.path().to_path_buf()),
+		];
+		let result = get_path_from_candidates(candidates)
+			.expect("should find the included target");
+		assert_eq!(result, temp_goal);
+	}
+
+	#[test]
+	fn test_config_dir_candidates_no_preexisting() {
+		let temp_dummy_1 = tempdir().expect("should create temp dir");
+		let temp_dummy_2 = tempdir().expect("should create temp dir");
+
+		let candidates = [
+			Some(temp_dummy_1.path().to_path_buf()),
+			Some(temp_dummy_2.path().to_path_buf()),
+		];
+
+		let result = get_path_from_candidates(candidates)
+			.expect("should return first candidate");
+		assert_eq!(result, temp_dummy_1.path().join("gitui"));
+	}
 }
