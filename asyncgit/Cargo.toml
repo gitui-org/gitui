@@ -11,6 +11,11 @@ license = "MIT"
 categories = ["concurrency", "asynchronous"]
 keywords = ["git"]
 
+[features]
+default = ["trace-libgit"]
+trace-libgit = []
+vendor-openssl = ["openssl-sys"]
+
 [dependencies]
 bitflags = "2"
 crossbeam-channel = "0.5"
@@ -18,10 +23,12 @@ dirs = "6.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
 git2 = "0.20"
-git2-hooks = { path = "../git2-hooks", version = ">=0.4" }
+git2-hooks = { path = "../git2-hooks", version = ">=0.5" }
 gix = { version = "0.71.0", default-features = false, features = [
     "max-performance",
     "revision",
+    "mailmap",
+    "status",
 ] }
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
@@ -43,8 +50,3 @@ invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
 serial_test = "3.2"
 tempfile = "3"
-
-[features]
-default = ["trace-libgit"]
-trace-libgit = []
-vendor-openssl = ["openssl-sys"]

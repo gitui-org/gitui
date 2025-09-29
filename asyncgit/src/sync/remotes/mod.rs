@@ -132,7 +132,7 @@ fn get_current_branch(
 
 /// Tries to find the default repo to fetch from based on configuration.
 ///
-/// > branch.<name>.remote
+/// > `branch.<name>.remote`
 /// >
 /// > When on branch `<name>`, it tells `git fetch` and `git push` which remote to fetch from or
 /// > push to. [...] If no remote is configured, or if you are not on any branch and there is more
@@ -173,12 +173,12 @@ pub(crate) fn get_default_remote_for_fetch_in_repo(
 
 /// Tries to find the default repo to push to based on configuration.
 ///
-/// > remote.pushDefault
+/// > `remote.pushDefault`
 /// >
 /// > The remote to push to by default. Overrides `branch.<name>.remote` for all branches, and is
 /// > overridden by `branch.<name>.pushRemote` for specific branches.
 ///
-/// > branch.<name>.remote
+/// > `branch.<name>.remote`
 /// >
 /// > When on branch `<name>`, it tells `git fetch` and `git push` which remote to fetch from or
 /// > push to. The remote to push to may be overridden with `remote.pushDefault` (for all

@@ -11,9 +11,9 @@ readme = "README.md"
 categories = ["development-tools::profiling"]
 keywords = ["profiling", "logging"]
 
+[features]
+default = []
+enabled = []
+
 [dependencies]
 log = "0.4"
-
-[features]
-default =[]
-enabled =[]

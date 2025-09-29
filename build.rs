@@ -44,6 +44,6 @@ fn main() {
 		format!("nightly {} ({})", build_date, get_git_hash())
 	};
 
-	println!("cargo:warning=buildname '{}'", build_name);
-	println!("cargo:rustc-env=GITUI_BUILD_NAME={}", build_name);
+	println!("cargo:warning=buildname '{build_name}'");
+	println!("cargo:rustc-env=GITUI_BUILD_NAME={build_name}");
 }

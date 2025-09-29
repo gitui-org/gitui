@@ -14,6 +14,25 @@ categories = ["command-line-utilities"]
 keywords = ["git", "gui", "cli", "terminal", "ui"]
 build = "build.rs"
 
+[workspace]
+members = [
+    "asyncgit",
+    "filetreelist",
+    "git2-hooks",
+    "git2-testing",
+    "scopetime",
+]
+
+[features]
+default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
+ghemoji = ["gh-emoji"]
+# regex-* features are mutually exclusive.
+regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
+regex-onig = ["syntect/regex-onig", "two-face/syntect-onig"]
+timing = ["scopetime/enabled"]
+trace-libgit = ["asyncgit/trace-libgit"]
+vendor-openssl = ["asyncgit/vendor-openssl"]
+
 [dependencies]
 anyhow = "1.0"
 asyncgit = { path = "./asyncgit", version = "0.27.0", default-features = false }
@@ -66,35 +85,16 @@ unicode-truncate = "2.0"
 unicode-width = "0.2"
 which = "7.0"
 
+[build-dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
 [dev-dependencies]
 env_logger = "0.11"
 pretty_assertions = "1.4"
 tempfile = "3"
 
-[build-dependencies]
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-
 [badges]
 maintenance = { status = "actively-developed" }
-
-[features]
-default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
-ghemoji = ["gh-emoji"]
-# regex-* features are mutually exclusive.
-regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
-regex-onig = ["syntect/regex-onig", "two-face/syntect-onig"]
-timing = ["scopetime/enabled"]
-trace-libgit = ["asyncgit/trace-libgit"]
-vendor-openssl = ["asyncgit/vendor-openssl"]
-
-[workspace]
-members = [
-    "asyncgit",
-    "filetreelist",
-    "git2-hooks",
-    "git2-testing",
-    "scopetime",
-]
 
 [profile.release]
 lto = true

@@ -230,6 +230,7 @@ mod tests {
 		},
 	};
 	use std::{
+		env,
 		fs::{self, remove_file, File},
 		io::Write,
 		path::Path,
@@ -271,6 +272,44 @@ mod tests {
 	}
 
 	#[test]
+	fn test_staging_one_file_from_different_sub_directory() {
+		// This test case covers an interaction between current working directory and the way
+		// `gitoxide` handles pathspecs.
+		//
+		// When staging a new file in one sub-directory, then running running `get_status` in a
+		// different sub-directory, `repo.pathspec` in `get_status` has to initialized with
+		// `empty_patterns_match_prefix` set to `false` for `get_status` to report the staged file’s
+		// status.
+		let file_path = Path::new("untracked/file1.txt");
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		fs::create_dir(root.join("untracked")).unwrap();
+
+		File::create(root.join(file_path))
+			.unwrap()
+			.write_all(b"test file1 content")
+			.unwrap();
+
+		let sub_dir_path = root.join("unrelated");
+
+		fs::create_dir(root.join("unrelated")).unwrap();
+
+		let current_dir = env::current_dir().unwrap();
+		env::set_current_dir(sub_dir_path).unwrap();
+
+		assert_eq!(get_statuses(repo_path), (1, 0));
+
+		stage_add_file(repo_path, file_path).unwrap();
+
+		assert_eq!(get_statuses(repo_path), (0, 1));
+
+		env::set_current_dir(current_dir).unwrap();
+	}
+
+	#[test]
 	fn test_staging_folder() -> Result<()> {
 		let (_td, repo) = repo_init().unwrap();
 		let root = repo.path().parent().unwrap();
@@ -288,6 +327,8 @@ mod tests {
 			.write_all(b"foo")?;
 		File::create(root.join(Path::new("a/f3.txt")))?
 			.write_all(b"foo")?;
+
+		repo.config()?.set_str("status.showUntrackedFiles", "all")?;
 
 		assert_eq!(status_count(StatusType::WorkingDir), 3);
 
@@ -350,6 +391,8 @@ mod tests {
 			.write_all(b"foo")?;
 		File::create(root.join(Path::new("f3.txt")))?
 			.write_all(b"foo")?;
+
+		repo.config()?.set_str("status.showUntrackedFiles", "all")?;
 
 		assert_eq!(get_statuses(repo_path), (3, 0));
 

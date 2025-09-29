@@ -1,4 +1,12 @@
-//! asyncgit
+/*!
+`AsyncGit` is a library that provides non-blocking access to Git
+operations, enabling `GitUI` to perform potentially slow Git operations
+in the background while keeping the user interface responsive.
+
+It also provides synchronous Git operations.
+
+It wraps libraries like git2 and gix.
+*/
 
 #![forbid(missing_docs)]
 #![deny(

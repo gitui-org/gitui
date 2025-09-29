@@ -195,8 +195,8 @@ impl PushPopup {
 	pub fn get_progress(
 		progress: Option<&RemoteProgress>,
 	) -> (String, u8) {
-		progress.as_ref().map_or(
-			(strings::PUSH_POPUP_PROGRESS_NONE.into(), 0),
+		progress.as_ref().map_or_else(
+			|| (strings::PUSH_POPUP_PROGRESS_NONE.into(), 0),
 			|progress| {
 				(
 					Self::progress_state_name(&progress.state),
