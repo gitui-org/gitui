@@ -61,7 +61,7 @@ impl CheckoutOptionPopup {
 				self.theme.text(true, false),
 			),
 			Span::styled(
-				self.branch.as_ref().unwrap().name.clone(),
+				self.branch.as_ref().expect("No branch").name.clone(),
 				self.theme.commit_hash(false),
 			),
 		]));
@@ -99,12 +99,12 @@ impl CheckoutOptionPopup {
 		if self.local {
 			checkout_branch(
 				&self.repo,
-				&self.branch.as_ref().unwrap().name,
-			)?
+				&self.branch.as_ref().expect("No branch").name,
+			)?;
 		} else {
 			checkout_remote_branch(
 				&self.repo,
-				&self.branch.as_ref().unwrap(),
+				self.branch.as_ref().expect("No branch"),
 			)?;
 		}
 

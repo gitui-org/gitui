@@ -588,7 +588,7 @@ impl BranchListPopup {
 			StatusType::WorkingDir,
 			None,
 		)
-		.unwrap();
+		.expect("Could not get status");
 
 		let selected_branch = &self.branches[self.selection as usize];
 		if status.is_empty() {
@@ -601,7 +601,7 @@ impl BranchListPopup {
 			} else {
 				checkout_remote_branch(
 					&self.repo.borrow(),
-					&selected_branch,
+					selected_branch,
 				)?;
 				self.local = true;
 				self.update_branches()?;
@@ -610,7 +610,7 @@ impl BranchListPopup {
 		} else {
 			self.queue.push(InternalEvent::CheckoutOption(
 				selected_branch.clone(),
-				self.local.clone(),
+				self.local,
 			));
 		}
 

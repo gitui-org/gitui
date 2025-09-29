@@ -438,14 +438,14 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<str> {
 	}
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum CheckoutOptions {
 	StashAndReapply,
 	Unchange,
 	Discard,
 }
 
-pub fn checkout_option_to_string(
+pub const fn checkout_option_to_string(
 	kind: CheckoutOptions,
 ) -> (&'static str, &'static str) {
 	const CHECKOUT_OPTION_STASH_AND_REAPPLY: &str =
