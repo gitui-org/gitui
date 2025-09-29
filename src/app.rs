@@ -912,7 +912,7 @@ impl App {
 			InternalEvent::CheckoutOption(branch, is_local) => {
 				self.checkout_option_popup.open(branch, is_local)?;
 			}
-		};
+		}
 
 		Ok(flags)
 	}
