@@ -282,21 +282,24 @@ pub fn discard_status(repo_path: &RepoPath) -> Result<bool> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::sync::tests::repo_init;
+	use crate::sync::{commit, stage_add_file, tests::repo_init};
 	use std::{fs::File, io::Write, path::Path};
 
 	#[test]
 	fn test_discard_status() {
-		let file_path = Path::new("foo");
+		let file_path = Path::new("README.md");
 		let (_td, repo) = repo_init().unwrap();
 		let root = repo.path().parent().unwrap();
 		let repo_path: &RepoPath =
 			&root.as_os_str().to_str().unwrap().into();
 
-		File::create(root.join(file_path))
-			.unwrap()
-			.write_all(b"test\nfoo")
-			.unwrap();
+		let mut file = File::create(root.join(file_path)).unwrap();
+
+		// initial commit
+		stage_add_file(repo_path, file_path).unwrap();
+		commit(repo_path, "commit msg").unwrap();
+
+		writeln!(file, "Test for discard_status").unwrap();
 
 		let statuses =
 			get_status(repo_path, StatusType::WorkingDir, None)
