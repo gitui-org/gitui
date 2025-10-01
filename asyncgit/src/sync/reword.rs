@@ -62,7 +62,7 @@ pub fn reword(
 /// and Err if there was a problem finding the branch
 fn get_current_branch(
 	repo: &Repository,
-) -> Result<Option<git2::Branch>> {
+) -> Result<Option<git2::Branch<'_>>> {
 	for b in repo.branches(None)? {
 		let branch = b?.0;
 		if branch.is_head() {
