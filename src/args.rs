@@ -49,7 +49,10 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
 
 	let confpath = get_app_config_path()?;
-	fs::create_dir_all(&confpath)?;
+	if let Err(err) = fs::create_dir_all(&confpath) {
+		eprintln!("Impossible to create the config directory {confpath:?}:");
+		return Err(err.into());
+	}
 	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
@@ -154,7 +157,10 @@ fn get_app_cache_path() -> Result<PathBuf> {
 		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
 
 	path.push("gitui");
-	fs::create_dir_all(&path)?;
+	if let Err(err) = fs::create_dir_all(&path) {
+		eprintln!("Impossible to create the cache directory {path:?}:");
+		return Err(err.into());
+	}
 	Ok(path)
 }
 
