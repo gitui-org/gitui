@@ -230,7 +230,7 @@ impl RemoteListPopup {
 		theme: &SharedTheme,
 		width_available: u16,
 		height: usize,
-	) -> Text {
+	) -> Text<'_> {
 		const THREE_DOTS: &str = "...";
 		const THREE_DOTS_LENGTH: usize = THREE_DOTS.len(); // "..."
 
