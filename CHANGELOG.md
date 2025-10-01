@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixes
 * resolve `core.hooksPath` relative to `GIT_WORK_TREE` [[@naseschwarz](https://github.com/naseschwarz)] ([#2571](https://github.com/gitui-org/gitui/issues/2571))
 * yanking commit ranges no longer generates incorrect dotted range notations, but lists each individual commit [[@naseschwarz](https://github.com/naseschwarz)] (https://github.com/gitui-org/gitui/issues/2576)
+* print slightly nicer errors when failing to create a directory [[@linkmauve](https://github.com/linkmauve)] (https://github.com/gitui-org/gitui/pull/2728)
 
 ## [0.27.0] - 2024-01-14
 
