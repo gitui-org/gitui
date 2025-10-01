@@ -159,7 +159,12 @@ fn get_app_cache_path() -> Result<PathBuf> {
 		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
 
 	path.push("gitui");
-	fs::create_dir_all(&path)?;
+	fs::create_dir_all(&path).with_context(|| {
+		format!(
+			"failed to create cache directory: {}",
+			path.display()
+		)
+	})?;
 	Ok(path)
 }
 
