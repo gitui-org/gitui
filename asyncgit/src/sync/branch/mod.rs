@@ -9,11 +9,12 @@ use super::{utils::bytes2string, RepoPath};
 use crate::{
 	error::{Error, Result},
 	sync::{
-		remotes::get_default_remote_for_push_in_repo,
+		gix_repo, remotes::get_default_remote_for_push_in_repo,
 		repository::repo, utils::get_head_repo, CommitId,
 	},
 };
 use git2::{Branch, BranchType, Repository};
+use gix::remote::Direction;
 use scopetime::scope_time;
 use std::collections::HashSet;
 
@@ -123,76 +124,111 @@ pub fn get_branches_info(
 ) -> Result<Vec<BranchInfo>> {
 	scope_time!("get_branches_info");
 
-	let repo = repo(repo_path)?;
+	let gix_repo = gix_repo(repo_path)?;
+	let platform = gix_repo.references()?;
+	let head_name = gix_repo.head_name().ok().flatten();
 
-	let (filter, remotes_with_tracking) = if local {
-		(BranchType::Local, HashSet::default())
-	} else {
-		let remotes: HashSet<_> = repo
-			.branches(Some(BranchType::Local))?
-			.filter_map(|b| {
-				let branch = b.ok()?.0;
-				let upstream = branch.upstream();
-				upstream
-					.ok()?
-					.name_bytes()
-					.ok()
-					.map(ToOwned::to_owned)
-			})
-			.collect();
-		(BranchType::Remote, remotes)
-	};
+	let mut branches_for_display: Vec<_> = if local {
+		platform
+			.local_branches()?
+			.flatten()
+			.filter_map(|mut branch| {
+				let branch_name = branch.name();
+				let name = branch_name.shorten().to_string();
+				let reference = branch_name.to_owned().to_string();
+				// TODO:
+				// Verify that this is sufficiently similar to `git2`’s `is_head` by looking at the
+				// implementation of `git_branch_is_head`.
+				let is_head =
+					head_name.as_ref().is_some_and(|head_name| {
+						head_name.as_ref() == branch_name
+					});
 
-	let mut branches_for_display: Vec<BranchInfo> = repo
-		.branches(Some(filter))?
-		.map(|b| {
-			let branch = b?.0;
-			let top_commit = branch.get().peel_to_commit()?;
-			let reference = bytes2string(branch.get().name_bytes())?;
-			let upstream = branch.upstream();
+				let top_commit = branch.peel_to_commit().ok()?;
+				let upstream = branch.remote_tracking_ref_name(
+					// TODO:
+					// Is that correct?
+					Direction::Fetch,
+				);
 
-			let remote = repo
-				.branch_upstream_remote(&reference)
-				.ok()
-				.as_ref()
-				.and_then(git2::Buf::as_str)
-				.map(String::from);
+				let upstream_branch = match upstream {
+					Some(Ok(reference)) => Some(UpstreamBranch {
+						reference: reference.into_owned().to_string(),
+					}),
+					_ => None,
+				};
 
-			let name_bytes = branch.name_bytes()?;
+				let remote = branch
+					.remote_name(
+						// TODO:
+						// Is that correct?
+						Direction::Fetch,
+					)
+					.map(|name| name.as_bstr().to_string());
 
-			let upstream_branch =
-				upstream.ok().and_then(|upstream| {
-					bytes2string(upstream.get().name_bytes())
-						.ok()
-						.map(|reference| UpstreamBranch { reference })
-				});
-
-			let details = if local {
-				BranchDetails::Local(LocalBranch {
-					is_head: branch.is_head(),
+				let details = BranchDetails::Local(LocalBranch {
+					is_head,
 					has_upstream: upstream_branch.is_some(),
 					upstream: upstream_branch,
 					remote,
-				})
-			} else {
-				BranchDetails::Remote(RemoteBranch {
-					has_tracking: remotes_with_tracking
-						.contains(name_bytes),
-				})
-			};
+				});
 
-			Ok(BranchInfo {
-				name: bytes2string(name_bytes)?,
-				reference,
-				top_commit_message: bytes2string(
-					top_commit.summary_bytes().unwrap_or_default(),
-				)?,
-				top_commit: top_commit.id().into(),
-				details,
+				Some(BranchInfo {
+					name,
+					reference,
+					top_commit_message: top_commit
+						.message()
+						.ok()?
+						.title
+						.to_string(),
+					top_commit: top_commit.into(),
+					details,
+				})
 			})
-		})
-		.filter_map(Result::ok)
-		.collect();
+			.collect()
+	} else {
+		let remotes_with_tracking: HashSet<_> = platform
+			.local_branches()?
+			.flatten()
+			.filter_map(|branch| {
+				let upstream = branch.remote_tracking_ref_name(
+					// TODO:
+					// Is that correct?
+					Direction::Fetch,
+				)?;
+				Some(upstream.ok()?.into_owned())
+			})
+			.collect();
+
+		platform
+			.remote_branches()?
+			.flatten()
+			.filter_map(|mut branch| {
+				let branch_name = branch.name();
+				let name = branch_name.shorten().to_string();
+				let reference = branch_name.to_owned().to_string();
+
+				let details = BranchDetails::Remote(RemoteBranch {
+					has_tracking: remotes_with_tracking
+						.contains(branch_name),
+				});
+
+				let top_commit = branch.peel_to_commit().ok()?;
+
+				Some(BranchInfo {
+					name,
+					reference,
+					top_commit_message: top_commit
+						.message()
+						.ok()?
+						.title
+						.to_string(),
+					top_commit: top_commit.into(),
+					details,
+				})
+			})
+			.collect()
+	};
 
 	branches_for_display.sort_by(|a, b| a.name.cmp(&b.name));
 
