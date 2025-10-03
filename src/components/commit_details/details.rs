@@ -33,7 +33,7 @@ pub struct DetailsComponent {
 	tags: Vec<Tag>,
 	theme: SharedTheme,
 	focused: bool,
-	current_width: Cell<u16>,
+	current_size: Cell<(u16, u16)>,
 	scroll: VerticalScroll,
 	scroll_to_bottom_next_draw: Cell<bool>,
 	key_config: SharedKeyConfig,
@@ -52,7 +52,7 @@ impl DetailsComponent {
 			theme: env.theme.clone(),
 			focused,
 			scroll_to_bottom_next_draw: Cell::new(false),
-			current_width: Cell::new(0),
+			current_size: Cell::new((0, 0)),
 			scroll: VerticalScroll::new(),
 			key_config: env.key_config.clone(),
 		}
@@ -246,7 +246,40 @@ impl DetailsComponent {
 
 	fn move_scroll_top(&self, move_type: ScrollType) -> bool {
 		if self.data.is_some() {
-			self.scroll.move_top(move_type)
+			let current_height = self.current_size.get().1 as usize;
+			match move_type {
+				ScrollType::PageDown => {
+					let new_top =
+						self.scroll.get_top().saturating_add(
+							current_height.saturating_sub(1),
+						);
+					if self.scroll.get_top() == new_top {
+						return false;
+					}
+					self.scroll.move_area_to_visible(
+						current_height,
+						new_top,
+						new_top.saturating_add(current_height),
+					);
+					true
+				}
+				ScrollType::PageUp => {
+					let new_top =
+						self.scroll.get_top().saturating_sub(
+							current_height.saturating_sub(1),
+						);
+					if self.scroll.get_top() == new_top {
+						return false;
+					}
+					self.scroll.move_area_to_visible(
+						current_height,
+						new_top,
+						new_top.saturating_add(current_height),
+					);
+					true
+				}
+				_ => self.scroll.move_top(move_type),
+			}
 		} else {
 			false
 		}
@@ -284,7 +317,7 @@ impl DrawableComponent for DetailsComponent {
 		let width = chunks[1].width.saturating_sub(border_width);
 		let height = chunks[1].height.saturating_sub(border_width);
 
-		self.current_width.set(width);
+		self.current_size.set((width, height));
 
 		let number_of_lines = Self::get_number_of_lines(
 			self.data.as_ref(),
@@ -340,7 +373,7 @@ impl Component for DetailsComponent {
 		out: &mut Vec<CommandInfo>,
 		force_all: bool,
 	) -> CommandBlocking {
-		let width = usize::from(self.current_width.get());
+		let width = usize::from(self.current_size.get().0);
 		let number_of_lines =
 			Self::get_number_of_lines(self.data.as_ref(), width);
 
@@ -369,6 +402,18 @@ impl Component for DetailsComponent {
 						self.key_config.keys.move_down,
 					) {
 						self.move_scroll_top(ScrollType::Down).into()
+					} else if key_match(
+						e,
+						self.key_config.keys.page_up,
+					) {
+						self.move_scroll_top(ScrollType::PageUp)
+							.into()
+					} else if key_match(
+						e,
+						self.key_config.keys.page_down,
+					) {
+						self.move_scroll_top(ScrollType::PageDown)
+							.into()
 					} else if key_match(e, self.key_config.keys.home)
 						|| key_match(e, self.key_config.keys.shift_up)
 					{
