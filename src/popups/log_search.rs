@@ -164,7 +164,7 @@ impl LogSearchPopupPopup {
 		}
 	}
 
-	fn get_text_options(&self) -> Vec<Line> {
+	fn get_text_options(&self) -> Vec<Line<'_>> {
 		let x_summary =
 			if self.options.0.contains(SearchFields::MESSAGE_SUMMARY)
 			{

@@ -263,7 +263,7 @@ impl FileRevlogPopup {
 		)
 	}
 
-	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row> {
+	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row<'_>> {
 		self.items
 			.iter()
 			.map(|entry| {

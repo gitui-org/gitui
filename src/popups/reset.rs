@@ -67,7 +67,7 @@ impl ResetPopup {
 		}
 	}
 
-	fn get_text(&self, _width: u16) -> Vec<Line> {
+	fn get_text(&self, _width: u16) -> Vec<Line<'_>> {
 		let mut txt: Vec<Line> = Vec::with_capacity(10);
 
 		txt.push(Line::from(vec![

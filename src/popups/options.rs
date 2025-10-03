@@ -51,7 +51,7 @@ impl OptionsPopup {
 		}
 	}
 
-	fn get_text(&self, width: u16) -> Vec<Line> {
+	fn get_text(&self, width: u16) -> Vec<Line<'_>> {
 		let mut txt: Vec<Line> = Vec::with_capacity(10);
 
 		self.add_status(&mut txt, width);
