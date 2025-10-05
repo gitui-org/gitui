@@ -44,7 +44,7 @@ impl KeyConfig {
 					"The custom key bindings file dosen't exists"
 				));
 			}
-			KeysList::init(path.to_path_buf())
+			KeysList::init(path.clone())
 		} else {
 			KeysList::init(Self::get_config_file()?)
 		};
@@ -55,7 +55,7 @@ impl KeyConfig {
 					"The custom key symbols file dosen't exists"
 				));
 			}
-			KeySymbols::init(path.to_path_buf())
+			KeySymbols::init(path.clone())
 		} else {
 			KeySymbols::init(Self::get_symbols_file()?)
 		};
