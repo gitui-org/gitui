@@ -29,6 +29,8 @@ pub struct CliArgs {
 	pub select_file: Option<PathBuf>,
 	pub repo_path: RepoPath,
 	pub notify_watcher: bool,
+	pub key_bindings_path: Option<PathBuf>,
+	pub key_symbols_path: Option<PathBuf>,
 }
 
 pub fn process_cmdline() -> Result<CliArgs> {
@@ -80,11 +82,21 @@ pub fn process_cmdline() -> Result<CliArgs> {
 	let notify_watcher: bool =
 		*arg_matches.get_one(WATCHER_FLAG_ID).unwrap_or(&false);
 
+	let key_bindings_path = arg_matches
+		.get_one::<String>("key_bindings")
+		.map(PathBuf::from);
+
+	let key_symbols_path = arg_matches
+		.get_one::<String>("key_symbols")
+		.map(PathBuf::from);
+
 	Ok(CliArgs {
 		theme,
 		select_file,
 		repo_path,
 		notify_watcher,
+		key_bindings_path,
+		key_symbols_path,
 	})
 }
 
@@ -103,6 +115,22 @@ fn app() -> ClapApp {
 
 {all-args}{after-help}
 		",
+		)
+			.arg(
+			Arg::new("key_bindings")
+				.help("Use a custom keybindings file")
+				.short('k')
+				.long("key-bindings")
+				.value_name("KEY_LIST_FILENAME")
+				.num_args(1),
+		)
+			.arg(
+			Arg::new("key_symbols")
+				.help("Use a custom symbols file")
+				.short('s')
+				.long("key-symblos")
+				.value_name("KEY_SYMBOLS_FILENAME")
+				.num_args(1),
 		)
 		.arg(
 			Arg::new(THEME_FLAG_ID)
