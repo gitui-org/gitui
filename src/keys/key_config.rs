@@ -1,8 +1,11 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyModifiers};
 use std::{fs::canonicalize, path::PathBuf, rc::Rc};
 
-use crate::{args::get_app_config_path, strings::symbol};
+use crate::{
+	args::{get_app_config_path, CliArgs},
+	strings::symbol,
+};
 
 use super::{
 	key_list::{GituiKeyEvent, KeysList},
@@ -34,9 +37,29 @@ impl KeyConfig {
 			.map_or_else(|_| Ok(symbols_file), Ok)
 	}
 
-	pub fn init() -> Result<Self> {
-		let keys = KeysList::init(Self::get_config_file()?);
-		let symbols = KeySymbols::init(Self::get_symbols_file()?);
+	pub fn init(cli_args: &CliArgs) -> Result<Self> {
+		let keys = if let Some(path) = &cli_args.key_bindings_path {
+			if !path.exists() {
+				return Err(anyhow!(
+					"The custom key bindings file dosen't exists"
+				));
+			}
+			KeysList::init(path.to_path_buf())
+		} else {
+			KeysList::init(Self::get_config_file()?)
+		};
+
+		let symbols = if let Some(path) = &cli_args.key_symbols_path {
+			if !path.exists() {
+				return Err(anyhow!(
+					"The custom key symbols file dosen't exists"
+				));
+			}
+			KeySymbols::init(path.to_path_buf())
+		} else {
+			KeySymbols::init(Self::get_symbols_file()?)
+		};
+
 		Ok(Self { keys, symbols })
 	}
 
