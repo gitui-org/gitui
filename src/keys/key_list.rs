@@ -128,6 +128,10 @@ pub struct KeysList {
 	pub commit_history_next: GituiKeyEvent,
 	pub commit: GituiKeyEvent,
 	pub newline: GituiKeyEvent,
+	pub alt_up: GituiKeyEvent,
+	pub alt_down: GituiKeyEvent,
+	pub alt_left: GituiKeyEvent,
+	pub alt_right: GituiKeyEvent,
 }
 
 #[rustfmt::skip]
@@ -157,6 +161,10 @@ impl Default for KeysList {
 			end: GituiKeyEvent::new(KeyCode::End,  KeyModifiers::empty()),
 			move_up: GituiKeyEvent::new(KeyCode::Up,  KeyModifiers::empty()),
 			move_down: GituiKeyEvent::new(KeyCode::Down,  KeyModifiers::empty()),
+			alt_up: GituiKeyEvent::new(KeyCode::Up,KeyModifiers::ALT),
+			alt_down:GituiKeyEvent::new(KeyCode::Down,KeyModifiers::ALT),
+			alt_left: GituiKeyEvent::new(KeyCode::Left,KeyModifiers::ALT),
+			alt_right:GituiKeyEvent::new(KeyCode::Right,KeyModifiers::ALT),
 			popup_up: GituiKeyEvent::new(KeyCode::Up,  KeyModifiers::empty()),
 			popup_down: GituiKeyEvent::new(KeyCode::Down,  KeyModifiers::empty()),
 			page_down: GituiKeyEvent::new(KeyCode::PageDown,  KeyModifiers::empty()),
