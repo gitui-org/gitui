@@ -38,14 +38,16 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		let mut cwd = env::current_dir()?;
 		let cwd_file_name = cwd
 			.file_name()
-			.ok_or(anyhow!("Coulden't get the CWD name"))?
+			.ok_or_else(|| anyhow!("Coulden't get the CWD name"))?
 			.as_encoded_bytes();
 		if cwd_file_name == b".git" {
 			cwd = cwd
 				.parent()
-				.ok_or(anyhow!(
-					"Coulden't find the parent directory of .git"
-				))?
+				.ok_or_else(|| {
+					anyhow!(
+						"Coulden't find the parent directory of .git"
+					)
+				})?
 				.to_path_buf();
 		}
 		break 'blk arg_matches
