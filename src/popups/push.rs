@@ -16,9 +16,9 @@ use asyncgit::{
 			extract_username_password_for_push,
 			need_username_password_for_push, BasicAuthCredential,
 		},
-		get_branch_remote,
+		get_branch_remote, hooks_pre_push,
 		remotes::get_default_remote_for_push,
-		RepoPathRef,
+		HookResult, RepoPathRef,
 	},
 	AsyncGitNotification, AsyncPush, PushRequest, PushType,
 	RemoteProgress, RemoteProgressState,
@@ -143,6 +143,19 @@ impl PushPopup {
 			);
 			remote
 		};
+
+		// run pre push hook - can reject push
+		if let HookResult::NotOk(e) =
+			hooks_pre_push(&self.repo.borrow())?
+		{
+			log::error!("pre-push hook failed: {e}");
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"pre-push hook failed:\n{e}"
+			)));
+			self.pending = false;
+			self.visible = false;
+			return Ok(());
+		}
 
 		self.pending = true;
 		self.progress = None;
