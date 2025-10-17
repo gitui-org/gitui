@@ -70,7 +70,7 @@ but this also allows us now to define colors in the common hex format:
 Checkout [THEMES.md](./THEMES.md) for more info.
 
 ### Added
-* due to github runner changes, the regular mac build is now arm64, so we added support for intel x86 apple build in nightlies and releases (via separat artifact)
+* due to github runner changes, the regular mac build is now arm64, so we added support for intel x86 apple build in nightlies and releases (via separate artifact)
 * support `BUILD_GIT_COMMIT_ID` enabling builds from `git archive` generated source tarballs or other outside a git repo [[@alerque](https://github.com/alerque)] ([#2187](https://github.com/gitui-org/gitui/pull/2187))
 
 ### Fixes
@@ -907,7 +907,7 @@ Thanks for your interest and support over this year! Read more about the 1 year 
 - log tab refreshes when head changes ([#78](https://github.com/gitui-org/gitui/issues/78))
 - performance optimization of the log tab in big repos
 - more readable default color for the commit hash in the log tab
-- more error/panic resiliance (`unwrap`/`panic` denied by clippy now) [[@MCord](https://github.com/MCord)](<[#77](https://github.com/gitui-org/gitui/issues/77)>)
+- more error/panic resilience (`unwrap`/`panic` denied by clippy now) [[@MCord](https://github.com/MCord)](<[#77](https://github.com/gitui-org/gitui/issues/77)>)
 
 ### Fixes
 
