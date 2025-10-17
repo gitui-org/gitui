@@ -11,6 +11,7 @@
 
 #![forbid(unsafe_code)]
 #![deny(
+	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,
