@@ -1437,6 +1437,18 @@ pub mod commands {
 			CMD_GROUP_GENERAL,
 		)
 	}
+	pub fn blame_file_back(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Back [{}]",
+				key_config.get_hint(key_config.keys.blame_back),
+			),
+			"go to previous blame",
+			CMD_GROUP_GENERAL,
+		)
+	}
 	pub fn open_file_history(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {
