@@ -120,6 +120,8 @@ pub enum InternalEvent {
 	///
 	SelectBranch,
 	///
+	SelectFile { path: PathBuf },
+	///
 	OpenExternalEditor(Option<String>),
 	///
 	Push(String, PushType, bool, bool),

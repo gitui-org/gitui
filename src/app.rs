@@ -156,6 +156,7 @@ impl App {
 		sender_app: Sender<AsyncAppNotification>,
 		input: Input,
 		theme: Theme,
+		select_file: Option<PathBuf>,
 		key_config: KeyConfig,
 	) -> Result<Self> {
 		log::trace!("open repo at: {:?}", &repo);
@@ -232,7 +233,21 @@ impl App {
 			popup_stack: PopupStack::default(),
 		};
 
-		app.set_tab(tab)?;
+		if let Some(file) = select_file {
+			app.set_tab(2)?;
+			// convert to relative git path
+			if let Ok(abs) = file.canonicalize() {
+				let repo =
+					app.repo.borrow().gitpath().canonicalize()?;
+				if let Ok(path) = abs.strip_prefix(repo) {
+					app.queue.push(InternalEvent::SelectFile {
+						path: Path::new(".").join(path),
+					});
+				}
+			}
+		} else {
+			app.set_tab(tab)?;
+		}
 
 		Ok(app)
 	}
@@ -774,6 +789,9 @@ impl App {
 			}
 			InternalEvent::SelectBranch => {
 				self.select_branch_popup.open()?;
+			}
+			InternalEvent::SelectFile { path } => {
+				self.files_tab.find_file(&path);
 			}
 			InternalEvent::ViewSubmodules => {
 				self.submodule_popup.open()?;

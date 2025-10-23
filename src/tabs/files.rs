@@ -58,6 +58,10 @@ impl FilesTab {
 	pub fn file_finder_update(&mut self, file: &Path) {
 		self.files.find_file(file);
 	}
+
+	pub fn find_file(&mut self, file: &Path) {
+		self.files.find_file(file);
+	}
 }
 
 impl DrawableComponent for FilesTab {

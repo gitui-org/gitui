@@ -105,7 +105,7 @@ use std::{
 	cell::RefCell,
 	io::{self, Stdout},
 	panic,
-	path::Path,
+	path::{Path, PathBuf},
 	time::{Duration, Instant},
 };
 use ui::style::Theme;
@@ -181,6 +181,7 @@ fn main() -> Result<()> {
 	set_panic_handler()?;
 
 	let mut repo_path = cliargs.repo_path;
+	let mut select_file = cliargs.select_file;
 	let mut terminal = start_terminal(io::stdout(), &repo_path)?;
 	let input = Input::new();
 
@@ -195,6 +196,7 @@ fn main() -> Result<()> {
 			app_start,
 			repo_path.clone(),
 			theme.clone(),
+			select_file.clone(),
 			key_config.clone(),
 			&input,
 			updater,
@@ -204,6 +206,7 @@ fn main() -> Result<()> {
 		match quit_state {
 			QuitState::OpenSubmodule(p) => {
 				repo_path = p;
+				select_file = None;
 			}
 			_ => break,
 		}
@@ -212,10 +215,12 @@ fn main() -> Result<()> {
 	Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_app(
 	app_start: Instant,
 	repo: RepoPath,
 	theme: Theme,
+	select_file: Option<PathBuf>,
 	key_config: KeyConfig,
 	input: &Input,
 	updater: Updater,
@@ -244,6 +249,7 @@ fn run_app(
 		tx_app,
 		input.clone(),
 		theme,
+		select_file,
 		key_config,
 	)?;
 
