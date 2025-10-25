@@ -991,11 +991,30 @@ impl App {
 				self.status_tab.abort_rebase();
 			}
 			Action::UndoCommit => {
+				// Get commit message before undoing
+				let commit_msg = sync::get_head(&self.repo.borrow())
+					.ok()
+					.and_then(|head_id| {
+						sync::get_commit_details(
+							&self.repo.borrow(),
+							head_id,
+						)
+						.ok()
+					})
+					.and_then(|details| details.message)
+					.map(|msg| msg.combine());
+
+				// Undo the commit
 				try_or_popup!(
 					self,
 					"undo commit failed:",
 					undo_last_commit(&self.repo.borrow())
 				);
+
+				// Preload the message and set commit popup text
+				if let Some(msg) = commit_msg {
+					self.commit_popup.set_commit_msg(msg);
+				}
 			}
 		}
 

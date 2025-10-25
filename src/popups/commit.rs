@@ -477,6 +477,11 @@ impl CommitPopup {
 
 		Ok(msg)
 	}
+
+	/// Set commit message text (e.g., for preloading after undo)
+	pub fn set_commit_msg(&mut self, msg: String) {
+		self.input.set_text(msg);
+	}
 }
 
 impl DrawableComponent for CommitPopup {
