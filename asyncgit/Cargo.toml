@@ -35,8 +35,8 @@ log = "0.4"
 # git2 = { git="https://github.com/extrawurst/git2-rs.git", rev="fc13dcc", features = ["vendored-openssl"]}
 # pinning to vendored openssl, using the git2 feature this gets lost with new resolver
 openssl-sys = { version = '0.9', features = ["vendored"], optional = true }
-rayon = "1.10"
-rayon-core = "1.12"
+rayon = "1.11"
+rayon-core = "1.13"
 scopetime = { path = "../scopetime", version = "0.1" }
 serde = { version = "1.0", features = ["derive"] }
 ssh-key = { version = "0.6.7", features = ["crypto", "encryption"] }
