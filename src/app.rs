@@ -932,7 +932,7 @@ impl App {
 					);
 				}
 			}
-		};
+		}
 
 		Ok(flags)
 	}
