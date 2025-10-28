@@ -369,12 +369,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		let remotes = get_remotes(repo_path).unwrap();
 
@@ -388,12 +384,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -418,12 +410,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -454,12 +442,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -494,12 +478,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -530,12 +510,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
