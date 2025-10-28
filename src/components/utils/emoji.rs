@@ -7,9 +7,10 @@ static EMOJI_REPLACER: Lazy<gh_emoji::Replacer> =
 // Replace markdown emojis with Unicode equivalent
 // :hammer: --> 🔨
 #[inline]
-pub fn emojifi_string(s: &mut String) {
-	let resulting_cow = EMOJI_REPLACER.replace_all(s);
-	if let Cow::Owned(altered_s) = resulting_cow {
-		*s = altered_s;
+pub fn emojifi_string(s: String) -> String {
+	if let Cow::Owned(altered_s) = EMOJI_REPLACER.replace_all(&s) {
+		altered_s
+	} else {
+		s
 	}
 }

@@ -1,8 +1,7 @@
-#![allow(dead_code)]
 use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
 use git2::{Commit, Oid, Repository};
-use gix::{revision::Walk, traverse::commit::simple::Sorting};
+use gix::revision::Walk;
 use std::{
 	cmp::Ordering,
 	collections::{BinaryHeap, HashSet},
@@ -10,21 +9,21 @@ use std::{
 
 struct TimeOrderedCommit<'a>(Commit<'a>);
 
-impl<'a> Eq for TimeOrderedCommit<'a> {}
+impl Eq for TimeOrderedCommit<'_> {}
 
-impl<'a> PartialEq for TimeOrderedCommit<'a> {
+impl PartialEq for TimeOrderedCommit<'_> {
 	fn eq(&self, other: &Self) -> bool {
 		self.0.time().eq(&other.0.time())
 	}
 }
 
-impl<'a> PartialOrd for TimeOrderedCommit<'a> {
+impl PartialOrd for TimeOrderedCommit<'_> {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl<'a> Ord for TimeOrderedCommit<'a> {
+impl Ord for TimeOrderedCommit<'_> {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.0.time().cmp(&other.0.time())
 	}
@@ -140,7 +139,7 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 
 		let platform = repo
 			.rev_walk(tips)
-			.sorting(Sorting::ByCommitTimeNewestFirst)
+			.sorting(gix::revision::walk::Sorting::ByCommitTime(gix::traverse::commit::simple::CommitTimeOrder::NewestFirst))
 			.use_commit_graph(false);
 
 		let walk = platform.all()?;
@@ -162,10 +161,7 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 		let mut count = 0_usize;
 
 		while let Some(Ok(info)) = self.walk.next() {
-			let bytes = info.id.as_bytes();
-			let commit_id: CommitId = Oid::from_bytes(bytes)?.into();
-
-			out.push(commit_id);
+			out.push(info.id.into());
 
 			count += 1;
 
@@ -185,6 +181,7 @@ mod tests {
 	use super::*;
 	use crate::error::Result;
 	use crate::sync::commit_filter::{SearchFields, SearchOptions};
+	use crate::sync::repository::gix_repo;
 	use crate::sync::tests::write_commit_file;
 	use crate::sync::{
 		commit, get_commits_info, stage_add_file,
@@ -270,10 +267,7 @@ mod tests {
 		stage_add_file(repo_path, file_path).unwrap();
 		let oid2 = commit(repo_path, "commit2").unwrap();
 
-		let mut repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)
-						.unwrap();
+		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walk = LogWalkerWithoutFilter::new(&mut repo, 100)?;
 		let mut items = Vec::new();
 		assert!(matches!(walk.read(&mut items), Ok(2)));

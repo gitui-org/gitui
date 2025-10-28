@@ -94,7 +94,7 @@ impl DrawableComponent for TagListPopup {
 
 			let table = Table::new(rows, constraints)
 				.column_spacing(1)
-				.highlight_style(self.theme.text(true, true))
+				.row_highlight_style(self.theme.text(true, true))
 				.block(
 					Block::default()
 						.borders(Borders::ALL)
@@ -433,14 +433,14 @@ impl TagListPopup {
 	}
 
 	///
-	fn get_rows(&self) -> Vec<Row> {
+	fn get_rows(&self) -> Vec<Row<'_>> {
 		self.tags.as_ref().map_or_else(Vec::new, |tags| {
 			tags.iter().map(|tag| self.get_row(tag)).collect()
 		})
 	}
 
 	///
-	fn get_row(&self, tag: &TagWithMetadata) -> Row {
+	fn get_row(&self, tag: &TagWithMetadata) -> Row<'_> {
 		const UPSTREAM_SYMBOL: &str = "\u{2191}";
 		const ATTACHMENT_SYMBOL: &str = "@";
 		const EMPTY_SYMBOL: &str = " ";
@@ -448,7 +448,7 @@ impl TagListPopup {
 		let is_tag_missing_on_remote = self
 			.missing_remote_tags
 			.as_ref()
-			.map_or(false, |missing_remote_tags| {
+			.is_some_and(|missing_remote_tags| {
 				let remote_tag = format!("refs/tags/{}", tag.name);
 
 				missing_remote_tags.contains(&remote_tag)
@@ -460,7 +460,7 @@ impl TagListPopup {
 			EMPTY_SYMBOL
 		};
 
-		let has_attachement_str = if tag.annotation.is_some() {
+		let has_attachment_str = if tag.annotation.is_some() {
 			ATTACHMENT_SYMBOL
 		} else {
 			EMPTY_SYMBOL
@@ -475,7 +475,7 @@ impl TagListPopup {
 				.style(self.theme.commit_time(false)),
 			Cell::from(tag.author.clone())
 				.style(self.theme.commit_author(false)),
-			Cell::from(has_attachement_str)
+			Cell::from(has_attachment_str)
 				.style(self.theme.text_danger()),
 			Cell::from(tag.message.clone())
 				.style(self.theme.text(true, false)),

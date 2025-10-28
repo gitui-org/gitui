@@ -70,9 +70,11 @@ pub trait Sign {
 		commit: &[u8],
 	) -> Result<(String, Option<String>), SignError>;
 
+	/// only available in `#[cfg(test)]` helping to diagnose issues
 	#[cfg(test)]
 	fn program(&self) -> &String;
 
+	/// only available in `#[cfg(test)]` helping to diagnose issues
 	#[cfg(test)]
 	fn signing_key(&self) -> &String;
 }
@@ -279,7 +281,7 @@ pub struct SSHSign {
 }
 
 impl SSHSign {
-	/// Create new [`SSHDiskKeySign`] for sign.
+	/// Create new `SSHDiskKeySign` for sign.
 	pub fn new(mut key: PathBuf) -> Result<Self, SignBuilderError> {
 		key.set_extension("");
 		if key.is_file() {

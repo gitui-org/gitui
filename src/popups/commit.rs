@@ -27,7 +27,9 @@ use ratatui::{
 	widgets::Paragraph,
 	Frame,
 };
+
 use std::{
+	fmt::Write as _,
 	fs::{read_to_string, File},
 	io::{Read, Write},
 	path::PathBuf,
@@ -218,6 +220,7 @@ impl CommitPopup {
 
 			self.hide();
 			self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+			self.queue.push(InternalEvent::StatusLastFileMoved);
 			self.input.clear();
 		}
 
@@ -469,9 +472,7 @@ impl CommitPopup {
 
 		let mut msg = msg.to_owned();
 		if let (Some(user), Some(mail)) = (user, mail) {
-			msg.push_str(&format!(
-				"\n\nSigned-off-by: {user} <{mail}>"
-			));
+			let _ = write!(msg, "\n\nSigned-off-by: {user} <{mail}>");
 		}
 
 		Ok(msg)

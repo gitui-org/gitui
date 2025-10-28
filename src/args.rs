@@ -1,9 +1,9 @@
 use crate::bug_report;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use asyncgit::sync::RepoPath;
 use clap::{
-	crate_authors, crate_description, crate_name, Arg,
-	Command as ClapApp,
+	builder::ArgPredicate, crate_authors, crate_description,
+	crate_name, Arg, Command as ClapApp,
 };
 use simplelog::{Config, LevelFilter, WriteLogger};
 use std::{
@@ -28,7 +28,8 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		std::process::exit(0);
 	}
 	if arg_matches.get_flag("logging") {
-		setup_logging()?;
+		let logfile = arg_matches.get_one::<String>("logfile");
+		setup_logging(logfile.map(PathBuf::from))?;
 	}
 
 	let workdir =
@@ -37,7 +38,6 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.get_one::<String>("directory")
 		.map_or_else(|| PathBuf::from("."), PathBuf::from);
 
-	#[allow(clippy::option_if_let_else)]
 	let repo_path = if let Some(w) = workdir {
 		RepoPath::Workdir { gitdir, workdir: w }
 	} else {
@@ -48,7 +48,14 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.get_one::<String>("theme")
 		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
 
-	let theme = get_app_config_path()?.join(arg_theme);
+	let confpath = get_app_config_path()?;
+	fs::create_dir_all(&confpath).with_context(|| {
+		format!(
+			"failed to create config directory: {}",
+			confpath.display()
+		)
+	})?;
+	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
 		*arg_matches.get_one("watcher").unwrap_or(&false);
@@ -87,14 +94,19 @@ fn app() -> ClapApp {
 		)
 		.arg(
 			Arg::new("logging")
-				.help("Stores logging output into a cache directory")
+				.help("Store logging output into a file (in the cache directory by default)")
 				.short('l')
 				.long("logging")
-				.num_args(0),
+                .default_value_if("logfile", ArgPredicate::IsPresent, "true")
+				.action(clap::ArgAction::SetTrue),
 		)
+        .arg(Arg::new("logfile")
+            .help("Store logging output into the specified file (implies --logging)")
+            .long("logfile")
+            .value_name("LOG_FILE"))
 		.arg(
 			Arg::new("watcher")
-				.help("Use notify-based file system watcher instead of tick-based update. This is more performant, but can cause issues on some platforms. See https://github.com/extrawurst/gitui/blob/master/FAQ.md#watcher for details.")
+				.help("Use notify-based file system watcher instead of tick-based update. This is more performant, but can cause issues on some platforms. See https://github.com/gitui-org/gitui/blob/master/FAQ.md#watcher for details.")
 				.long("watcher")
 				.action(clap::ArgAction::SetTrue),
 		)
@@ -122,11 +134,16 @@ fn app() -> ClapApp {
 		)
 }
 
-fn setup_logging() -> Result<()> {
-	let mut path = get_app_cache_path()?;
-	path.push("gitui.log");
+fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
+	let path = if let Some(path) = path_override {
+		path
+	} else {
+		let mut path = get_app_cache_path()?;
+		path.push("gitui.log");
+		path
+	};
 
-	println!("Logging enabled. log written to: {path:?}");
+	println!("Logging enabled. Log written to: {}", path.display());
 
 	WriteLogger::init(
 		LevelFilter::Trace,
@@ -142,7 +159,12 @@ fn get_app_cache_path() -> Result<PathBuf> {
 		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
 
 	path.push("gitui");
-	fs::create_dir_all(&path)?;
+	fs::create_dir_all(&path).with_context(|| {
+		format!(
+			"failed to create cache directory: {}",
+			path.display()
+		)
+	})?;
 	Ok(path)
 }
 
@@ -155,7 +177,6 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 	.ok_or_else(|| anyhow!("failed to find os config dir."))?;
 
 	path.push("gitui");
-	fs::create_dir_all(&path)?;
 	Ok(path)
 }
 

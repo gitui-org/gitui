@@ -324,7 +324,7 @@ impl DiffComponent {
 		None
 	}
 
-	fn get_text(&self, width: u16, height: u16) -> Vec<Line> {
+	fn get_text(&self, width: u16, height: u16) -> Vec<Line<'_>> {
 		if let Some(diff) = &self.diff {
 			return if diff.hunks.is_empty() {
 				self.get_text_binary(diff)
@@ -339,9 +339,7 @@ impl DiffComponent {
 
 				for (i, hunk) in diff.hunks.iter().enumerate() {
 					let hunk_selected = self.focused()
-						&& self
-							.selected_hunk
-							.map_or(false, |s| s == i);
+						&& self.selected_hunk.is_some_and(|s| s == i);
 
 					if lines_added >= height as usize {
 						break;
@@ -389,7 +387,7 @@ impl DiffComponent {
 		vec![]
 	}
 
-	fn get_text_binary(&self, diff: &FileDiff) -> Vec<Line> {
+	fn get_text_binary(&self, diff: &FileDiff) -> Vec<Line<'_>> {
 		let is_positive = diff.size_delta >= 0;
 		let delta_byte_size =
 			ByteSize::b(diff.size_delta.unsigned_abs());

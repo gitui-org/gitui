@@ -124,10 +124,7 @@ impl FileRevlogPopup {
 	///
 	pub fn any_work_pending(&self) -> bool {
 		self.git_diff.is_pending()
-			|| self
-				.git_log
-				.as_ref()
-				.map_or(false, AsyncLog::is_pending)
+			|| self.git_log.as_ref().is_some_and(AsyncLog::is_pending)
 	}
 
 	///
@@ -174,7 +171,7 @@ impl FileRevlogPopup {
 					{
 						if params == diff_params {
 							self.diff.update(
-								open_request.file_path.to_string(),
+								open_request.file_path.clone(),
 								false,
 								last,
 							);
@@ -213,7 +210,7 @@ impl FileRevlogPopup {
 			);
 
 			if let Ok(commits) = commits {
-				self.items.set_items(new_offset, commits, &None);
+				self.items.set_items(new_offset, commits, None);
 			}
 
 			self.count_total = git_log.count()?;
@@ -254,8 +251,8 @@ impl FileRevlogPopup {
 		};
 		let revisions = self.get_max_selection();
 
-		self.open_request.as_ref().map_or(
-			"<no history available>".into(),
+		self.open_request.as_ref().map_or_else(
+			|| "<no history available>".into(),
 			|open_request| {
 				strings::file_log_title(
 					&open_request.file_path,
@@ -266,7 +263,7 @@ impl FileRevlogPopup {
 		)
 	}
 
-	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row> {
+	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row<'_>> {
 		self.items
 			.iter()
 			.map(|entry| {
@@ -391,7 +388,7 @@ impl FileRevlogPopup {
 
 		let table = Table::new(rows, constraints)
 			.column_spacing(1)
-			.highlight_style(self.theme.text(true, true))
+			.row_highlight_style(self.theme.text(true, true))
 			.block(
 				Block::default()
 					.borders(Borders::ALL)
@@ -524,7 +521,7 @@ impl Component for FileRevlogPopup {
 								InspectCommitOpen::new(commit_id),
 							),
 						));
-					};
+					}
 				} else if key_match(key, self.key_config.keys.blame) {
 					if let Some(open_request) =
 						self.open_request.clone()

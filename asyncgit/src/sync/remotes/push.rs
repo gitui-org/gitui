@@ -3,7 +3,12 @@ use crate::{
 	progress::ProgressPercent,
 	sync::{
 		branch::branch_set_upstream_after_push,
+		config::{
+			push_default_strategy_config_repo,
+			PushDefaultStrategyConfig,
+		},
 		cred::BasicAuthCredential,
+		get_branch_upstream_merge,
 		remotes::{proxy_auto, Callbacks},
 		repository::repo,
 		CommitId, RepoPath,
@@ -12,6 +17,7 @@ use crate::{
 use crossbeam_channel::Sender;
 use git2::{PackBuilderStage, PushOptions};
 use scopetime::scope_time;
+use std::fmt::Write as _;
 
 ///
 pub trait AsyncProgress: Clone + Send + Sync {
@@ -92,18 +98,13 @@ impl AsyncProgress for ProgressNotification {
 }
 
 ///
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum PushType {
 	///
+	#[default]
 	Branch,
 	///
 	Tag,
-}
-
-impl Default for PushType {
-	fn default() -> Self {
-		Self::Branch
-	}
 }
 
 #[cfg(test)]
@@ -128,7 +129,7 @@ pub fn push_branch(
 	)
 }
 
-//TODO: clenaup
+//TODO: cleanup
 #[allow(clippy::too_many_arguments)]
 pub fn push_raw(
 	repo_path: &RepoPath,
@@ -145,6 +146,9 @@ pub fn push_raw(
 	let repo = repo(repo_path)?;
 	let mut remote = repo.find_remote(remote)?;
 
+	let push_default_strategy =
+		push_default_strategy_config_repo(&repo)?;
+
 	let mut options = PushOptions::new();
 	options.proxy_options(proxy_auto());
 
@@ -158,14 +162,28 @@ pub fn push_raw(
 		(true, false) => "+",
 		(false, false) => "",
 	};
-	let ref_type = match ref_type {
+	let git_ref_type = match ref_type {
 		PushType::Branch => "heads",
 		PushType::Tag => "tags",
 	};
 
-	let branch_name =
-		format!("{branch_modifier}refs/{ref_type}/{branch}");
-	remote.push(&[branch_name.as_str()], Some(&mut options))?;
+	let mut push_ref =
+		format!("{branch_modifier}refs/{git_ref_type}/{branch}");
+
+	if !delete
+		&& ref_type == PushType::Branch
+		&& push_default_strategy
+			== PushDefaultStrategyConfig::Upstream
+	{
+		if let Ok(Some(branch_upstream_merge)) =
+			get_branch_upstream_merge(repo_path, branch)
+		{
+			let _ = write!(push_ref, ":{branch_upstream_merge}");
+		}
+	}
+
+	log::debug!("push to: {push_ref}");
+	remote.push(&[push_ref], Some(&mut options))?;
 
 	if let Some((reference, msg)) =
 		callbacks.get_stats()?.push_rejected_msg
@@ -267,7 +285,7 @@ mod tests {
 
 		// Attempt force push,
 		// should work as it forces the push through
-		assert!(!push_branch(
+		assert!(push_branch(
 			&tmp_other_repo_dir.path().to_str().unwrap().into(),
 			"origin",
 			"master",
@@ -276,7 +294,7 @@ mod tests {
 			None,
 			None,
 		)
-		.is_err());
+		.is_ok());
 	}
 
 	#[test]

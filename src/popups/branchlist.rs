@@ -473,7 +473,7 @@ impl BranchListPopup {
 		theme: &SharedTheme,
 		width_available: u16,
 		height: usize,
-	) -> Text {
+	) -> Text<'_> {
 		const UPSTREAM_SYMBOL: char = '\u{2191}';
 		const TRACKING_SYMBOL: char = '\u{2193}';
 		const HEAD_SYMBOL: char = '*';
@@ -557,7 +557,7 @@ impl BranchListPopup {
 				theme.commit_hash(selected),
 			);
 			let span_msg = Span::styled(
-				commit_message.to_string(),
+				commit_message.clone(),
 				theme.text(true, selected),
 			);
 			let span_name = Span::styled(

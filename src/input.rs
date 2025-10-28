@@ -1,4 +1,4 @@
-use crate::notify_mutex::NotifyableMutex;
+use crate::notify_mutex::NotifiableMutex;
 use anyhow::Result;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use crossterm::event::{self, Event, Event::Key, KeyEventKind};
@@ -31,7 +31,7 @@ pub enum InputEvent {
 ///
 #[derive(Clone)]
 pub struct Input {
-	desired_state: Arc<NotifyableMutex<bool>>,
+	desired_state: Arc<NotifiableMutex<bool>>,
 	current_state: Arc<AtomicBool>,
 	receiver: Receiver<InputEvent>,
 	aborted: Arc<AtomicBool>,
@@ -42,7 +42,7 @@ impl Input {
 	pub fn new() -> Self {
 		let (tx, rx) = unbounded();
 
-		let desired_state = Arc::new(NotifyableMutex::new(true));
+		let desired_state = Arc::new(NotifiableMutex::new(true));
 		let current_state = Arc::new(AtomicBool::new(true));
 		let aborted = Arc::new(AtomicBool::new(false));
 
@@ -100,7 +100,7 @@ impl Input {
 	}
 
 	fn input_loop(
-		arc_desired: &Arc<NotifyableMutex<bool>>,
+		arc_desired: &Arc<NotifiableMutex<bool>>,
 		arc_current: &Arc<AtomicBool>,
 		tx: &Sender<InputEvent>,
 	) -> Result<()> {
@@ -125,7 +125,7 @@ impl Input {
 					tx.send(InputEvent::Input(e))?;
 					//Note: right after an input event we might have a reason to stop
 					// polling (external editor opening) so lets do a quick poll until the next input
-					// this fixes https://github.com/extrawurst/gitui/issues/1506
+					// this fixes https://github.com/gitui-org/gitui/issues/1506
 					poll_duration = FAST_POLL_DURATION;
 				} else {
 					poll_duration = SLOW_POLL_DURATION;

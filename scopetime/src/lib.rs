@@ -1,7 +1,7 @@
 //! simple macro to insert a scope based runtime measure that logs the result
 
 #![forbid(unsafe_code)]
-#![deny(unused_imports)]
+#![deny(mismatched_lifetime_syntaxes, unused_imports)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::perf)]
 
@@ -32,7 +32,7 @@ impl<'a> ScopeTimeLog<'a> {
 	}
 }
 
-impl<'a> Drop for ScopeTimeLog<'a> {
+impl Drop for ScopeTimeLog<'_> {
 	fn drop(&mut self) {
 		log::trace!(
 			"scopetime: {:?} ms [{}::{}] @{}:{}",

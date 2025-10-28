@@ -1,3 +1,4 @@
+use crate::ui::syntax_text::DEFAULT_SYNTAX_THEME;
 use anyhow::Result;
 use asyncgit::{DiffLineType, StatusItemType};
 use ratatui::style::{Color, Modifier, Style};
@@ -9,12 +10,13 @@ use struct_patch::Patch;
 pub type SharedTheme = Rc<Theme>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Patch)]
-#[patch_derive(Serialize, Deserialize)]
+#[patch(attribute(derive(Serialize, Deserialize)))]
 pub struct Theme {
 	selected_tab: Color,
 	command_fg: Color,
 	selection_bg: Color,
 	selection_fg: Color,
+	use_selection_fg: bool,
 	cmdbar_bg: Color,
 	disabled_fg: Color,
 	diff_line_add: Color,
@@ -33,6 +35,7 @@ pub struct Theme {
 	branch_fg: Color,
 	line_break: String,
 	block_title_focused: Color,
+	syntax: String,
 }
 
 impl Theme {
@@ -148,7 +151,11 @@ impl Theme {
 		selected: bool,
 	) -> Style {
 		if selected {
-			style.bg(self.selection_bg).fg(self.selection_fg)
+			if self.use_selection_fg {
+				style.bg(self.selection_bg).fg(self.selection_fg)
+			} else {
+				style.bg(self.selection_bg)
+			}
 		} else {
 			style
 		}
@@ -293,6 +300,10 @@ impl Theme {
 		Ok(())
 	}
 
+	pub fn get_syntax(&self) -> String {
+		self.syntax.clone()
+	}
+
 	pub fn init(theme_path: &PathBuf) -> Self {
 		let mut theme = Self::default();
 
@@ -329,6 +340,7 @@ impl Default for Theme {
 			command_fg: Color::White,
 			selection_bg: Color::Blue,
 			selection_fg: Color::White,
+			use_selection_fg: true,
 			cmdbar_bg: Color::Blue,
 			disabled_fg: Color::DarkGray,
 			diff_line_add: Color::Green,
@@ -347,6 +359,9 @@ impl Default for Theme {
 			branch_fg: Color::LightYellow,
 			line_break: "¶".to_string(),
 			block_title_focused: Color::Reset,
+			// Available themes can be found in:
+			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
+			syntax: DEFAULT_SYNTAX_THEME.to_string(),
 		}
 	}
 }
@@ -372,6 +387,8 @@ mod tests {
 (
 	selection_bg: Some("Black"),
 	selection_fg: Some("#ffffff"),
+	use_selection_fg: Some(false),
+	syntax: Some("InspiredGitHub")
 )
 "##
 		)
@@ -382,7 +399,9 @@ mod tests {
 		assert_eq!(theme.selected_tab, Theme::default().selected_tab);
 
 		assert_ne!(theme.selection_bg, Theme::default().selection_bg);
+		assert_ne!(theme.syntax, Theme::default().syntax);
 		assert_eq!(theme.selection_bg, Color::Black);
 		assert_eq!(theme.selection_fg, Color::Rgb(255, 255, 255));
+		assert_eq!(theme.syntax, "InspiredGitHub");
 	}
 }

@@ -41,6 +41,10 @@ struct SyntaxFileBlame {
 }
 
 impl SyntaxFileBlame {
+	#[expect(
+		clippy::missing_const_for_fn,
+		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
+	)]
 	fn path(&self) -> &str {
 		&self.file_blame.path
 	}
@@ -138,7 +142,7 @@ impl DrawableComponent for BlameFilePopup {
 
 			let table = Table::new(rows, constraints)
 				.column_spacing(1)
-				.highlight_style(self.theme.text(true, true))
+				.row_highlight_style(self.theme.text(true, true))
 				.block(
 					Block::default()
 						.borders(Borders::ALL)
@@ -525,7 +529,7 @@ impl BlameFilePopup {
 	}
 
 	///
-	fn get_rows(&self, width: usize) -> Vec<Row> {
+	fn get_rows(&self, width: usize) -> Vec<Row<'_>> {
 		self.blame
 			.as_ref()
 			.and_then(|blame| blame.result())
@@ -544,7 +548,7 @@ impl BlameFilePopup {
 							i,
 							(blame_hunk.as_ref(), line.as_ref()),
 							file_blame,
-							&styled_text,
+							styled_text.as_ref(),
 						)
 					})
 					.collect()
@@ -576,6 +580,7 @@ impl BlameFilePopup {
 		job.spawn(AsyncSyntaxJob::new(
 			text,
 			params.file_path.clone(),
+			self.theme.get_syntax(),
 		));
 	}
 
@@ -585,7 +590,7 @@ impl BlameFilePopup {
 		line_number: usize,
 		hunk_and_line: (Option<&BlameHunk>, &str),
 		file_blame: &'a SyntaxFileBlame,
-		styled_text: &Option<Text<'a>>,
+		styled_text: Option<&Text<'a>>,
 	) -> Row<'a> {
 		let (hunk_for_line, line) = hunk_and_line;
 
@@ -638,7 +643,7 @@ impl BlameFilePopup {
 		&self,
 		width: usize,
 		blame_hunk: Option<&BlameHunk>,
-	) -> Vec<Cell> {
+	) -> Vec<Cell<'_>> {
 		let commit_hash = blame_hunk.map_or_else(
 			|| NO_COMMIT_ID.into(),
 			|hunk| hunk.commit_id.get_short_string(),

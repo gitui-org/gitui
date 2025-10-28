@@ -209,6 +209,6 @@ impl CreateRemotePopup {
 
 				self.hide();
 			}
-		};
+		}
 	}
 }

@@ -25,7 +25,7 @@ pub fn stage_hunk(
 
 	let mut opt = ApplyOptions::new();
 	opt.hunk_callback(|hunk| {
-		hunk.map_or(false, |hunk| {
+		hunk.is_some_and(|hunk| {
 			let header = HunkHeader::from(hunk);
 			hash(&header) == hunk_hash
 		})

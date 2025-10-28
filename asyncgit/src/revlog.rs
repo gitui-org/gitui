@@ -1,8 +1,8 @@
 use crate::{
 	error::Result,
 	sync::{
-		repo, CommitId, LogWalker, LogWalkerWithoutFilter, RepoPath,
-		SharedCommitFilterFn,
+		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
+		RepoPath, SharedCommitFilterFn,
 	},
 	AsyncGitNotification, Error,
 };
@@ -276,9 +276,7 @@ impl AsyncLog {
 		let mut entries = vec![CommitId::default(); LIMIT_COUNT];
 		entries.resize(0, CommitId::default());
 
-		let mut repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)?;
+		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walker =
 			LogWalkerWithoutFilter::new(&mut repo, LIMIT_COUNT)?;
 
@@ -331,6 +329,8 @@ mod tests {
 	use std::time::Duration;
 
 	use crossbeam_channel::unbounded;
+	use serial_test::serial;
+	use tempfile::TempDir;
 
 	use crate::sync::tests::{debug_cmd_print, repo_init};
 	use crate::sync::RepoPath;
@@ -339,6 +339,7 @@ mod tests {
 	use super::AsyncLogResult;
 
 	#[test]
+	#[serial]
 	fn test_smoke_in_subdir() {
 		let (_td, repo) = repo_init().unwrap();
 		let root = repo.path().parent().unwrap();
@@ -366,6 +367,39 @@ mod tests {
 			&tx_git,
 		);
 
-		assert!(result.is_ok());
+		assert_eq!(result.unwrap(), ());
+	}
+
+	#[test]
+	#[serial]
+	fn test_env_variables() {
+		let (_td, repo) = repo_init().unwrap();
+		let git_dir = repo.path();
+
+		let (tx_git, _rx_git) = unbounded();
+
+		let empty_dir = TempDir::new().unwrap();
+		let empty_path: RepoPath =
+			empty_dir.path().to_str().unwrap().into();
+
+		let arc_current = Arc::new(Mutex::new(AsyncLogResult {
+			commits: Vec::new(),
+			duration: Duration::default(),
+		}));
+		let arc_background = Arc::new(AtomicBool::new(false));
+
+		std::env::set_var("GIT_DIR", git_dir);
+
+		let result = AsyncLog::fetch_helper_without_filter(
+			// We pass an empty path, thus testing whether `GIT_DIR`, set above, is taken into account.
+			&empty_path,
+			&arc_current,
+			&arc_background,
+			&tx_git,
+		);
+
+		std::env::remove_var("GIT_DIR");
+
+		assert_eq!(result.unwrap(), ());
 	}
 }

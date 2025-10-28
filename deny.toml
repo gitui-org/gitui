@@ -7,19 +7,59 @@ allow = [
     "CC0-1.0",
     "ISC",
     "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
 ]
 
 [advisories]
 version = 2
-# No fix for RSA, and this is a dependency from ssh_key crate to handle rsa ssh key.
-# https://rustsec.org/advisories/RUSTSEC-2023-0071
-ignore = ["RUSTSEC-2023-0071"]
-
-[[licenses.exceptions]]
-allow = ["Unicode-DFS-2016"]
-name = "unicode-ident"
-version = "1.0.3"
+ignore = [
+    # No fix for RSA, and this is a dependency from ssh_key crate to handle rsa ssh key.
+    # https://rustsec.org/advisories/RUSTSEC-2023-0071
+    "RUSTSEC-2023-0071",
+    # Crate paste is unmaintained. The dependency is already removed in
+    # ratatui:master. Until a new release is available, ignore this in
+    # order to pass CI. (https://github.com/gitui-org/gitui/issues/2554)
+    { id = "RUSTSEC-2024-0436", reason = "The paste dependency is already removed from ratatui." }
+]
 
 [bans]
 multiple-versions = "deny"
-skip-tree = [{ name = "windows-sys" }, { name = "bitflags" }, { name = "mio" }]
+skip-tree = [
+    # currently needed due to:
+    # * `dirs-sys v0.4.1` (https://github.com/dirs-dev/dirs-sys-rs/issues/29)
+    { name = "windows-sys" },
+    # this is needed for:
+    #  `bwrap v1.3.0` (https://github.com/micl2e2/bwrap/pull/4)
+    { name = "unicode-width" },
+    # currently needed due to `ratatui v0.29.0`
+    { name = "unicode-truncate" },
+    # currently needed due to:
+    # * `redox_users v0.4.6`
+    # * `syntect v5.2.0`
+    { name = "thiserror" },
+    # currently needed due to:
+    # * `windows v0.57.0`
+    # * `iana-time-zone v0.1.60`
+    { name = "windows-core" },
+    # currently needed due to:
+    # * `parking_lot_core v0.9.10`
+    # * `filetime v0.2.23`
+    { name = "redox_syscall" },
+    # currently needed due to:
+    # * `gix-hashtable v0.6.0`
+    { name = "hashbrown" },
+    # 2022-10-26 `getrandom` and `rustix` were added when `gitoxide` was
+    # upgraded from 0.71.0 to 0.74.1.
+    # currently needed due to:
+    # * `tempfile v3.23.0`
+    # * `rand_core v0.6.4`
+    # * `redox_users v0.5.0`
+    { name = "getrandom" },
+    # currently needed due to:
+    # * `crossterm v0.28.1`
+    # * `which v7.0.2`
+    # * `gix-index v0.42.1`
+    # * `tempfile v3.23.0`
+    { name = "rustix" },
+]

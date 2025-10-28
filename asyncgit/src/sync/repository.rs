@@ -42,6 +42,12 @@ impl RepoPath {
 	}
 }
 
+impl From<PathBuf> for RepoPath {
+	fn from(value: PathBuf) -> Self {
+		Self::Path(value)
+	}
+}
+
 impl From<&str> for RepoPath {
 	fn from(p: &str) -> Self {
 		Self::Path(PathBuf::from(p))
@@ -58,6 +64,15 @@ pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
 	if let Some(workdir) = repo_path.workdir() {
 		repo.set_workdir(workdir, false)?;
 	}
+
+	Ok(repo)
+}
+
+pub fn gix_repo(repo_path: &RepoPath) -> Result<gix::Repository> {
+	let repo = gix::ThreadSafeRepository::discover_with_environment_overrides(
+		repo_path.gitpath(),
+	)
+	.map(Into::into)?;
 
 	Ok(repo)
 }
