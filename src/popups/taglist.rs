@@ -433,14 +433,14 @@ impl TagListPopup {
 	}
 
 	///
-	fn get_rows(&self) -> Vec<Row> {
+	fn get_rows(&self) -> Vec<Row<'_>> {
 		self.tags.as_ref().map_or_else(Vec::new, |tags| {
 			tags.iter().map(|tag| self.get_row(tag)).collect()
 		})
 	}
 
 	///
-	fn get_row(&self, tag: &TagWithMetadata) -> Row {
+	fn get_row(&self, tag: &TagWithMetadata) -> Row<'_> {
 		const UPSTREAM_SYMBOL: &str = "\u{2191}";
 		const ATTACHMENT_SYMBOL: &str = "@";
 		const EMPTY_SYMBOL: &str = " ";
