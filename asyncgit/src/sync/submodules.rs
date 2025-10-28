@@ -182,7 +182,7 @@ mod tests {
 			s.add_finalize().unwrap();
 		}
 
-		let repo_p = RepoPath::Path(dir.into_path());
+		let repo_p = RepoPath::Path(dir.keep());
 		let subs = get_submodules(&repo_p).unwrap();
 
 		assert_eq!(subs.len(), 1);
