@@ -223,7 +223,7 @@ impl StatusTreeComponent {
 	/// allowing folders to be folded up if they are alone in their directory
 	fn build_vec_text_draw_info_for_drawing(
 		&self,
-	) -> (Vec<TextDrawInfo>, usize, usize) {
+	) -> (Vec<TextDrawInfo<'_>>, usize, usize) {
 		let mut should_skip_over: usize = 0;
 		let mut selection_offset: usize = 0;
 		let mut selection_offset_visible: usize = 0;

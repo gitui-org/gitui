@@ -50,7 +50,7 @@ fn exec_copy_with_args(
 }
 
 // Implementation taken from https://crates.io/crates/wsl.
-// Using /proc/sys/kernel/osrelease as an authoratative source
+// Using /proc/sys/kernel/osrelease as an authoritative source
 // based on this comment: https://github.com/microsoft/WSL/issues/423#issuecomment-221627364
 #[cfg(all(target_family = "unix", not(target_os = "macos")))]
 fn is_wsl() -> bool {
