@@ -133,7 +133,7 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 		// reason this is 2^14, so benchmarking might reveal that there’s better values.
 		repo.object_cache_size_if_unset(2_usize.pow(14));
 
-		let commit = repo.head()?.peel_to_commit_in_place()?;
+		let commit = repo.head()?.peel_to_commit()?;
 
 		let tips = [commit.id];
 

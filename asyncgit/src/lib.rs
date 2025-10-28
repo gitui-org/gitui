@@ -15,7 +15,8 @@ It wraps libraries like git2 and gix.
 	unused_must_use,
 	dead_code,
 	unstable_name_collisions,
-	unused_assignments
+	unused_assignments,
+	deprecated
 )]
 #![deny(clippy::all, clippy::perf, clippy::nursery, clippy::pedantic)]
 #![deny(
