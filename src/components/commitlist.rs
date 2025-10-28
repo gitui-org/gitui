@@ -627,8 +627,7 @@ impl CommitList {
 			let filtered_branches: Vec<_> = remote_branches
 				.iter()
 				.filter(|remote_branch| {
-					self.local_branches.get(&e.id).map_or(
-						true,
+					self.local_branches.get(&e.id).is_none_or(
 						|local_branch| {
 							local_branch.iter().any(|local_branch| {
 								let has_corresponding_local_branch =
