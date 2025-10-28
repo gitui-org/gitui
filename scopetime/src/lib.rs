@@ -1,7 +1,7 @@
 //! simple macro to insert a scope based runtime measure that logs the result
 
 #![forbid(unsafe_code)]
-#![deny(unused_imports)]
+#![deny(mismatched_lifetime_syntaxes, unused_imports)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::perf)]
 

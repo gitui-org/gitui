@@ -66,7 +66,7 @@ impl FuzzyFindPopup {
 		} else if self
 			.query
 			.as_ref()
-			.map_or(true, |q| q != self.find_text.get_text())
+			.is_none_or(|q| q != self.find_text.get_text())
 		{
 			self.set_query(Some(
 				self.find_text.get_text().to_string(),

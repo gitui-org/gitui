@@ -98,7 +98,7 @@ impl Stashing {
 		Ok(())
 	}
 
-	fn get_option_text(&self) -> Vec<Line> {
+	fn get_option_text(&self) -> Vec<Line<'_>> {
 		let bracket_open = Span::raw(Cow::from("["));
 		let bracket_close = Span::raw(Cow::from("]"));
 		let option_on =

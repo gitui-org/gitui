@@ -433,14 +433,14 @@ impl TagListPopup {
 	}
 
 	///
-	fn get_rows(&self) -> Vec<Row> {
+	fn get_rows(&self) -> Vec<Row<'_>> {
 		self.tags.as_ref().map_or_else(Vec::new, |tags| {
 			tags.iter().map(|tag| self.get_row(tag)).collect()
 		})
 	}
 
 	///
-	fn get_row(&self, tag: &TagWithMetadata) -> Row {
+	fn get_row(&self, tag: &TagWithMetadata) -> Row<'_> {
 		const UPSTREAM_SYMBOL: &str = "\u{2191}";
 		const ATTACHMENT_SYMBOL: &str = "@";
 		const EMPTY_SYMBOL: &str = " ";
@@ -460,7 +460,7 @@ impl TagListPopup {
 			EMPTY_SYMBOL
 		};
 
-		let has_attachement_str = if tag.annotation.is_some() {
+		let has_attachment_str = if tag.annotation.is_some() {
 			ATTACHMENT_SYMBOL
 		} else {
 			EMPTY_SYMBOL
@@ -475,7 +475,7 @@ impl TagListPopup {
 				.style(self.theme.commit_time(false)),
 			Cell::from(tag.author.clone())
 				.style(self.theme.commit_author(false)),
-			Cell::from(has_attachement_str)
+			Cell::from(has_attachment_str)
 				.style(self.theme.text_danger()),
 			Cell::from(tag.message.clone())
 				.style(self.theme.text(true, false)),

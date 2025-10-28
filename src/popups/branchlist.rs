@@ -473,7 +473,7 @@ impl BranchListPopup {
 		theme: &SharedTheme,
 		width_available: u16,
 		height: usize,
-	) -> Text {
+	) -> Text<'_> {
 		const UPSTREAM_SYMBOL: char = '\u{2191}';
 		const TRACKING_SYMBOL: char = '\u{2193}';
 		const HEAD_SYMBOL: char = '*';

@@ -177,11 +177,23 @@ pub fn get_status(
 
 	let repo: gix::Repository = gix_repo(repo_path)?;
 
-	let mut status = repo.status(gix::progress::Discard)?;
+	let show_untracked = if let Some(config) = show_untracked {
+		config
+	} else {
+		let git2_repo = crate::sync::repository::repo(repo_path)?;
 
-	if let Some(config) = show_untracked {
-		status = status.untracked_files(config.into());
-	}
+		// Calling `untracked_files_config_repo` ensures compatibility with `gitui` <= 0.27.
+		// `untracked_files_config_repo` defaults to `All` while both `libgit2` and `gix` default to
+		// `Normal`. According to [show-untracked-files], `normal` is the default value that `git`
+		// chooses.
+		//
+		// [show-untracked-files]: https://git-scm.com/docs/git-config#Documentation/git-config.txt-statusshowUntrackedFiles
+		untracked_files_config_repo(&git2_repo)?
+	};
+
+	let status = repo
+		.status(gix::progress::Discard)?
+		.untracked_files(show_untracked.into());
 
 	let mut res = Vec::new();
 

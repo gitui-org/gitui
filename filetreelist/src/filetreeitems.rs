@@ -309,7 +309,7 @@ impl FileTreeItems {
 
 			if prefix
 				.as_ref()
-				.map_or(true, |prefix| item_path.starts_with(prefix))
+				.is_none_or(|prefix| item_path.starts_with(prefix))
 			{
 				self.tree_items[i].info_mut().set_visible(true);
 			} else {

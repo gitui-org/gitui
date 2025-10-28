@@ -446,7 +446,7 @@ impl StatusTree {
 			}
 
 			if prefix
-				.map_or(true, |prefix| item_path.starts_with(prefix))
+				.is_none_or(|prefix| item_path.starts_with(prefix))
 			{
 				self.tree[i].info.visible = true;
 			} else {

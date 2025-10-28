@@ -220,7 +220,7 @@ see [NIGHTLIES.md](./NIGHTLIES.md)
 
 ### Requirements
 
-- Minimum supported `rust`/`cargo` version: `1.81`
+- Minimum supported `rust`/`cargo` version: `1.82`
   - See [Install Rust](https://www.rust-lang.org/tools/install)
 
 - To build openssl dependency (see https://docs.rs/openssl/latest/openssl/)

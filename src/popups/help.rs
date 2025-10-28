@@ -211,7 +211,7 @@ impl HelpPopup {
 		}
 	}
 
-	fn get_text(&self) -> Vec<Line> {
+	fn get_text(&self) -> Vec<Line<'_>> {
 		let mut txt: Vec<Line> = Vec::new();
 
 		let mut processed = 0_u16;
