@@ -308,6 +308,25 @@ impl StatusTreeComponent {
 			}
 		}
 	}
+
+	fn open_history(&mut self) {
+		match self.selection_file() {
+			Some(status_item)
+				if !matches!(
+					status_item.status,
+					StatusItemType::New
+				) =>
+			{
+				self.hide();
+				self.queue.push(InternalEvent::OpenPopup(
+					StackablePopupOpen::FileRevlog(FileRevOpen::new(
+						status_item.path,
+					)),
+				));
+			}
+			_ => {}
+		}
+	}
 }
 
 /// Used for drawing the `FileTreeComponent`
@@ -485,26 +504,7 @@ impl Component for StatusTreeComponent {
 					e,
 					self.key_config.keys.file_history,
 				) {
-					match self.selection_file() {
-						Some(status_item)
-							if !matches!(
-								status_item.status,
-								StatusItemType::New
-							) =>
-						{
-							self.hide();
-							self.queue.push(
-								InternalEvent::OpenPopup(
-									StackablePopupOpen::FileRevlog(
-										FileRevOpen::new(
-											status_item.path,
-										),
-									),
-								),
-							);
-						}
-						_ => {}
-					}
+					self.open_history();
 					Ok(EventState::Consumed)
 				} else if key_match(e, self.key_config.keys.edit_file)
 				{
