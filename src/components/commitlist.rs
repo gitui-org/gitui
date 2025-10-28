@@ -565,7 +565,7 @@ impl CommitList {
 		Line::from(txt)
 	}
 
-	fn get_text(&self, height: usize, width: usize) -> Vec<Line> {
+	fn get_text(&self, height: usize, width: usize) -> Vec<Line<'_>> {
 		let selection = self.relative_selection();
 
 		let mut txt: Vec<Line> = Vec::with_capacity(height);
@@ -627,8 +627,7 @@ impl CommitList {
 			let filtered_branches: Vec<_> = remote_branches
 				.iter()
 				.filter(|remote_branch| {
-					self.local_branches.get(&e.id).map_or(
-						true,
+					self.local_branches.get(&e.id).is_none_or(
 						|local_branch| {
 							local_branch.iter().any(|local_branch| {
 								let has_corresponding_local_branch =

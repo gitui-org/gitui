@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 * execute git-hooks directly if possible (on *nix) else use sh instead of bash (without reading SHELL variable) [[@Joshix](https://github.com/Joshix-1)] ([#2483](https://github.com/extrawurst/gitui/pull/2483))
+* increase MSRV from 1.81 to 1.82 [[@cruessler](https://github.com/cruessler)]
 
 ### Added
 * Files and status tab support pageUp and pageDown  [[@fatpandac](https://github.com/fatpandac)] ([#1951](https://github.com/extrawurst/gitui/issues/1951))
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixes
 * resolve `core.hooksPath` relative to `GIT_WORK_TREE` [[@naseschwarz](https://github.com/naseschwarz)] ([#2571](https://github.com/gitui-org/gitui/issues/2571))
 * yanking commit ranges no longer generates incorrect dotted range notations, but lists each individual commit [[@naseschwarz](https://github.com/naseschwarz)] (https://github.com/gitui-org/gitui/issues/2576)
+* print slightly nicer errors when failing to create a directory [[@linkmauve](https://github.com/linkmauve)] (https://github.com/gitui-org/gitui/pull/2728)
 * disable blame and history popup keybinds for untracked files [[@kpbaks](https://github.com/kpbaks)] ([#2489](https://github.com/gitui-org/gitui/pull/2489))
 
 ## [0.27.0] - 2024-01-14
@@ -70,7 +72,7 @@ but this also allows us now to define colors in the common hex format:
 Checkout [THEMES.md](./THEMES.md) for more info.
 
 ### Added
-* due to github runner changes, the regular mac build is now arm64, so we added support for intel x86 apple build in nightlies and releases (via separat artifact)
+* due to github runner changes, the regular mac build is now arm64, so we added support for intel x86 apple build in nightlies and releases (via separate artifact)
 * support `BUILD_GIT_COMMIT_ID` enabling builds from `git archive` generated source tarballs or other outside a git repo [[@alerque](https://github.com/alerque)] ([#2187](https://github.com/gitui-org/gitui/pull/2187))
 
 ### Fixes
@@ -907,7 +909,7 @@ Thanks for your interest and support over this year! Read more about the 1 year 
 - log tab refreshes when head changes ([#78](https://github.com/gitui-org/gitui/issues/78))
 - performance optimization of the log tab in big repos
 - more readable default color for the commit hash in the log tab
-- more error/panic resiliance (`unwrap`/`panic` denied by clippy now) [[@MCord](https://github.com/MCord)](<[#77](https://github.com/gitui-org/gitui/issues/77)>)
+- more error/panic resilience (`unwrap`/`panic` denied by clippy now) [[@MCord](https://github.com/MCord)](<[#77](https://github.com/gitui-org/gitui/issues/77)>)
 
 ### Fixes
 

@@ -33,6 +33,7 @@
 
 #![forbid(unsafe_code)]
 #![deny(
+	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,
@@ -44,11 +45,9 @@
 	clippy::unwrap_used,
 	clippy::filetype_is_file,
 	clippy::cargo,
-	clippy::unwrap_used,
 	clippy::panic,
 	clippy::match_like_matches_macro
 )]
-#![allow(clippy::module_name_repetitions)]
 #![allow(
 	clippy::multiple_crate_versions,
 	clippy::bool_to_int_with_if,

@@ -49,4 +49,17 @@ skip-tree = [
     # currently needed due to:
     # * `gix-hashtable v0.6.0`
     { name = "hashbrown" },
+    # 2022-10-26 `getrandom` and `rustix` were added when `gitoxide` was
+    # upgraded from 0.71.0 to 0.74.1.
+    # currently needed due to:
+    # * `tempfile v3.23.0`
+    # * `rand_core v0.6.4`
+    # * `redox_users v0.5.0`
+    { name = "getrandom" },
+    # currently needed due to:
+    # * `crossterm v0.28.1`
+    # * `which v7.0.2`
+    # * `gix-index v0.42.1`
+    # * `tempfile v3.23.0`
+    { name = "rustix" },
 ]
