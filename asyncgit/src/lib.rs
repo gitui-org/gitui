@@ -10,6 +10,7 @@ It wraps libraries like git2 and gix.
 
 #![forbid(missing_docs)]
 #![deny(
+	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,

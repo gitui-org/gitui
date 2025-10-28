@@ -565,7 +565,7 @@ impl CommitList {
 		Line::from(txt)
 	}
 
-	fn get_text(&self, height: usize, width: usize) -> Vec<Line> {
+	fn get_text(&self, height: usize, width: usize) -> Vec<Line<'_>> {
 		let selection = self.relative_selection();
 
 		let mut txt: Vec<Line> = Vec::with_capacity(height);

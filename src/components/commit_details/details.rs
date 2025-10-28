@@ -136,7 +136,7 @@ impl DetailsComponent {
 		&self,
 		width: usize,
 		height: usize,
-	) -> Vec<Line> {
+	) -> Vec<Line<'_>> {
 		let (wrapped_title, wrapped_message) =
 			Self::get_wrapped_lines(self.data.as_ref(), width);
 
@@ -156,7 +156,7 @@ impl DetailsComponent {
 	}
 
 	#[allow(clippy::too_many_lines)]
-	fn get_text_info(&self) -> Vec<Line> {
+	fn get_text_info(&self) -> Vec<Line<'_>> {
 		self.data.as_ref().map_or_else(Vec::new, |data| {
 			let mut res = vec![
 				Line::from(vec![
