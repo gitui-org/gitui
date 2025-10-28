@@ -82,7 +82,7 @@ two-face = { version = "0.4.3", default-features = false }
 unicode-segmentation = "1.12"
 unicode-truncate = "2.0"
 unicode-width = "0.2"
-which = "7.0"
+which = "8.0"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
