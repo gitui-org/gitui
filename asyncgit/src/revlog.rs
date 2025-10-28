@@ -1,8 +1,8 @@
 use crate::{
 	error::Result,
 	sync::{
-		repo, CommitId, LogWalker, LogWalkerWithoutFilter, RepoPath,
-		SharedCommitFilterFn,
+		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
+		RepoPath, SharedCommitFilterFn,
 	},
 	AsyncGitNotification, Error,
 };
@@ -276,9 +276,7 @@ impl AsyncLog {
 		let mut entries = vec![CommitId::default(); LIMIT_COUNT];
 		entries.resize(0, CommitId::default());
 
-		let mut repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)?;
+		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walker =
 			LogWalkerWithoutFilter::new(&mut repo, LIMIT_COUNT)?;
 

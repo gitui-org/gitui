@@ -198,22 +198,22 @@ pub fn filter_commit_by_search(
 				.flatten()
 				.is_some_and(|diff| filter.match_diff(&diff));
 
-			let authors_match = filter
+			let authors_match = if filter
 				.options
 				.fields
 				.contains(SearchFields::AUTHORS)
-				.then(|| {
-					let author =
-						get_author_of_commit(&commit, &mailmap);
-					[author.email(), author.name()].iter().any(
-						|opt_haystack| {
-							opt_haystack.is_some_and(|haystack| {
-								filter.match_text(haystack)
-							})
-						},
-					)
-				})
-				.unwrap_or_default();
+			{
+				let author = get_author_of_commit(&commit, &mailmap);
+				[author.email(), author.name()].iter().any(
+					|opt_haystack| {
+						opt_haystack.is_some_and(|haystack| {
+							filter.match_text(haystack)
+						})
+					},
+				)
+			} else {
+				false
+			};
 
 			Ok(msg_summary_match
 				|| msg_body_match

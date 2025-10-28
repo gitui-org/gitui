@@ -20,7 +20,6 @@ enum DrawListEntry {
 struct Command {
 	txt: String,
 	enabled: bool,
-	line: usize,
 }
 
 /// helper to be used while drawing
@@ -104,9 +103,8 @@ impl CommandBar {
 			line_width += entry_w + 1;
 
 			self.draw_list.push(DrawListEntry::Command(Command {
-				txt: c.text.name.to_string(),
+				txt: c.text.name.clone(),
 				enabled: c.enabled,
-				line: lines.saturating_sub(1) as usize,
 			}));
 		}
 
@@ -157,9 +155,7 @@ impl CommandBar {
 							DrawListEntry::Command(c) => {
 								Span::styled(
 									Cow::from(c.txt.as_str()),
-									self.theme.commandbar(
-										c.enabled, c.line,
-									),
+									self.theme.commandbar(c.enabled),
 								)
 							}
 							DrawListEntry::LineBreak => {

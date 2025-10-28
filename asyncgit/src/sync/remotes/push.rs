@@ -17,6 +17,7 @@ use crate::{
 use crossbeam_channel::Sender;
 use git2::{PackBuilderStage, PushOptions};
 use scopetime::scope_time;
+use std::fmt::Write as _;
 
 ///
 pub trait AsyncProgress: Clone + Send + Sync {
@@ -97,18 +98,13 @@ impl AsyncProgress for ProgressNotification {
 }
 
 ///
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum PushType {
 	///
+	#[default]
 	Branch,
 	///
 	Tag,
-}
-
-impl Default for PushType {
-	fn default() -> Self {
-		Self::Branch
-	}
 }
 
 #[cfg(test)]
@@ -133,7 +129,7 @@ pub fn push_branch(
 	)
 }
 
-//TODO: clenaup
+//TODO: cleanup
 #[allow(clippy::too_many_arguments)]
 pub fn push_raw(
 	repo_path: &RepoPath,
@@ -182,7 +178,7 @@ pub fn push_raw(
 		if let Ok(Some(branch_upstream_merge)) =
 			get_branch_upstream_merge(repo_path, branch)
 		{
-			push_ref.push_str(&format!(":{branch_upstream_merge}"));
+			let _ = write!(push_ref, ":{branch_upstream_merge}");
 		}
 	}
 
@@ -289,7 +285,7 @@ mod tests {
 
 		// Attempt force push,
 		// should work as it forces the push through
-		assert!(!push_branch(
+		assert!(push_branch(
 			&tmp_other_repo_dir.path().to_str().unwrap().into(),
 			"origin",
 			"master",
@@ -298,7 +294,7 @@ mod tests {
 			None,
 			None,
 		)
-		.is_err());
+		.is_ok());
 	}
 
 	#[test]

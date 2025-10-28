@@ -144,8 +144,6 @@ impl FileTreeItems {
 				let item_path =
 					Path::new(item.info().full_path_str());
 
-				//TODO: fix once FP in clippy is fixed
-				#[allow(clippy::needless_borrow)]
 				if item_path.starts_with(&path) {
 					item.hide();
 				} else {
@@ -311,7 +309,7 @@ impl FileTreeItems {
 
 			if prefix
 				.as_ref()
-				.map_or(true, |prefix| item_path.starts_with(prefix))
+				.is_none_or(|prefix| item_path.starts_with(prefix))
 			{
 				self.tree_items[i].info_mut().set_visible(true);
 			} else {

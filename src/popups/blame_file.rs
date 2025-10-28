@@ -44,6 +44,10 @@ pub struct SyntaxFileBlame {
 }
 
 impl SyntaxFileBlame {
+	#[expect(
+		clippy::missing_const_for_fn,
+		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
+	)]
 	fn path(&self) -> &str {
 		&self.file_blame.path
 	}
@@ -574,7 +578,7 @@ impl BlameFilePopup {
 	}
 
 	///
-	fn get_rows(&self, width: usize) -> Vec<Row> {
+	fn get_rows(&self, width: usize) -> Vec<Row<'_>> {
 		self.blame
 			.as_ref()
 			.and_then(|blame| blame.result())
@@ -688,7 +692,7 @@ impl BlameFilePopup {
 		&self,
 		width: usize,
 		blame_hunk: Option<&BlameHunk>,
-	) -> Vec<Cell> {
+	) -> Vec<Cell<'_>> {
 		let commit_hash = blame_hunk.map_or_else(
 			|| NO_COMMIT_ID.into(),
 			|hunk| hunk.commit_id.get_short_string(),

@@ -223,7 +223,7 @@ impl StatusTreeComponent {
 	/// allowing folders to be folded up if they are alone in their directory
 	fn build_vec_text_draw_info_for_drawing(
 		&self,
-	) -> (Vec<TextDrawInfo>, usize, usize) {
+	) -> (Vec<TextDrawInfo<'_>>, usize, usize) {
 		let mut should_skip_over: usize = 0;
 		let mut selection_offset: usize = 0;
 		let mut selection_offset_visible: usize = 0;
@@ -351,6 +351,7 @@ impl DrawableComponent for StatusTreeComponent {
 				.map(|idx| idx.saturating_sub(selection_offset))
 				.unwrap_or_default();
 			let tree_height = r.height.saturating_sub(2) as usize;
+			self.tree.window_height.set(Some(tree_height));
 
 			self.scroll_top.set(ui::calc_scroll_top(
 				self.scroll_top.get(),
@@ -505,6 +506,15 @@ impl Component for StatusTreeComponent {
 					|| key_match(e, self.key_config.keys.shift_down)
 				{
 					Ok(self.move_selection(MoveSelection::End).into())
+				} else if key_match(e, self.key_config.keys.page_up) {
+					Ok(self
+						.move_selection(MoveSelection::PageUp)
+						.into())
+				} else if key_match(e, self.key_config.keys.page_down)
+				{
+					Ok(self
+						.move_selection(MoveSelection::PageDown)
+						.into())
 				} else if key_match(e, self.key_config.keys.move_left)
 				{
 					Ok(self

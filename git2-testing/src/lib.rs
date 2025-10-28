@@ -1,3 +1,5 @@
+#![deny(mismatched_lifetime_syntaxes)]
+
 use git2::Repository;
 use tempfile::TempDir;
 

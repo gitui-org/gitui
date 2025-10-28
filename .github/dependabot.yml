@@ -5,3 +5,12 @@ updates:
   schedule:
     interval: daily
   open-pull-requests-limit: 10
+  groups:
+    cargo-minor:
+      patterns: ["*"]
+      update-types:
+        - 'minor'
+    cargo-patch:
+      patterns: ["*"]
+      update-types:
+        - 'patch'

@@ -271,7 +271,7 @@ pub fn config_is_pull_rebase(repo_path: &RepoPath) -> Result<bool> {
 		let value =
 			rebase.value().map(String::from).unwrap_or_default();
 		return Ok(value == "true");
-	};
+	}
 
 	Ok(false)
 }
@@ -701,7 +701,7 @@ mod tests_branches {
 			&root.as_os_str().to_str().unwrap().into();
 
 		let upstream_merge_res =
-			get_branch_upstream_merge(&repo_path, "master");
+			get_branch_upstream_merge(repo_path, "master");
 		assert!(
 			upstream_merge_res.is_ok_and(|v| v.as_ref().is_none())
 		);
@@ -715,24 +715,24 @@ mod tests_branches {
 			&root.as_os_str().to_str().unwrap().into();
 
 		let branch_name = "master";
-		let upstrem_merge = "refs/heads/master";
+		let upstream_merge = "refs/heads/master";
 
 		let mut config = repo.config().unwrap();
 		config
 			.set_str(
 				&format!("branch.{branch_name}.merge"),
-				&upstrem_merge,
+				upstream_merge,
 			)
 			.expect("fail set branch merge config");
 
 		let upstream_merge_res =
-			get_branch_upstream_merge(&repo_path, &branch_name);
+			get_branch_upstream_merge(repo_path, branch_name);
 		assert!(upstream_merge_res
 			.as_ref()
 			.is_ok_and(|v| v.as_ref().is_some()));
 		assert_eq!(
 			&upstream_merge_res.unwrap().unwrap(),
-			upstrem_merge
+			upstream_merge
 		);
 	}
 }
@@ -1017,7 +1017,7 @@ mod test_remote_branches {
 	}
 
 	#[test]
-	fn test_checkout_remote_branch_hirachical() {
+	fn test_checkout_remote_branch_hierarchical() {
 		let (r1_dir, _repo) = repo_init_bare().unwrap();
 
 		let (clone1_dir, clone1) =

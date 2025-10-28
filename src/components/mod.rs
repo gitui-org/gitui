@@ -1,3 +1,40 @@
+/*!
+Components are the visible building blocks in gitui.
+
+They have a state, handle events, and render to the terminal:
+
+* Some are full screen. That would be all the [`tabs`](super::tabs).
+* Some look like panels, eg [`CommitDetailsComponent`]
+* Some overlap others. They are collected in module [`popups`](super::popups)
+* Some are decorations, eg [`HorizontalScroll`](utils::scroll_horizontal::HorizontalScroll).
+
+Components can be reused.
+For example, [`CommitList`] is used in both tab "revlog" and tab "stashlist".
+
+
+## Composition
+
+In gitui, composition is driven by code. This means each component must
+have code that explicitly forwards component function calls like draw,
+commands and event to the components it is composed of.
+
+Other systems use composition by data: They provide a generic data structure
+that reflects the visual hierarchy, and uses it at runtime to
+determine which code should be executed. This is not how gitui works.
+
+## Traits
+
+There are two traits defined here:
+* [`Component`] handles events from the user,
+* [`DrawableComponent`] renders to the terminal.
+
+In the current codebase these are always implemented together, and it probably
+makes more sense to merge them some time in the future.
+It is a little strange that you implement `draw()` on a `DrawableComponent`,
+but have function `hide()` from trait Component which does not know how
+to `draw()`.
+*/
+
 mod changes;
 mod command;
 mod commit_details;

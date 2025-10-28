@@ -51,7 +51,7 @@ impl OptionsPopup {
 		}
 	}
 
-	fn get_text(&self, width: u16) -> Vec<Line> {
+	fn get_text(&self, width: u16) -> Vec<Line<'_>> {
 		let mut txt: Vec<Line> = Vec::with_capacity(10);
 
 		self.add_status(&mut txt, width);
@@ -207,7 +207,7 @@ impl OptionsPopup {
 						.borrow_mut()
 						.diff_hunk_lines_change(true);
 				}
-			};
+			}
 		} else {
 			match self.selection {
 				AppOption::StatusShowUntracked => {
@@ -246,7 +246,7 @@ impl OptionsPopup {
 						.borrow_mut()
 						.diff_hunk_lines_change(false);
 				}
-			};
+			}
 		}
 
 		self.queue

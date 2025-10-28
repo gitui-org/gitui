@@ -277,7 +277,7 @@ impl App {
 				3 => self.stashing_tab.draw(f, chunks_main[1])?,
 				4 => self.stashlist_tab.draw(f, chunks_main[1])?,
 				_ => bail!("unknown tab"),
-			};
+			}
 		}
 
 		self.draw_popups(f)?;
@@ -1024,7 +1024,7 @@ impl App {
 					undo_last_commit(&self.repo.borrow())
 				);
 			}
-		};
+		}
 
 		flags.insert(NeedsUpdate::ALL);
 
@@ -1046,7 +1046,7 @@ impl App {
 			));
 
 			self.tags_popup.update_tags()?;
-		};
+		}
 		Ok(())
 	}
 

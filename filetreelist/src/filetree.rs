@@ -2,7 +2,7 @@ use crate::{
 	error::Result, filetreeitems::FileTreeItems,
 	tree_iter::TreeIterator, TreeItemInfo,
 };
-use std::{collections::BTreeSet, path::Path};
+use std::{cell::Cell, collections::BTreeSet, path::Path};
 
 ///
 #[derive(Copy, Clone, Debug)]
@@ -15,6 +15,12 @@ pub enum MoveSelection {
 	End,
 	PageDown,
 	PageUp,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Direction {
+	Up,
+	Down,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -30,6 +36,7 @@ pub struct FileTree {
 	selection: Option<usize>,
 	// caches the absolute selection translated to visual index
 	visual_selection: Option<VisualSelection>,
+	pub window_height: Cell<Option<usize>>,
 }
 
 impl FileTree {
@@ -42,6 +49,7 @@ impl FileTree {
 			items: FileTreeItems::new(list, collapsed)?,
 			selection: if list.is_empty() { None } else { Some(0) },
 			visual_selection: None,
+			window_height: None.into(),
 		};
 		new_self.visual_selection = new_self.calc_visual_selection();
 
@@ -112,27 +120,49 @@ impl FileTree {
 		}
 	}
 
+	fn selection_page_updown(
+		&self,
+		current_index: usize,
+		direction: Direction,
+	) -> Option<usize> {
+		let page_size = self.window_height.get().unwrap_or(0);
+
+		if direction == Direction::Up {
+			self.get_new_selection(
+				(0..=current_index).rev(),
+				page_size,
+			)
+		} else {
+			self.get_new_selection(
+				current_index..(self.items.len()),
+				page_size,
+			)
+		}
+	}
+
 	///
 	pub fn move_selection(&mut self, dir: MoveSelection) -> bool {
 		self.selection.is_some_and(|selection| {
 			let new_index = match dir {
 				MoveSelection::Up => {
-					self.selection_updown(selection, true)
+					self.selection_updown(selection, Direction::Up)
 				}
 				MoveSelection::Down => {
-					self.selection_updown(selection, false)
+					self.selection_updown(selection, Direction::Down)
 				}
 				MoveSelection::Left => self.selection_left(selection),
 				MoveSelection::Right => {
 					self.selection_right(selection)
 				}
-				MoveSelection::Top => {
-					Self::selection_start(selection)
-				}
-				MoveSelection::End => self.selection_end(selection),
-				MoveSelection::PageDown | MoveSelection::PageUp => {
-					None
-				}
+				MoveSelection::Top => Some(0),
+				MoveSelection::End => self.selection_end(),
+				MoveSelection::PageUp => self
+					.selection_page_updown(selection, Direction::Up),
+				MoveSelection::PageDown => self
+					.selection_page_updown(
+						selection,
+						Direction::Down,
+					),
 			};
 
 			let changed_index =
@@ -203,98 +233,53 @@ impl FileTree {
 		})
 	}
 
-	const fn selection_start(current_index: usize) -> Option<usize> {
-		if current_index == 0 {
-			None
-		} else {
-			Some(0)
-		}
-	}
-
-	fn selection_end(&self, current_index: usize) -> Option<usize> {
+	fn selection_end(&self) -> Option<usize> {
 		let items_max = self.items.len().saturating_sub(1);
 
-		let mut new_index = items_max;
+		self.get_new_selection((0..=items_max).rev(), 1)
+	}
 
-		loop {
-			if self.is_visible_index(new_index) {
-				break;
-			}
-
-			if new_index == 0 {
-				break;
-			}
-
-			new_index = new_index.saturating_sub(1);
-			new_index = std::cmp::min(new_index, items_max);
-		}
-
-		if new_index == current_index {
-			None
-		} else {
-			Some(new_index)
-		}
+	fn get_new_selection(
+		&self,
+		range: impl Iterator<Item = usize>,
+		take: usize,
+	) -> Option<usize> {
+		range
+			.filter(|index| self.is_visible_index(*index))
+			.take(take)
+			.last()
 	}
 
 	fn selection_updown(
 		&self,
 		current_index: usize,
-		up: bool,
+		direction: Direction,
 	) -> Option<usize> {
-		let mut index = current_index;
-
-		loop {
-			index = {
-				let new_index = if up {
-					index.saturating_sub(1)
-				} else {
-					index.saturating_add(1)
-				};
-
-				// when reaching usize bounds
-				if new_index == index {
-					break;
-				}
-
-				if new_index >= self.items.len() {
-					break;
-				}
-
-				new_index
-			};
-
-			if self.is_visible_index(index) {
-				break;
-			}
-		}
-
-		if index == current_index {
-			None
+		if direction == Direction::Up {
+			self.get_new_selection(
+				(0..=current_index.saturating_sub(1)).rev(),
+				1,
+			)
 		} else {
-			Some(index)
+			self.get_new_selection(
+				(current_index + 1)..(self.items.len()),
+				1,
+			)
 		}
 	}
 
 	fn select_parent(&self, current_index: usize) -> Option<usize> {
-		let indent =
+		let current_indent =
 			self.items.tree_items[current_index].info().indent();
 
-		let mut index = current_index;
+		let range = (0..=current_index).rev();
 
-		while let Some(selection) = self.selection_updown(index, true)
-		{
-			index = selection;
-
-			if self.items.tree_items[index].info().indent() < indent {
-				break;
-			}
-		}
-
-		if index == current_index {
-			None
-		} else {
-			Some(index)
-		}
+		range.filter(|index| self.is_visible_index(*index)).find(
+			|index| {
+				self.items.tree_items[*index].info().indent()
+					< current_indent
+			},
+		)
 	}
 
 	fn selection_left(
@@ -322,7 +307,10 @@ impl FileTree {
 				self.items.expand(current_selection, false);
 				return Some(current_selection);
 			}
-			return self.selection_updown(current_selection, false);
+			return self.selection_updown(
+				current_selection,
+				Direction::Down,
+			);
 		}
 
 		None
@@ -513,5 +501,37 @@ mod test {
 
 		assert_eq!(s.count, 3);
 		assert_eq!(s.index, 2);
+	}
+
+	#[test]
+	fn test_selection_page_updown() {
+		let items = vec![
+			Path::new("a/b/c"),  //
+			Path::new("a/b/c2"), //
+			Path::new("a/d"),    //
+			Path::new("a/e"),    //
+		];
+
+		//0 a/
+		//1   b/
+		//2     c
+		//3     c2
+		//4   d
+		//5   e
+
+		let mut tree =
+			FileTree::new(&items, &BTreeSet::new()).unwrap();
+
+		tree.window_height.set(Some(3));
+
+		tree.selection = Some(0);
+		assert!(tree.move_selection(MoveSelection::PageDown));
+		assert_eq!(tree.selection, Some(2));
+		assert!(tree.move_selection(MoveSelection::PageDown));
+		assert_eq!(tree.selection, Some(4));
+		assert!(tree.move_selection(MoveSelection::PageUp));
+		assert_eq!(tree.selection, Some(2));
+		assert!(tree.move_selection(MoveSelection::PageUp));
+		assert_eq!(tree.selection, Some(0));
 	}
 }

@@ -120,7 +120,7 @@ pub fn get_default_remote(repo_path: &RepoPath) -> Result<String> {
 /// and Err if there was a problem finding the branch
 fn get_current_branch(
 	repo: &Repository,
-) -> Result<Option<git2::Branch>> {
+) -> Result<Option<git2::Branch<'_>>> {
 	for b in repo.branches(None)? {
 		let branch = b?.0;
 		if branch.is_head() {
@@ -132,7 +132,7 @@ fn get_current_branch(
 
 /// Tries to find the default repo to fetch from based on configuration.
 ///
-/// > branch.<name>.remote
+/// > `branch.<name>.remote`
 /// >
 /// > When on branch `<name>`, it tells `git fetch` and `git push` which remote to fetch from or
 /// > push to. [...] If no remote is configured, or if you are not on any branch and there is more
@@ -173,12 +173,12 @@ pub(crate) fn get_default_remote_for_fetch_in_repo(
 
 /// Tries to find the default repo to push to based on configuration.
 ///
-/// > remote.pushDefault
+/// > `remote.pushDefault`
 /// >
 /// > The remote to push to by default. Overrides `branch.<name>.remote` for all branches, and is
 /// > overridden by `branch.<name>.pushRemote` for specific branches.
 ///
-/// > branch.<name>.remote
+/// > `branch.<name>.remote`
 /// >
 /// > When on branch `<name>`, it tells `git fetch` and `git push` which remote to fetch from or
 /// > push to. The remote to push to may be overridden with `remote.pushDefault` (for all
@@ -369,12 +369,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		let remotes = get_remotes(repo_path).unwrap();
 
@@ -388,12 +384,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -418,12 +410,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -454,12 +442,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, _repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -494,12 +478,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,
@@ -530,12 +510,8 @@ mod tests {
 		let (remote_dir, _remote) = repo_init().unwrap();
 		let remote_path = remote_dir.path().to_str().unwrap();
 		let (repo_dir, repo) = repo_clone(remote_path).unwrap();
-		let repo_path: &RepoPath = &repo_dir
-			.into_path()
-			.as_os_str()
-			.to_str()
-			.unwrap()
-			.into();
+		let repo_path: &RepoPath =
+			&repo_dir.keep().as_os_str().to_str().unwrap().into();
 
 		debug_cmd_print(
 			repo_path,

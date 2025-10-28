@@ -63,7 +63,7 @@ impl AsyncProgressBuffer {
 
 	pub fn update(&mut self, current: usize) -> bool {
 		self.current = current;
-		self.last_send.map_or(true, |last_send| {
+		self.last_send.is_none_or(|last_send| {
 			last_send.elapsed() > self.min_interval
 		})
 	}
@@ -170,6 +170,10 @@ impl SyntaxText {
 	}
 
 	///
+	#[expect(
+		clippy::missing_const_for_fn,
+		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
+	)]
 	pub fn path(&self) -> &Path {
 		&self.path
 	}

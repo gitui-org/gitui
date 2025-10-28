@@ -55,7 +55,7 @@ impl AsyncTags {
 	fn is_outdated(&self, dur: Duration) -> bool {
 		self.last
 			.as_ref()
-			.map_or(true, |(last_time, _)| last_time.elapsed() > dur)
+			.is_none_or(|(last_time, _)| last_time.elapsed() > dur)
 	}
 
 	///
