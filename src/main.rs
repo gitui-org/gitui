@@ -355,8 +355,8 @@ fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
 fn ensure_valid_path(repo_path: &RepoPath) -> Result<()> {
 	match asyncgit::sync::repo_open_error(repo_path) {
 		Some(e) => {
-			log::error!("{e}");
-			bail!(e)
+			log::error!("invalid repo path: {e}");
+			bail!("invalid repo path: {e}")
 		}
 		None => Ok(()),
 	}
