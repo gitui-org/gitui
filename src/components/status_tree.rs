@@ -308,6 +308,25 @@ impl StatusTreeComponent {
 			}
 		}
 	}
+
+	fn open_history(&mut self) {
+		match self.selection_file() {
+			Some(status_item)
+				if !matches!(
+					status_item.status,
+					StatusItemType::New
+				) =>
+			{
+				self.hide();
+				self.queue.push(InternalEvent::OpenPopup(
+					StackablePopupOpen::FileRevlog(FileRevOpen::new(
+						status_item.path,
+					)),
+				));
+			}
+			_ => {}
+		}
+	}
 }
 
 /// Used for drawing the `FileTreeComponent`
@@ -395,11 +414,18 @@ impl Component for StatusTreeComponent {
 		out: &mut Vec<CommandInfo>,
 		force_all: bool,
 	) -> CommandBlocking {
+		let available = self.focused || force_all;
+		let selection = self.selection_file();
+		let selected_is_file = selection.is_some();
+		let tracked = selection.is_some_and(|s| {
+			!matches!(s.status, StatusItemType::New)
+		});
+
 		out.push(
 			CommandInfo::new(
 				strings::commands::navigate_tree(&self.key_config),
 				!self.is_empty(),
-				self.focused || force_all,
+				available,
 			)
 			.order(order::NAV),
 		);
@@ -407,8 +433,8 @@ impl Component for StatusTreeComponent {
 		out.push(
 			CommandInfo::new(
 				strings::commands::blame_file(&self.key_config),
-				self.selection_file().is_some(),
-				self.focused || force_all,
+				selected_is_file && tracked,
+				available,
 			)
 			.order(order::RARE_ACTION),
 		);
@@ -418,8 +444,8 @@ impl Component for StatusTreeComponent {
 				strings::commands::open_file_history(
 					&self.key_config,
 				),
-				self.selection_file().is_some(),
-				self.focused || force_all,
+				selected_is_file && tracked,
+				available,
 			)
 			.order(order::RARE_ACTION),
 		);
@@ -427,8 +453,8 @@ impl Component for StatusTreeComponent {
 		out.push(
 			CommandInfo::new(
 				strings::commands::edit_item(&self.key_config),
-				self.selection_file().is_some(),
-				self.focused || force_all,
+				selected_is_file,
+				available,
 			)
 			.order(order::RARE_ACTION),
 		);
@@ -436,8 +462,8 @@ impl Component for StatusTreeComponent {
 		out.push(
 			CommandInfo::new(
 				strings::commands::copy_path(&self.key_config),
-				self.selection_file().is_some(),
-				self.focused || force_all,
+				selected_is_file,
+				available,
 			)
 			.order(order::RARE_ACTION),
 		);
@@ -445,35 +471,40 @@ impl Component for StatusTreeComponent {
 		CommandBlocking::PassingOn
 	}
 
+	#[expect(clippy::cognitive_complexity)]
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.focused {
 			if let Event::Key(e) = ev {
 				return if key_match(e, self.key_config.keys.blame) {
-					if let Some(status_item) = self.selection_file() {
-						self.hide();
-						self.queue.push(InternalEvent::OpenPopup(
-							StackablePopupOpen::BlameFile(
-								BlameFileOpen {
-									file_path: status_item.path,
-									commit_id: self.revision,
-									selection: None,
-								},
-							),
-						));
+					match self.selection_file() {
+						Some(status_item)
+							if !matches!(
+								status_item.status,
+								StatusItemType::New
+							) =>
+						{
+							self.hide();
+							self.queue.push(
+								InternalEvent::OpenPopup(
+									StackablePopupOpen::BlameFile(
+										BlameFileOpen {
+											file_path: status_item
+												.path,
+											commit_id: self.revision,
+											selection: None,
+										},
+									),
+								),
+							);
+						}
+						_ => {}
 					}
 					Ok(EventState::Consumed)
 				} else if key_match(
 					e,
 					self.key_config.keys.file_history,
 				) {
-					if let Some(status_item) = self.selection_file() {
-						self.hide();
-						self.queue.push(InternalEvent::OpenPopup(
-							StackablePopupOpen::FileRevlog(
-								FileRevOpen::new(status_item.path),
-							),
-						));
-					}
+					self.open_history();
 					Ok(EventState::Consumed)
 				} else if key_match(e, self.key_config.keys.edit_file)
 				{

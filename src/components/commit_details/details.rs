@@ -369,6 +369,18 @@ impl Component for DetailsComponent {
 						self.key_config.keys.move_down,
 					) {
 						self.move_scroll_top(ScrollType::Down).into()
+					} else if key_match(
+						e,
+						self.key_config.keys.page_up,
+					) {
+						self.move_scroll_top(ScrollType::PageUp)
+							.into()
+					} else if key_match(
+						e,
+						self.key_config.keys.page_down,
+					) {
+						self.move_scroll_top(ScrollType::PageDown)
+							.into()
 					} else if key_match(e, self.key_config.keys.home)
 						|| key_match(e, self.key_config.keys.shift_up)
 					{

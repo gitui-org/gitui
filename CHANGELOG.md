@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 * support choosing checkout branch method when status is not empty [[@fatpandac](https://github.com/fatpandac)] ([#2404](https://github.com/extrawurst/gitui/issues/2404))
+* Message tab supports pageUp and pageDown  [[@xlai89](https://github.com/xlai89)] ([#2623](https://github.com/extrawurst/gitui/issues/2623))
 * Files and status tab support pageUp and pageDown  [[@fatpandac](https://github.com/fatpandac)] ([#1951](https://github.com/extrawurst/gitui/issues/1951))
 * support loading custom syntax highlighting themes from a file [[@acuteenvy](https://github.com/acuteenvy)] ([#2565](https://github.com/gitui-org/gitui/pull/2565))
 * Select syntax highlighting theme out of the defaults from syntect [[@vasilismanol](https://github.com/vasilismanol)] ([#1931](https://github.com/extrawurst/gitui/issues/1931))
@@ -34,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * resolve `core.hooksPath` relative to `GIT_WORK_TREE` [[@naseschwarz](https://github.com/naseschwarz)] ([#2571](https://github.com/gitui-org/gitui/issues/2571))
 * yanking commit ranges no longer generates incorrect dotted range notations, but lists each individual commit [[@naseschwarz](https://github.com/naseschwarz)] (https://github.com/gitui-org/gitui/issues/2576)
 * print slightly nicer errors when failing to create a directory [[@linkmauve](https://github.com/linkmauve)] (https://github.com/gitui-org/gitui/pull/2728)
+* When the terminal is insufficient to display all the commands, the cmdbar_bg configuration color does not fully take effect. ([#2347](https://github.com/extrawurst/gitui/issues/2347))
+* disable blame and history popup keybinds for untracked files [[@kpbaks](https://github.com/kpbaks)] ([#2489](https://github.com/gitui-org/gitui/pull/2489))
 
 ## [0.27.0] - 2024-01-14
 
