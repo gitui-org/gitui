@@ -52,7 +52,8 @@
 	clippy::multiple_crate_versions,
 	clippy::bool_to_int_with_if,
 	clippy::module_name_repetitions,
-	clippy::empty_docs
+	clippy::empty_docs,
+	clippy::unnecessary_debug_formatting
 )]
 
 //TODO:
