@@ -78,7 +78,7 @@ syntect = { version = "5.3", default-features = false, features = [
     "html",
 ] }
 tui-textarea = "0.7"
-two-face = { version = "0.4.3", default-features = false }
+two-face = { version = "0.4.4", default-features = false }
 unicode-segmentation = "1.12"
 unicode-truncate = "2.0"
 unicode-width = "0.2"

@@ -3817,12 +3817,12 @@ dependencies = [
 
 [[package]]
 name = "two-face"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "384eda438ddf62e2c6f39a174452d952d9d9df5a8ad5ade22198609f8dcaf852"
+checksum = "3d112cfd41c1387546416bcf49c4ae2a1fcacda0d42c9e97120e9798c90c0923"
 dependencies = [
- "once_cell",
  "serde",
+ "serde_derive",
  "syntect",
 ]
 
