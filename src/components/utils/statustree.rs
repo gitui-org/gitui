@@ -202,13 +202,13 @@ impl StatusTree {
 			return None;
 		}
 
-		if let Ok(i) = self.tree.items().binary_search_by(|e| {
+		let res = self.tree.items().binary_search_by(|e| {
 			e.info.full_path.as_str().cmp(last_selection)
-		}) {
-			return Some(i);
+		});
+		match res {
+			Ok(i) => Some(i),
+			Err(i) => Some(cmp::min(i, self.tree.len() - 1)),
 		}
-
-		Some(cmp::min(last_index, self.tree.len() - 1))
 	}
 
 	fn selection_updown(
@@ -520,7 +520,7 @@ mod tests {
 		res.update(&string_vec_to_status(&["a", "b"])).unwrap();
 		res.selection = Some(1);
 
-		res.update(&string_vec_to_status(&["d", "c", "a"])).unwrap();
+		res.update(&string_vec_to_status(&["a", "c", "d"])).unwrap();
 		assert_eq!(res.selection, Some(1));
 	}
 
@@ -543,6 +543,21 @@ mod tests {
 		);
 		assert!(res.is_visible_index(res.selection.unwrap()));
 		assert_eq!(res.selection, Some(0));
+	}
+
+	#[test]
+	fn test_next_when_dir_disappears() {
+		let mut res = StatusTree::default();
+		res.update(&string_vec_to_status(&["a/b", "c", "d"]))
+			.unwrap();
+		res.selection = Some(1);
+		assert_eq!(
+			res.selected_item().unwrap().info.full_path,
+			"a/b"
+		);
+
+		res.update(&string_vec_to_status(&["c", "d"])).unwrap();
+		assert_eq!(res.selected_item().unwrap().info.full_path, "c");
 	}
 
 	#[test]
