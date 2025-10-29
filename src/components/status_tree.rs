@@ -471,7 +471,6 @@ impl Component for StatusTreeComponent {
 		CommandBlocking::PassingOn
 	}
 
-	#[expect(clippy::cognitive_complexity)]
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.focused {
 			if let Event::Key(e) = ev {

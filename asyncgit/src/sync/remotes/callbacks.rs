@@ -107,11 +107,7 @@ impl Callbacks {
 		reference: &str,
 		msg: Option<&str>,
 	) {
-		log::debug!(
-			"push_update_reference: '{}' {:?}",
-			reference,
-			msg
-		);
+		log::debug!("push_update_reference: '{reference}' {msg:?}",);
 
 		if let Ok(mut stats) = self.stats.lock() {
 			stats.push_rejected_msg = msg
@@ -125,7 +121,7 @@ impl Callbacks {
 		total: usize,
 		current: usize,
 	) {
-		log::debug!("packing: {:?} - {}/{}", stage, current, total);
+		log::debug!("packing: {stage:?} - {current}/{total}");
 		self.sender.clone().map(|sender| {
 			sender.send(ProgressNotification::Packing {
 				stage,
@@ -150,7 +146,7 @@ impl Callbacks {
 	}
 
 	fn update_tips(&self, name: &str, a: git2::Oid, b: git2::Oid) {
-		log::debug!("update tips: '{}' [{}] [{}]", name, a, b);
+		log::debug!("update tips: '{name}' [{a}] [{b}]");
 		self.sender.clone().map(|sender| {
 			sender.send(ProgressNotification::UpdateTips {
 				name: name.to_string(),
@@ -166,7 +162,7 @@ impl Callbacks {
 		total: usize,
 		bytes: usize,
 	) {
-		log::debug!("progress: {}/{} ({} B)", current, total, bytes,);
+		log::debug!("progress: {current}/{total} ({bytes} B)",);
 		self.sender.clone().map(|sender| {
 			sender.send(ProgressNotification::PushTransfer {
 				current,
@@ -187,10 +183,7 @@ impl Callbacks {
 		allowed_types: git2::CredentialType,
 	) -> std::result::Result<Cred, GitError> {
 		log::debug!(
-			"creds: '{}' {:?} ({:?})",
-			url,
-			username_from_url,
-			allowed_types
+			"creds: '{url}' {username_from_url:?} ({allowed_types:?})",
 		);
 
 		// This boolean is used to avoid multiple calls to credentials callback.

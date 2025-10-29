@@ -54,7 +54,7 @@ impl Input {
 			if let Err(e) =
 				Self::input_loop(&arc_desired, &arc_current, &tx)
 			{
-				log::error!("input thread error: {}", e);
+				log::error!("input thread error: {e}");
 				arc_aborted.store(true, Ordering::SeqCst);
 			}
 		});

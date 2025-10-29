@@ -285,7 +285,7 @@ impl App {
 
 	///
 	pub fn event(&mut self, ev: InputEvent) -> Result<()> {
-		log::trace!("event: {:?}", ev);
+		log::trace!("event: {ev:?}");
 
 		if let InputEvent::Input(ev) = ev {
 			if self.check_hard_exit(&ev) || self.check_quit(&ev) {
@@ -402,7 +402,7 @@ impl App {
 		&mut self,
 		ev: AsyncNotification,
 	) -> Result<()> {
-		log::trace!("update_async: {:?}", ev);
+		log::trace!("update_async: {ev:?}");
 
 		if let AsyncNotification::Git(ev) = ev {
 			self.status_tab.update_git(ev)?;
@@ -1061,7 +1061,7 @@ impl App {
 				));
 			}
 			Err(e) => {
-				log::error!("delete remote: {}", e,);
+				log::error!("delete remote: {e:?}");
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("delete remote error:\n{e}",),
 				));

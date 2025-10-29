@@ -26,7 +26,7 @@ impl From<RepositoryState> for RepoState {
 			RepositoryState::Revert => Self::Revert,
 			RepositoryState::RebaseMerge => Self::Rebase,
 			_ => {
-				log::warn!("state not supported yet: {:?}", state);
+				log::warn!("state not supported yet: {state:?}");
 				Self::Other
 			}
 		}
