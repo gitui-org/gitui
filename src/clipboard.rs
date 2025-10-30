@@ -24,18 +24,18 @@ fn exec_copy_with_args(
 			Stdio::null()
 		})
 		.spawn()
-		.map_err(|e| anyhow!("`{:?}`: {}", command, e))?;
+		.map_err(|e| anyhow!("`{command:?}`: {e:?}"))?;
 
 	process
 		.stdin
 		.as_mut()
-		.ok_or_else(|| anyhow!("`{:?}`", command))?
+		.ok_or_else(|| anyhow!("`{command:?}`"))?
 		.write_all(text.as_bytes())
-		.map_err(|e| anyhow!("`{:?}`: {}", command, e))?;
+		.map_err(|e| anyhow!("`{command:?}`: {e:?}"))?;
 
 	let out = process
 		.wait_with_output()
-		.map_err(|e| anyhow!("`{:?}`: {}", command, e))?;
+		.map_err(|e| anyhow!("`{command:?}`: {e:?}"))?;
 
 	if out.status.success() {
 		Ok(())
@@ -50,7 +50,7 @@ fn exec_copy_with_args(
 }
 
 // Implementation taken from https://crates.io/crates/wsl.
-// Using /proc/sys/kernel/osrelease as an authoratative source
+// Using /proc/sys/kernel/osrelease as an authoritative source
 // based on this comment: https://github.com/microsoft/WSL/issues/423#issuecomment-221627364
 #[cfg(all(target_family = "unix", not(target_os = "macos")))]
 fn is_wsl() -> bool {

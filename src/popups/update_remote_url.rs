@@ -138,7 +138,7 @@ impl UpdateRemoteUrlPopup {
 					));
 				}
 				Err(e) => {
-					log::error!("update remote url: {}", e,);
+					log::error!("update remote url: {e}");
 					self.queue.push(InternalEvent::ShowErrorMsg(
 						format!("update remote url error:\n{e}",),
 					));

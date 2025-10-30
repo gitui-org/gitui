@@ -76,7 +76,7 @@ impl FileTreeItem {
 				),
 				kind: FileTreeItemKind::File(item.clone()),
 			}),
-			None => bail!("invalid file name {:?}", item),
+			None => bail!("invalid file name {item:?}"),
 		}
 	}
 

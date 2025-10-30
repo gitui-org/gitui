@@ -240,7 +240,7 @@ impl CommitPopup {
 			if let HookResult::NotOk(e) =
 				sync::hooks_pre_commit(&self.repo.borrow())?
 			{
-				log::error!("pre-commit hook error: {}", e);
+				log::error!("pre-commit hook error: {e}");
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("pre-commit hook error:\n{e}"),
 				));
@@ -256,7 +256,7 @@ impl CommitPopup {
 			if let HookResult::NotOk(e) =
 				sync::hooks_commit_msg(&self.repo.borrow(), &mut msg)?
 			{
-				log::error!("commit-msg hook error: {}", e);
+				log::error!("commit-msg hook error: {e}");
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("commit-msg hook error:\n{e}"),
 				));
@@ -268,7 +268,7 @@ impl CommitPopup {
 		if let HookResult::NotOk(e) =
 			sync::hooks_post_commit(&self.repo.borrow())?
 		{
-			log::error!("post-commit hook error: {}", e);
+			log::error!("post-commit hook error: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"post-commit hook error:\n{e}"
 			)));
@@ -400,7 +400,7 @@ impl CommitPopup {
 						"commit.template",
 					)
 					.map_err(|e| {
-						log::error!("load git-config failed: {}", e);
+						log::error!("load git-config failed: {e}");
 						e
 					})
 					.ok()
@@ -415,7 +415,7 @@ impl CommitPopup {
 					.and_then(|path| {
 						read_to_string(&path)
 							.map_err(|e| {
-								log::error!("read commit.template failed: {e} (path: '{:?}')",path);
+								log::error!("read commit.template failed: {e} (path: '{path:?}')");
 								e
 							})
 							.ok()

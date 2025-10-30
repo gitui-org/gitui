@@ -33,6 +33,7 @@
 
 #![forbid(unsafe_code)]
 #![deny(
+	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,
@@ -51,7 +52,8 @@
 	clippy::multiple_crate_versions,
 	clippy::bool_to_int_with_if,
 	clippy::module_name_repetitions,
-	clippy::empty_docs
+	clippy::empty_docs,
+	clippy::unnecessary_debug_formatting
 )]
 
 //TODO:
@@ -343,7 +345,7 @@ fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
 
 	terminal.draw(|f| {
 		if let Err(e) = app.draw(f) {
-			log::error!("failed to draw: {:?}", e);
+			log::error!("failed to draw: {e:?}");
 		}
 	})?;
 
@@ -353,8 +355,8 @@ fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
 fn ensure_valid_path(repo_path: &RepoPath) -> Result<()> {
 	match asyncgit::sync::repo_open_error(repo_path) {
 		Some(e) => {
-			log::error!("{e}");
-			bail!(e)
+			log::error!("invalid repo path: {e}");
+			bail!("invalid repo path: {e}")
 		}
 		None => Ok(()),
 	}
