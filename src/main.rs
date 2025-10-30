@@ -219,7 +219,6 @@ fn main() -> Result<()> {
 	Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_app(
 	app_start: Instant,
 	cliargs: CliArgs,
