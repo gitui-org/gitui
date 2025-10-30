@@ -168,7 +168,7 @@ impl DrawableComponent for GotoLinePopup {
 			};
 			let input = Paragraph::new(self.input.as_str())
 				.style(style)
-				.block(Block::bordered().title("Go to Line"));
+				.block(Block::bordered().title("Go to"));
 
 			let input_area = ui::centered_rect_absolute(15, 3, area);
 			f.render_widget(Clear, input_area);

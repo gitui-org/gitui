@@ -1454,7 +1454,7 @@ pub mod commands {
 	) -> CommandText {
 		CommandText::new(
 			format!(
-				"Go to Line [{}]",
+				"Go to [{}]",
 				key_config.get_hint(key_config.keys.goto_line),
 			),
 			"go to a given line number in the blame view",
@@ -1886,7 +1886,7 @@ pub mod commands {
 	pub fn goto_line(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(
-				"Go To Line [{}]",
+				"Go To [{}]",
 				key_config.get_hint(key_config.keys.enter),
 			),
 			"Go to the given line",
