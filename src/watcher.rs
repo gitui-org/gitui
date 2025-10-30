@@ -30,7 +30,7 @@ impl RepoWatcher {
 		thread::spawn(move || {
 			if let Err(e) = Self::forwarder(&rx, &out_tx) {
 				//maybe we need to restart the forwarder now?
-				log::error!("notify receive error: {}", e);
+				log::error!("notify receive error: {e}");
 			}
 		});
 
@@ -53,7 +53,7 @@ impl RepoWatcher {
 				log::debug!("notify events: {}", ev.len());
 
 				for (idx, ev) in ev.iter().enumerate() {
-					log::debug!("notify [{}]: {:?}", idx, ev);
+					log::debug!("notify [{idx}]: {ev:?}");
 				}
 
 				if !ev.is_empty() {

@@ -118,7 +118,7 @@ impl AsyncBlame {
 
 			let notify = match notify {
 				Err(err) => {
-					log::error!("get_blame_helper error: {}", err);
+					log::error!("get_blame_helper error: {err}");
 					true
 				}
 				Ok(notify) => notify,

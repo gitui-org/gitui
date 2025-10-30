@@ -115,11 +115,11 @@ pub fn submodule_parent_info(
 	let repo = repo(repo_path)?;
 	let repo_wd = work_dir(&repo)?.to_path_buf();
 
-	log::trace!("[sub] repo_wd: {:?}", repo_wd);
+	log::trace!("[sub] repo_wd: {repo_wd:?}");
 	log::trace!("[sub] repo_path: {:?}", repo.path());
 
 	if let Some(parent_path) = repo_wd.parent() {
-		log::trace!("[sub] parent_path: {:?}", parent_path);
+		log::trace!("[sub] parent_path: {parent_path:?}");
 
 		if let Ok(parent) = Repository::open_ext(
 			parent_path,
@@ -127,14 +127,14 @@ pub fn submodule_parent_info(
 			Vec::<&Path>::new(),
 		) {
 			let parent_wd = work_dir(&parent)?.to_path_buf();
-			log::trace!("[sub] parent_wd: {:?}", parent_wd);
+			log::trace!("[sub] parent_wd: {parent_wd:?}");
 
 			let submodule_name = repo_wd
 				.strip_prefix(parent_wd)?
 				.to_string_lossy()
 				.to_string();
 
-			log::trace!("[sub] submodule_name: {:?}", submodule_name);
+			log::trace!("[sub] submodule_name: {submodule_name:?}");
 
 			if let Ok(submodule) =
 				parent.find_submodule(&submodule_name)

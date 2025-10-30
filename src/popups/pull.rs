@@ -152,8 +152,8 @@ impl PullPopup {
 				&self.repo.borrow(),
 				&self.branch,
 			);
-			if let Err(err) = ff_res {
-				log::trace!("ff failed: {}", err);
+			if let Err(e) = ff_res {
+				log::trace!("ff failed: {e}");
 				self.confirm_merge(branch_compare.behind);
 			}
 		}
