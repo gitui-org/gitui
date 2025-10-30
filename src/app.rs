@@ -1,5 +1,6 @@
 use crate::{
 	accessors,
+	args::CliArgs,
 	cmdbar::CommandBar,
 	components::{
 		command_pump, event_pump, CommandInfo, Component,
@@ -151,14 +152,14 @@ impl App {
 	///
 	#[allow(clippy::too_many_lines)]
 	pub fn new(
-		repo: RepoPathRef,
+		cliargs: CliArgs,
 		sender_git: Sender<AsyncGitNotification>,
 		sender_app: Sender<AsyncAppNotification>,
 		input: Input,
 		theme: Theme,
-		select_file: Option<PathBuf>,
 		key_config: KeyConfig,
 	) -> Result<Self> {
+		let repo = RefCell::new(cliargs.repo_path.clone());
 		log::trace!("open repo at: {:?}", &repo);
 
 		let repo_path_text =
@@ -233,7 +234,7 @@ impl App {
 			popup_stack: PopupStack::default(),
 		};
 
-		if let Some(file) = select_file {
+		if let Some(file) = cliargs.select_file {
 			app.set_tab(2)?;
 			// convert to relative git path
 			if let Ok(abs) = file.canonicalize() {

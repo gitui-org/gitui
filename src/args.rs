@@ -23,6 +23,7 @@ const WATCHER_FLAG_ID: &str = "watcher";
 const DEFAULT_THEME: &str = "theme.ron";
 const DEFAULT_GIT_DIR: &str = ".";
 
+#[derive(Clone)]
 pub struct CliArgs {
 	pub theme: PathBuf,
 	pub select_file: Option<PathBuf>,
