@@ -37,7 +37,7 @@ static NO_AUTHOR: &str = "<no author>";
 static MIN_AUTHOR_WIDTH: usize = 3;
 static MAX_AUTHOR_WIDTH: usize = 20;
 
-pub struct SyntaxFileBlame {
+struct SyntaxFileBlame {
 	pub file_blame: FileBlame,
 	pub styled_text: Option<SyntaxText>,
 }
@@ -56,7 +56,7 @@ impl SyntaxFileBlame {
 	}
 }
 
-pub enum BlameProcess {
+enum BlameProcess {
 	GettingBlame(AsyncBlame),
 	SyntaxHighlighting {
 		unstyled_file_blame: SyntaxFileBlame,
