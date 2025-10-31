@@ -37,7 +37,6 @@ static NO_AUTHOR: &str = "<no author>";
 static MIN_AUTHOR_WIDTH: usize = 3;
 static MAX_AUTHOR_WIDTH: usize = 20;
 
-#[derive(Debug, Clone)]
 pub struct SyntaxFileBlame {
 	pub file_blame: FileBlame,
 	pub styled_text: Option<SyntaxText>,
@@ -57,7 +56,6 @@ impl SyntaxFileBlame {
 	}
 }
 
-#[derive(Clone, Debug)]
 pub enum BlameProcess {
 	GettingBlame(AsyncBlame),
 	SyntaxHighlighting {
@@ -468,6 +466,7 @@ impl BlameFilePopup {
 									),
 								},
 							);
+							self.set_open_selection();
 							self.highlight_blame_lines();
 
 							return Ok(());
@@ -478,7 +477,6 @@ impl BlameFilePopup {
 				}
 			}
 		}
-		self.set_open_selection();
 
 		Ok(())
 	}
@@ -752,9 +750,7 @@ impl BlameFilePopup {
 			self.open_request.as_ref().and_then(|req| req.selection)
 		{
 			let mut table_state = self.table_state.take();
-			let max_line_number = self.get_max_line_number();
-			table_state
-				.select(Some(selection.clamp(0, max_line_number)));
+			table_state.select(Some(selection));
 			self.table_state.set(table_state);
 		}
 	}
