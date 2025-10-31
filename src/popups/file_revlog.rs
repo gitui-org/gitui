@@ -28,7 +28,7 @@ use ratatui::{
 	Frame,
 };
 
-use super::{BlameFileOpen, BlameRequest, InspectCommitOpen};
+use super::{BlameFileOpen, InspectCommitOpen};
 
 const SLICE_SIZE: usize = 1200;
 
@@ -533,7 +533,6 @@ impl Component for FileRevlogPopup {
 									file_path: open_request.file_path,
 									commit_id: self.selected_commit(),
 									selection: None,
-									blame: BlameRequest::StartNew,
 								},
 							),
 						));

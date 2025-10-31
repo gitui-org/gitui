@@ -26,11 +26,6 @@ pub struct GotoLineContext {
 	pub max_line: usize,
 }
 
-#[derive(Debug)]
-pub struct GotoLineOpen {
-	pub context: GotoLineContext,
-}
-
 pub struct GotoLinePopup {
 	visible: bool,
 	input: String,
@@ -56,9 +51,9 @@ impl GotoLinePopup {
 		}
 	}
 
-	pub fn open(&mut self, open: GotoLineOpen) {
+	pub fn open(&mut self, context: GotoLineContext) {
 		self.visible = true;
-		self.context = open.context;
+		self.context = context;
 	}
 }
 
@@ -102,7 +97,6 @@ impl Component for GotoLinePopup {
 				if key_match(key, self.key_config.keys.exit_popup) {
 					self.visible = false;
 					self.input.clear();
-					self.queue.push(InternalEvent::PopupStackPop);
 				} else if let KeyCode::Char(c) = key.code {
 					if c.is_ascii_digit() || c == '-' {
 						self.input.push(c);
@@ -121,7 +115,6 @@ impl Component for GotoLinePopup {
 							self.line_number,
 						));
 					}
-					self.queue.push(InternalEvent::PopupStackPop);
 					self.input.clear();
 					self.invalid_input = false;
 				}

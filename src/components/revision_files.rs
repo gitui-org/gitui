@@ -6,7 +6,7 @@ use super::{
 use crate::{
 	app::Environment,
 	keys::{key_match, SharedKeyConfig},
-	popups::{BlameFileOpen, BlameRequest, FileRevOpen},
+	popups::{BlameFileOpen, FileRevOpen},
 	queue::{InternalEvent, Queue, StackablePopupOpen},
 	strings::{self, order, symbol},
 	try_or_popup,
@@ -193,7 +193,6 @@ impl RevisionFilesComponent {
 					file_path: path,
 					commit_id: self.revision.as_ref().map(|c| c.id),
 					selection: None,
-					blame: BlameRequest::StartNew,
 				}),
 			));
 

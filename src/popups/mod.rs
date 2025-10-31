@@ -29,7 +29,7 @@ mod tag_commit;
 mod taglist;
 mod update_remote_url;
 
-pub use blame_file::{BlameFileOpen, BlameFilePopup, BlameRequest};
+pub use blame_file::{BlameFileOpen, BlameFilePopup};
 pub use branchlist::BranchListPopup;
 pub use commit::CommitPopup;
 pub use compare_commits::CompareCommitsPopup;
@@ -40,7 +40,7 @@ pub use externaleditor::ExternalEditorPopup;
 pub use fetch::FetchPopup;
 pub use file_revlog::{FileRevOpen, FileRevlogPopup};
 pub use fuzzy_find::FuzzyFindPopup;
-pub use goto_line::{GotoLineOpen, GotoLinePopup};
+pub use goto_line::{GotoLineContext, GotoLinePopup};
 pub use help::HelpPopup;
 pub use inspect_commit::{InspectCommitOpen, InspectCommitPopup};
 pub use log_search::LogSearchPopupPopup;

@@ -10,16 +10,16 @@ use crate::{
 	options::{Options, SharedOptions},
 	popup_stack::PopupStack,
 	popups::{
-		AppOption, BlameFileOpen, BlameFilePopup, BlameRequest,
-		BranchListPopup, CommitPopup, CompareCommitsPopup,
-		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
-		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
-		FuzzyFindPopup, GotoLinePopup, HelpPopup, InspectCommitPopup,
-		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
-		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
-		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
-		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
-		TagListPopup, UpdateRemoteUrlPopup,
+		AppOption, BlameFilePopup, BranchListPopup, CommitPopup,
+		CompareCommitsPopup, ConfirmPopup, CreateBranchPopup,
+		CreateRemotePopup, ExternalEditorPopup, FetchPopup,
+		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
+		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
+		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
+		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
+		ResetPopup, RevisionFilesPopup, StashMsgPopup,
+		SubmodulesListPopup, TagCommitPopup, TagListPopup,
+		UpdateRemoteUrlPopup,
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -695,9 +695,6 @@ impl App {
 			StackablePopupOpen::CompareCommits(param) => {
 				self.compare_commits_popup.open(param)?;
 			}
-			StackablePopupOpen::GotoLine(param) => {
-				self.goto_line_popup.open(param);
-			}
 		}
 
 		Ok(())
@@ -912,24 +909,12 @@ impl App {
 			InternalEvent::CommitSearch(options) => {
 				self.revlog.search(options);
 			}
+			InternalEvent::OpenGotoLinePopup(context) => {
+				self.goto_line_popup.open(context);
+			}
 			InternalEvent::GotoLine(line) => {
-				if let Some(popup) = self.popup_stack.pop() {
-					if let StackablePopupOpen::BlameFile(params) =
-						popup
-					{
-						self.popup_stack.push(
-							StackablePopupOpen::BlameFile(
-								BlameFileOpen {
-									selection: Some(line),
-									blame: BlameRequest::KeepExisting,
-									..params
-								},
-							),
-						);
-					}
-					flags.insert(
-						NeedsUpdate::ALL | NeedsUpdate::COMMANDS,
-					);
+				if self.blame_file_popup.is_visible() {
+					self.blame_file_popup.goto_line(line);
 				}
 			}
 		}

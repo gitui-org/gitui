@@ -30,7 +30,7 @@ use ratatui::{
 };
 use std::path::Path;
 
-use super::{goto_line::GotoLineContext, GotoLineOpen};
+use super::goto_line::GotoLineContext;
 
 static NO_COMMIT_ID: &str = "0000000";
 static NO_AUTHOR: &str = "<no author>";
@@ -81,17 +81,10 @@ impl BlameProcess {
 }
 
 #[derive(Clone, Debug)]
-pub enum BlameRequest {
-	StartNew,
-	KeepExisting,
-}
-
-#[derive(Clone, Debug)]
 pub struct BlameFileOpen {
 	pub file_path: String,
 	pub commit_id: Option<CommitId>,
 	pub selection: Option<usize>,
-	pub blame: BlameRequest,
 }
 
 pub struct BlameFilePopup {
@@ -336,22 +329,13 @@ impl Component for BlameFilePopup {
 						.blame
 						.as_ref()
 						.and_then(|blame| blame.result());
-					if maybe_blame_result.is_some() {
-						let max_line = maybe_blame_result
-							.expect("This can not be None")
-							.lines()
-							.len() - 1;
-						self.hide_stacked(true);
-						self.visible = true;
-						self.queue.push(InternalEvent::OpenPopup(
-							StackablePopupOpen::GotoLine(
-								GotoLineOpen {
-									context: GotoLineContext {
-										max_line,
-									},
-								},
+					if let Some(blame_result) = maybe_blame_result {
+						let max_line = blame_result.lines().len() - 1;
+						self.queue.push(
+							InternalEvent::OpenGotoLinePopup(
+								GotoLineContext { max_line },
 							),
-						));
+						);
 					}
 				}
 
@@ -402,7 +386,6 @@ impl BlameFilePopup {
 						file_path: request.file_path,
 						commit_id: request.commit_id,
 						selection: self.get_selection(),
-						blame: BlameRequest::KeepExisting,
 					}),
 				));
 			}
@@ -418,13 +401,11 @@ impl BlameFilePopup {
 			file_path: open.file_path,
 			commit_id: open.commit_id,
 		});
-		if matches!(open.blame, BlameRequest::StartNew) {
-			self.blame =
-				Some(BlameProcess::GettingBlame(AsyncBlame::new(
-					self.repo.borrow().clone(),
-					&self.git_sender,
-				)));
-		}
+		self.blame =
+			Some(BlameProcess::GettingBlame(AsyncBlame::new(
+				self.repo.borrow().clone(),
+				&self.git_sender,
+			)));
 		self.table_state.get_mut().select(Some(0));
 		self.visible = true;
 		self.update()?;
@@ -791,6 +772,14 @@ impl BlameFilePopup {
 
 				selection
 			})
+	}
+
+	pub fn goto_line(&mut self, line: usize) {
+		self.visible = true;
+		let mut table_state = self.table_state.take();
+		table_state
+			.select(Some(line.clamp(0, self.get_max_line_number())));
+		self.table_state.set(table_state);
 	}
 
 	fn selected_commit(&self) -> Option<CommitId> {
