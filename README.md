@@ -38,8 +38,9 @@
 11. [Key Bindings](#bindings)
 12. [Sponsoring](#sponsoring)
 13. [Inspiration](#inspiration)
-14. [Contributing](#contributing)
-15. [Contributors](#contributors)
+14. [Comparison](#comparison)
+15. [Contributing](#contributing)
+16. [Contributors](#contributors)
 
 ## 1. <a name="features"></a> Features <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
@@ -280,11 +281,15 @@ The key bindings can be customized: See [Key Config](KEY_CONFIG.md) on how to se
   - It would be nice to come up with a way to have the map view available in a terminal tool
 - [git-brunch](https://github.com/andys8/git-brunch)
 
-## 14. <a name="contributing"></a> Contributing <small><sup>[Top ▲](#table-of-contents)</sup></small>
+## 14. <a name="comparison"></a> Comparison <small><sup>[Top ▲](#table-of-contents)</sup></small>
+
+Medium made a comparison in 2023 with a few other tools in the following [article](https://medium.com/@le_moment_it/what-is-the-best-git-client-3e394c6c1b4d)
+
+## 15. <a name="contributing"></a> Contributing <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## 15. <a name="contributors"></a> Contributors <small><sup>[Top ▲](#table-of-contents)</sup></small>
+## 16. <a name="contributors"></a> Contributors <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 Thanks goes to all the contributors that help make GitUI amazing! ❤️
 
