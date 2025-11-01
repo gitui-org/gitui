@@ -129,7 +129,7 @@ impl SyntaxText {
 				let ops = state
 					.parse_line(line, &SYNTAX_SET)
 					.map_err(|e| {
-						log::error!("syntax error: {:?}", e);
+						log::error!("syntax error: {e:?}");
 						asyncgit::Error::Generic(
 							"syntax error".to_string(),
 						)

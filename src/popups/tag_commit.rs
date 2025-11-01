@@ -194,7 +194,7 @@ impl TagCommitPopup {
 					self.input.set_text(tag_name);
 					self.hide();
 
-					log::error!("e: {}", e,);
+					log::error!("e: {e}");
 					self.queue.push(InternalEvent::ShowErrorMsg(
 						format!("tag error:\n{e}",),
 					));
