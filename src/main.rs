@@ -79,7 +79,10 @@ mod tabs;
 mod ui;
 mod watcher;
 
-use crate::{app::App, args::process_cmdline};
+use crate::{
+	app::App,
+	args::{process_cmdline, CliArgs},
+};
 use anyhow::{anyhow, bail, Result};
 use app::QuitState;
 use asyncgit::{
@@ -102,7 +105,6 @@ use scopeguard::defer;
 use scopetime::scope_time;
 use spinner::Spinner;
 use std::{
-	cell::RefCell,
 	io::{self, Stdout},
 	panic,
 	path::Path,
@@ -163,7 +165,7 @@ macro_rules! log_eprintln {
 fn main() -> Result<()> {
 	let app_start = Instant::now();
 
-	let cliargs = process_cmdline()?;
+	let mut cliargs = process_cmdline()?;
 
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
@@ -180,8 +182,8 @@ fn main() -> Result<()> {
 
 	set_panic_handler()?;
 
-	let mut repo_path = cliargs.repo_path;
-	let mut terminal = start_terminal(io::stdout(), &repo_path)?;
+	let mut terminal =
+		start_terminal(io::stdout(), &cliargs.repo_path)?;
 	let input = Input::new();
 
 	let updater = if cliargs.notify_watcher {
@@ -193,7 +195,7 @@ fn main() -> Result<()> {
 	loop {
 		let quit_state = run_app(
 			app_start,
-			repo_path.clone(),
+			cliargs.clone(),
 			theme.clone(),
 			key_config.clone(),
 			&input,
@@ -203,7 +205,12 @@ fn main() -> Result<()> {
 
 		match quit_state {
 			QuitState::OpenSubmodule(p) => {
-				repo_path = p;
+				cliargs = CliArgs {
+					repo_path: p,
+					select_file: None,
+					theme: cliargs.theme,
+					notify_watcher: cliargs.notify_watcher,
+				}
 			}
 			_ => break,
 		}
@@ -214,7 +221,7 @@ fn main() -> Result<()> {
 
 fn run_app(
 	app_start: Instant,
-	repo: RepoPath,
+	cliargs: CliArgs,
 	theme: Theme,
 	key_config: KeyConfig,
 	input: &Input,
@@ -228,8 +235,9 @@ fn run_app(
 
 	let (rx_ticker, rx_watcher) = match updater {
 		Updater::NotifyWatcher => {
-			let repo_watcher =
-				RepoWatcher::new(repo_work_dir(&repo)?.as_str());
+			let repo_watcher = RepoWatcher::new(
+				repo_work_dir(&cliargs.repo_path)?.as_str(),
+			);
 
 			(never(), repo_watcher.receiver())
 		}
@@ -239,7 +247,7 @@ fn run_app(
 	let spinner_ticker = tick(SPINNER_INTERVAL);
 
 	let mut app = App::new(
-		RefCell::new(repo),
+		cliargs,
 		tx_git,
 		tx_app,
 		input.clone(),

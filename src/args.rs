@@ -17,13 +17,16 @@ const LOG_FILE_FLAG_ID: &str = "logfile";
 const LOGGING_FLAG_ID: &str = "logging";
 const THEME_FLAG_ID: &str = "theme";
 const WORKDIR_FLAG_ID: &str = "workdir";
+const FILE_FLAG_ID: &str = "file";
 const GIT_DIR_FLAG_ID: &str = "directory";
 const WATCHER_FLAG_ID: &str = "watcher";
 const DEFAULT_THEME: &str = "theme.ron";
 const DEFAULT_GIT_DIR: &str = ".";
 
+#[derive(Clone)]
 pub struct CliArgs {
 	pub theme: PathBuf,
+	pub select_file: Option<PathBuf>,
 	pub repo_path: RepoPath,
 	pub notify_watcher: bool,
 }
@@ -51,6 +54,10 @@ pub fn process_cmdline() -> Result<CliArgs> {
 			PathBuf::from,
 		);
 
+	let select_file = arg_matches
+		.get_one::<String>(FILE_FLAG_ID)
+		.map(PathBuf::from);
+
 	let repo_path = if let Some(w) = workdir {
 		RepoPath::Workdir { gitdir, workdir: w }
 	} else {
@@ -75,6 +82,7 @@ pub fn process_cmdline() -> Result<CliArgs> {
 
 	Ok(CliArgs {
 		theme,
+		select_file,
 		repo_path,
 		notify_watcher,
 	})
@@ -128,6 +136,13 @@ fn app() -> ClapApp {
 				.help("Generate a bug report")
 				.long("bugreport")
 				.action(clap::ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new(FILE_FLAG_ID)
+				.help("Select the file in the file tab")
+				.short('f')
+				.long("file")
+				.num_args(1),
 		)
 		.arg(
 			Arg::new(GIT_DIR_FLAG_ID)

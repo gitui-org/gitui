@@ -30,7 +30,10 @@ use ratatui::{
 	Frame,
 };
 use std::{borrow::Cow, fmt::Write};
-use std::{collections::BTreeSet, path::Path};
+use std::{
+	collections::BTreeSet,
+	path::{Path, PathBuf},
+};
 use unicode_truncate::UnicodeTruncateStr;
 use unicode_width::UnicodeWidthStr;
 
@@ -53,11 +56,15 @@ pub struct RevisionFilesComponent {
 	revision: Option<CommitInfo>,
 	focus: Focus,
 	key_config: SharedKeyConfig,
+	select_file: Option<PathBuf>,
 }
 
 impl RevisionFilesComponent {
 	///
-	pub fn new(env: &Environment) -> Self {
+	pub fn new(
+		env: &Environment,
+		select_file: Option<PathBuf>,
+	) -> Self {
 		Self {
 			queue: env.queue.clone(),
 			tree: FileTree::default(),
@@ -72,6 +79,7 @@ impl RevisionFilesComponent {
 			focus: Focus::Tree,
 			key_config: env.key_config.clone(),
 			repo: env.repo.clone(),
+			select_file,
 			visible: false,
 		}
 	}
@@ -134,6 +142,12 @@ impl RevisionFilesComponent {
 						self.tree.collapse_but_root();
 
 						self.files = Some(last);
+
+						let select_file = self.select_file.clone();
+						self.select_file = None;
+						if let Some(file) = select_file {
+							self.find_file(file.as_path());
+						}
 					}
 				} else if let Some(rev) = &self.revision {
 					self.request_files(rev.id);
