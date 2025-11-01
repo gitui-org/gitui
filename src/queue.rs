@@ -159,7 +159,7 @@ pub enum InternalEvent {
 	///
 	CommitSearch(LogFilterSearchOptions),
 	///
-	CheckoutOption(BranchInfo, bool),
+	CheckoutOption(BranchInfo),
 }
 
 /// single threaded simple queue for components to communicate with each other

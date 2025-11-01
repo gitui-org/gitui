@@ -29,7 +29,6 @@ use ratatui::{
 pub struct CheckoutOptionPopup {
 	queue: Queue,
 	repo: RepoPath,
-	local: bool,
 	branch: Option<BranchInfo>,
 	option: CheckoutOptions,
 	visible: bool,
@@ -43,7 +42,6 @@ impl CheckoutOptionPopup {
 		Self {
 			queue: env.queue.clone(),
 			repo: env.repo.borrow().clone(),
-			local: false,
 			branch: None,
 			option: CheckoutOptions::StashAndReapply,
 			visible: false,
@@ -82,30 +80,27 @@ impl CheckoutOptionPopup {
 	}
 
 	///
-	pub fn open(
-		&mut self,
-		branch: BranchInfo,
-		is_local: bool,
-	) -> Result<()> {
+	pub fn open(&mut self, branch: BranchInfo) -> Result<()> {
 		self.show()?;
 
 		self.branch = Some(branch);
-		self.local = is_local;
 
 		Ok(())
 	}
 
 	fn checkout(&self) -> Result<()> {
-		if self.local {
-			checkout_branch(
-				&self.repo,
-				&self.branch.as_ref().expect("No branch").name,
-			)?;
-		} else {
-			checkout_remote_branch(
-				&self.repo,
-				self.branch.as_ref().expect("No branch"),
-			)?;
+		if let Some(branch) = &self.branch {
+			if branch.is_local() {
+				checkout_branch(
+					&self.repo,
+					&self.branch.as_ref().expect("No branch").name,
+				)?;
+			} else {
+				checkout_remote_branch(
+					&self.repo,
+					self.branch.as_ref().expect("No branch"),
+				)?;
+			}
 		}
 
 		Ok(())

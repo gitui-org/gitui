@@ -909,8 +909,8 @@ impl App {
 			InternalEvent::CommitSearch(options) => {
 				self.revlog.search(options);
 			}
-			InternalEvent::CheckoutOption(branch, is_local) => {
-				self.checkout_option_popup.open(branch, is_local)?;
+			InternalEvent::CheckoutOption(branch) => {
+				self.checkout_option_popup.open(branch)?;
 			}
 		}
 
