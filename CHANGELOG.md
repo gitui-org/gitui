@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * new command-line option to override the default log file path (`--logfile`) [[@acuteenvy](https://github.com/acuteenvy)] ([#2539](https://github.com/gitui-org/gitui/pull/2539))
 * dx: `make check` checks Cargo.toml dependency ordering using `cargo sort` [[@naseschwarz](https://github.com/naseschwarz)]
 * add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
+* Support opening branches popup from all tabs [[@kpbaks](https://github.com/kpbaks)] ([#2709](https://github.com/gitui-org/gitui/pull/2709))
 
 ### Changed
 * improve error messages [[@acuteenvy](https://github.com/acuteenvy)] ([#2617](https://github.com/gitui-org/gitui/pull/2617))

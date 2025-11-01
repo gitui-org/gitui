@@ -182,6 +182,13 @@ impl Component for StashList {
 				selection_valid,
 				true,
 			));
+			out.push(CommandInfo::new(
+				strings::commands::open_branch_select_popup(
+					&self.key_config,
+				),
+				true,
+				true,
+			));
 		}
 
 		visibility_blocking(self)
@@ -214,6 +221,12 @@ impl Component for StashList {
 					self.key_config.keys.stash_open,
 				) {
 					self.inspect();
+				} else if key_match(
+					k,
+					self.key_config.keys.select_branch,
+				) {
+					self.queue.push(InternalEvent::SelectBranch);
+					return Ok(EventState::Consumed);
 				}
 			}
 		}
