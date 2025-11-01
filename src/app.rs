@@ -175,7 +175,20 @@ impl App {
 			sender_app,
 		};
 
-		let tab = env.options.borrow().current_tab();
+		let mut select_file: Option<PathBuf> = None;
+		let tab = if let Some(file) = cliargs.select_file {
+			// convert to relative git path
+			if let Ok(abs) = file.canonicalize() {
+				if let Ok(path) = abs.strip_prefix(
+					env.repo.borrow().gitpath().canonicalize()?,
+				) {
+					select_file = Some(Path::new(".").join(path));
+				}
+			}
+			2
+		} else {
+			env.options.borrow().current_tab()
+		};
 
 		let mut app = Self {
 			input,
@@ -220,7 +233,7 @@ impl App {
 			status_tab: Status::new(&env),
 			stashing_tab: Stashing::new(&env),
 			stashlist_tab: StashList::new(&env),
-			files_tab: FilesTab::new(&env),
+			files_tab: FilesTab::new(&env, select_file),
 			goto_line_popup: GotoLinePopup::new(&env),
 			tab: 0,
 			queue: env.queue,
@@ -234,21 +247,7 @@ impl App {
 			popup_stack: PopupStack::default(),
 		};
 
-		if let Some(file) = cliargs.select_file {
-			app.set_tab(2)?;
-			// convert to relative git path
-			if let Ok(abs) = file.canonicalize() {
-				let repo =
-					app.repo.borrow().gitpath().canonicalize()?;
-				if let Ok(path) = abs.strip_prefix(repo) {
-					app.queue.push(InternalEvent::SelectFile {
-						path: Path::new(".").join(path),
-					});
-				}
-			}
-		} else {
-			app.set_tab(tab)?;
-		}
+		app.set_tab(tab)?;
 
 		Ok(app)
 	}
@@ -790,9 +789,6 @@ impl App {
 			}
 			InternalEvent::SelectBranch => {
 				self.select_branch_popup.open()?;
-			}
-			InternalEvent::SelectFile { path } => {
-				self.files_tab.find_file(&path);
 			}
 			InternalEvent::ViewSubmodules => {
 				self.submodule_popup.open()?;
