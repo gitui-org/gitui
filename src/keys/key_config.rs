@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyModifiers};
 use std::{fs::canonicalize, path::PathBuf, rc::Rc};
 
@@ -34,9 +34,32 @@ impl KeyConfig {
 			.map_or_else(|_| Ok(symbols_file), Ok)
 	}
 
-	pub fn init() -> Result<Self> {
-		let keys = KeysList::init(Self::get_config_file()?);
-		let symbols = KeySymbols::init(Self::get_symbols_file()?);
+	pub fn init(
+		key_bindings_path: Option<&PathBuf>,
+		key_symbols_path: Option<&PathBuf>,
+	) -> Result<Self> {
+		let keys = if let Some(path) = key_bindings_path {
+			if !path.exists() {
+				return Err(anyhow!(
+					"The custom key bindings file dosen't exists"
+				));
+			}
+			KeysList::init(path.clone())
+		} else {
+			KeysList::init(Self::get_config_file()?)
+		};
+
+		let symbols = if let Some(path) = key_symbols_path {
+			if !path.exists() {
+				return Err(anyhow!(
+					"The custom key symbols file dosen't exists"
+				));
+			}
+			KeySymbols::init(path.clone())
+		} else {
+			KeySymbols::init(Self::get_symbols_file()?)
+		};
+
 		Ok(Self { keys, symbols })
 	}
 
@@ -185,7 +208,7 @@ mod tests {
 
 		// testing
 		let result = std::panic::catch_unwind(|| {
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				KeysList::default().move_down
@@ -200,7 +223,7 @@ mod tests {
 				&original_key_symbols_path,
 			)
 			.unwrap();
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				KeysList::default().move_down
@@ -212,7 +235,7 @@ mod tests {
 				&original_key_list_path,
 			)
 			.unwrap();
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				GituiKeyEvent::new(
@@ -223,7 +246,7 @@ mod tests {
 			assert_eq!(loaded_config.symbols.esc, "Esc");
 
 			fs::remove_file(&original_key_symbols_path).unwrap();
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				GituiKeyEvent::new(
