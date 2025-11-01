@@ -38,7 +38,7 @@ impl RevisionFilesPopup {
 	///
 	pub fn new(env: &Environment) -> Self {
 		Self {
-			files: RevisionFilesComponent::new(env),
+			files: RevisionFilesComponent::new(env, None),
 			visible: false,
 			key_config: env.key_config.clone(),
 			open_request: None,

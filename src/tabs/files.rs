@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{
 	app::Environment,
@@ -19,10 +19,13 @@ pub struct FilesTab {
 
 impl FilesTab {
 	///
-	pub fn new(env: &Environment) -> Self {
+	pub fn new(
+		env: &Environment,
+		select_file: Option<PathBuf>,
+	) -> Self {
 		Self {
 			visible: false,
-			files: RevisionFilesComponent::new(env),
+			files: RevisionFilesComponent::new(env, select_file),
 			repo: env.repo.clone(),
 		}
 	}
@@ -56,10 +59,6 @@ impl FilesTab {
 	}
 
 	pub fn file_finder_update(&mut self, file: &Path) {
-		self.files.find_file(file);
-	}
-
-	pub fn find_file(&mut self, file: &Path) {
 		self.files.find_file(file);
 	}
 }
