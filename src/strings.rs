@@ -1449,6 +1449,18 @@ pub mod commands {
 			CMD_GROUP_LOG,
 		)
 	}
+	pub fn open_line_number_popup(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Go to [{}]",
+				key_config.get_hint(key_config.keys.goto_line),
+			),
+			"go to a given line number in the blame view",
+			CMD_GROUP_GENERAL,
+		)
+	}
 	pub fn log_tag_commit(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {
@@ -1868,6 +1880,17 @@ pub mod commands {
 			),
 			"find commit from sha",
 			CMD_GROUP_LOG,
+		)
+	}
+
+	pub fn goto_line(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Go To [{}]",
+				key_config.get_hint(key_config.keys.enter),
+			),
+			"Go to the given line",
+			CMD_GROUP_GENERAL,
 		)
 	}
 }
