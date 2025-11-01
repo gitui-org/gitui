@@ -8,6 +8,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum GixError {
 	///
+	#[error("gix::config::diff::algorithm error: {0}")]
+	ConfigDiffAlgorithm(#[from] gix::config::diff::algorithm::Error),
+
+	///
 	#[error("gix::discover error: {0}")]
 	Discover(#[from] Box<gix::discover::Error>),
 
@@ -46,6 +50,12 @@ pub enum GixError {
 	///
 	#[error("gix::reference::iter::init::Error error: {0}")]
 	ReferenceIterInit(#[from] gix::reference::iter::init::Error),
+
+	///
+	#[error("gix::repository::blame_file::Error error: {0}")]
+	RepositoryBlameFile(
+		#[from] Box<gix::repository::blame_file::Error>,
+	),
 
 	///
 	#[error("gix::revision::walk error: {0}")]
@@ -201,6 +211,12 @@ impl<T> From<crossbeam_channel::SendError<T>> for Error {
 	}
 }
 
+impl From<gix::config::diff::algorithm::Error> for Error {
+	fn from(error: gix::config::diff::algorithm::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
 impl From<gix::discover::Error> for GixError {
 	fn from(error: gix::discover::Error) -> Self {
 		Self::Discover(Box::new(error))
@@ -345,6 +361,18 @@ impl From<gix::worktree::open_index::Error> for GixError {
 
 impl From<gix::worktree::open_index::Error> for Error {
 	fn from(error: gix::worktree::open_index::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::repository::blame_file::Error> for GixError {
+	fn from(error: gix::repository::blame_file::Error) -> Self {
+		Self::RepositoryBlameFile(Box::new(error))
+	}
+}
+
+impl From<gix::repository::blame_file::Error> for Error {
+	fn from(error: gix::repository::blame_file::Error) -> Self {
 		Self::Gix(GixError::from(error))
 	}
 }

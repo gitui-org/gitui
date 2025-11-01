@@ -25,6 +25,8 @@ fuzzy-matcher = "0.3"
 git2 = "0.20"
 git2-hooks = { path = "../git2-hooks", version = ">=0.5" }
 gix = { version = "0.74.1", default-features = false, features = [
+    "blame",
+    "blob-diff",
     "max-performance",
     "revision",
     "mailmap",
