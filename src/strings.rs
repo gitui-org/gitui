@@ -446,29 +446,29 @@ pub enum CheckoutOptions {
 }
 
 impl CheckoutOptions {
-	pub fn previous(&self) -> Self {
+	pub const fn previous(self) -> Self {
 		match self {
-			CheckoutOptions::KeepLocalChanges => {
-				CheckoutOptions::Discard
+			Self::KeepLocalChanges => {
+				Self::Discard
 			}
-			CheckoutOptions::Unchange => {
-				CheckoutOptions::KeepLocalChanges
+			Self::Unchange => {
+				Self::KeepLocalChanges
 			}
-			CheckoutOptions::Discard => CheckoutOptions::Unchange,
+			Self::Discard => Self::Unchange,
 		}
 	}
 
-	pub fn next(&self) -> Self {
+	pub const fn next(self) -> Self {
 		match self {
-			CheckoutOptions::KeepLocalChanges => CheckoutOptions::Unchange,
-			CheckoutOptions::Unchange => CheckoutOptions::Discard,
-			CheckoutOptions::Discard => {
-				CheckoutOptions::KeepLocalChanges
+			Self::KeepLocalChanges => Self::Unchange,
+			Self::Unchange => Self::Discard,
+			Self::Discard => {
+				Self::KeepLocalChanges
 			}
 		}
 	}
 
-	pub fn to_string_pair(&self) -> (&'static str, &'static str) {
+	pub const fn to_string_pair(self) -> (&'static str, &'static str) {
 		const CHECKOUT_OPTION_STASH_AND_REAPPLY: &str =
 			" 🟢 Stash and reapply changes";
 		const CHECKOUT_OPTION_UNCHANGE: &str =
@@ -477,14 +477,14 @@ impl CheckoutOptions {
 			" 🔴 Discard all local changes";
 
 		match self {
-			CheckoutOptions::KeepLocalChanges => (
+			Self::KeepLocalChanges => (
 				"Stash and reapply",
 				CHECKOUT_OPTION_STASH_AND_REAPPLY,
 			),
-			CheckoutOptions::Unchange => {
+			Self::Unchange => {
 				("Don't change", CHECKOUT_OPTION_UNCHANGE)
 			}
-			CheckoutOptions::Discard => {
+			Self::Discard => {
 				("Discard", CHECKOUT_OPTION_DISCARD)
 			}
 		}
