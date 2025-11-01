@@ -3,7 +3,7 @@ use crate::components::{
 	DrawableComponent, EventState,
 };
 use crate::queue::{InternalEvent, NeedsUpdate};
-use crate::strings::{checkout_option_to_string, CheckoutOptions};
+use crate::strings::CheckoutOptions;
 use crate::try_or_popup;
 use crate::{
 	app::Environment,
@@ -43,7 +43,7 @@ impl CheckoutOptionPopup {
 			queue: env.queue.clone(),
 			repo: env.repo.borrow().clone(),
 			branch: None,
-			option: CheckoutOptions::StashAndReapply,
+			option: CheckoutOptions::KeepLocalChanges,
 			visible: false,
 			key_config: env.key_config.clone(),
 			theme: env.theme.clone(),
@@ -64,8 +64,7 @@ impl CheckoutOptionPopup {
 			),
 		]));
 
-		let (kind_name, kind_desc) =
-			checkout_option_to_string(self.option);
+		let (kind_name, kind_desc) = self.option.to_string_pair();
 
 		txt.push(Line::from(vec![
 			Span::styled(
@@ -108,7 +107,7 @@ impl CheckoutOptionPopup {
 
 	fn handle_event(&mut self) -> Result<()> {
 		match self.option {
-			CheckoutOptions::StashAndReapply => {
+			CheckoutOptions::KeepLocalChanges => {
 				let stash_id =
 					stash_save(&self.repo, None, true, false)?;
 				self.checkout()?;
@@ -133,21 +132,21 @@ impl CheckoutOptionPopup {
 	fn change_kind(&mut self, incr: bool) {
 		self.option = if incr {
 			match self.option {
-				CheckoutOptions::StashAndReapply => {
+				CheckoutOptions::KeepLocalChanges => {
 					CheckoutOptions::Unchange
 				}
 				CheckoutOptions::Unchange => CheckoutOptions::Discard,
 				CheckoutOptions::Discard => {
-					CheckoutOptions::StashAndReapply
+					CheckoutOptions::KeepLocalChanges
 				}
 			}
 		} else {
 			match self.option {
-				CheckoutOptions::StashAndReapply => {
+				CheckoutOptions::KeepLocalChanges => {
 					CheckoutOptions::Discard
 				}
 				CheckoutOptions::Unchange => {
-					CheckoutOptions::StashAndReapply
+					CheckoutOptions::KeepLocalChanges
 				}
 				CheckoutOptions::Discard => CheckoutOptions::Unchange,
 			}

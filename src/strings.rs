@@ -440,29 +440,31 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum CheckoutOptions {
-	StashAndReapply,
+	KeepLocalChanges,
 	Unchange,
 	Discard,
 }
 
-pub const fn checkout_option_to_string(
-	kind: CheckoutOptions,
-) -> (&'static str, &'static str) {
-	const CHECKOUT_OPTION_STASH_AND_REAPPLY: &str =
-		" 🟢 Stash and reapply changes";
-	const CHECKOUT_OPTION_UNCHANGE: &str = " 🟡 Keep local changes";
-	const CHECKOUT_OPTION_DISCARD: &str =
-		" 🔴 Discard all local changes";
+impl CheckoutOptions {
+	pub fn to_string_pair(&self) -> (&'static str, &'static str) {
+		const CHECKOUT_OPTION_STASH_AND_REAPPLY: &str =
+			" 🟢 Stash and reapply changes";
+		const CHECKOUT_OPTION_UNCHANGE: &str =
+			" 🟡 Keep local changes";
+		const CHECKOUT_OPTION_DISCARD: &str =
+			" 🔴 Discard all local changes";
 
-	match kind {
-		CheckoutOptions::StashAndReapply => {
-			("Stash and reapply", CHECKOUT_OPTION_STASH_AND_REAPPLY)
-		}
-		CheckoutOptions::Unchange => {
-			("Don't change", CHECKOUT_OPTION_UNCHANGE)
-		}
-		CheckoutOptions::Discard => {
-			("Discard", CHECKOUT_OPTION_DISCARD)
+		match self {
+			CheckoutOptions::KeepLocalChanges => (
+				"Stash and reapply",
+				CHECKOUT_OPTION_STASH_AND_REAPPLY,
+			),
+			CheckoutOptions::Unchange => {
+				("Don't change", CHECKOUT_OPTION_UNCHANGE)
+			}
+			CheckoutOptions::Discard => {
+				("Discard", CHECKOUT_OPTION_DISCARD)
+			}
 		}
 	}
 }
