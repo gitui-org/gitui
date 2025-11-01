@@ -16,7 +16,7 @@ use anyhow::{Ok, Result};
 use asyncgit::sync::branch::checkout_remote_branch;
 use asyncgit::sync::status::discard_status;
 use asyncgit::sync::{
-	checkout_branch, stash_pop, stash_save, BranchInfo, RepoPath,
+	checkout_branch, BranchInfo, RepoPath,
 };
 use crossterm::event::Event;
 use ratatui::{
@@ -43,7 +43,7 @@ impl CheckoutOptionPopup {
 			queue: env.queue.clone(),
 			repo: env.repo.borrow().clone(),
 			branch: None,
-			option: CheckoutOptions::KeepLocalChanges,
+			option: CheckoutOptions::Unchange,
 			visible: false,
 			key_config: env.key_config.clone(),
 			theme: env.theme.clone(),
@@ -107,12 +107,6 @@ impl CheckoutOptionPopup {
 
 	fn handle_event(&mut self) -> Result<()> {
 		match self.option {
-			CheckoutOptions::KeepLocalChanges => {
-				let stash_id =
-					stash_save(&self.repo, None, true, false)?;
-				self.checkout()?;
-				stash_pop(&self.repo, stash_id)?;
-			}
 			CheckoutOptions::Unchange => {
 				self.checkout()?;
 			}

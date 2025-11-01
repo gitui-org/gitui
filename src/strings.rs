@@ -440,7 +440,6 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum CheckoutOptions {
-	KeepLocalChanges,
 	Unchange,
 	Discard,
 }
@@ -448,35 +447,27 @@ pub enum CheckoutOptions {
 impl CheckoutOptions {
 	pub const fn previous(self) -> Self {
 		match self {
-			Self::KeepLocalChanges => Self::Discard,
-			Self::Unchange => Self::KeepLocalChanges,
+			Self::Unchange => Self::Discard,
 			Self::Discard => Self::Unchange,
 		}
 	}
 
 	pub const fn next(self) -> Self {
 		match self {
-			Self::KeepLocalChanges => Self::Unchange,
 			Self::Unchange => Self::Discard,
-			Self::Discard => Self::KeepLocalChanges,
+			Self::Discard => Self::Unchange,
 		}
 	}
 
 	pub const fn to_string_pair(
 		self,
 	) -> (&'static str, &'static str) {
-		const CHECKOUT_OPTION_STASH_AND_REAPPLY: &str =
-			" 🟢 Stash and reapply changes";
 		const CHECKOUT_OPTION_UNCHANGE: &str =
 			" 🟡 Keep local changes";
 		const CHECKOUT_OPTION_DISCARD: &str =
 			" 🔴 Discard all local changes";
 
 		match self {
-			Self::KeepLocalChanges => (
-				"Stash and reapply",
-				CHECKOUT_OPTION_STASH_AND_REAPPLY,
-			),
 			Self::Unchange => {
 				("Don't change", CHECKOUT_OPTION_UNCHANGE)
 			}
