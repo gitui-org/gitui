@@ -446,6 +446,28 @@ pub enum CheckoutOptions {
 }
 
 impl CheckoutOptions {
+	pub fn previous(&self) -> Self {
+		match self {
+			CheckoutOptions::KeepLocalChanges => {
+				CheckoutOptions::Discard
+			}
+			CheckoutOptions::Unchange => {
+				CheckoutOptions::KeepLocalChanges
+			}
+			CheckoutOptions::Discard => CheckoutOptions::Unchange,
+		}
+	}
+
+	pub fn next(&self) -> Self {
+		match self {
+			CheckoutOptions::KeepLocalChanges => CheckoutOptions::Unchange,
+			CheckoutOptions::Unchange => CheckoutOptions::Discard,
+			CheckoutOptions::Discard => {
+				CheckoutOptions::KeepLocalChanges
+			}
+		}
+	}
+
 	pub fn to_string_pair(&self) -> (&'static str, &'static str) {
 		const CHECKOUT_OPTION_STASH_AND_REAPPLY: &str =
 			" 🟢 Stash and reapply changes";

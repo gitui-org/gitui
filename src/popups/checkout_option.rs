@@ -131,25 +131,9 @@ impl CheckoutOptionPopup {
 
 	fn change_kind(&mut self, incr: bool) {
 		self.option = if incr {
-			match self.option {
-				CheckoutOptions::KeepLocalChanges => {
-					CheckoutOptions::Unchange
-				}
-				CheckoutOptions::Unchange => CheckoutOptions::Discard,
-				CheckoutOptions::Discard => {
-					CheckoutOptions::KeepLocalChanges
-				}
-			}
+			self.option.next()
 		} else {
-			match self.option {
-				CheckoutOptions::KeepLocalChanges => {
-					CheckoutOptions::Discard
-				}
-				CheckoutOptions::Unchange => {
-					CheckoutOptions::KeepLocalChanges
-				}
-				CheckoutOptions::Discard => CheckoutOptions::Unchange,
-			}
+			self.option.previous()
 		};
 	}
 }
