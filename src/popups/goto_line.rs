@@ -21,11 +21,6 @@ use anyhow::Result;
 
 use crossterm::event::{Event, KeyCode};
 
-#[derive(Debug)]
-pub struct GotoLineContext {
-	pub max_line: usize,
-}
-
 pub struct GotoLinePopup {
 	visible: bool,
 	input: String,
@@ -34,7 +29,7 @@ pub struct GotoLinePopup {
 	queue: Queue,
 	theme: SharedTheme,
 	invalid_input: bool,
-	context: GotoLineContext,
+	max_line: usize,
 }
 
 impl GotoLinePopup {
@@ -46,14 +41,14 @@ impl GotoLinePopup {
 			queue: env.queue.clone(),
 			theme: env.theme.clone(),
 			invalid_input: false,
-			context: GotoLineContext { max_line: 0 },
+			max_line: 0,
 			line_number: 0,
 		}
 	}
 
-	pub fn open(&mut self, context: GotoLineContext) {
+	pub fn open(&mut self, max_line: usize) {
 		self.visible = true;
-		self.context = context;
+		self.max_line = max_line;
 	}
 }
 
@@ -107,7 +102,7 @@ impl Component for GotoLinePopup {
 					self.visible = false;
 					if self.invalid_input {
 						self.queue.push(InternalEvent::ShowErrorMsg(
-                            format!("Invalid input: only numbers between -{} and {} (included) are allowed (-1 denotes the last line, -2 denotes the second to last line, and so on)",self.context.max_line + 1, self.context.max_line))
+                            format!("Invalid input: only numbers between -{} and {} (included) are allowed (-1 denotes the last line, -2 denotes the second to last line, and so on)",self.max_line + 1, self.max_line))
                             ,
                         );
 					} else if !self.input.is_empty() {
@@ -121,8 +116,7 @@ impl Component for GotoLinePopup {
 			}
 			match self.input.parse::<isize>() {
 				Ok(input) => {
-					let mut max_value_allowed_abs =
-						self.context.max_line;
+					let mut max_value_allowed_abs = self.max_line;
 					// negative indices are 1 based
 					if input < 0 {
 						max_value_allowed_abs += 1;

@@ -909,8 +909,8 @@ impl App {
 			InternalEvent::CommitSearch(options) => {
 				self.revlog.search(options);
 			}
-			InternalEvent::OpenGotoLinePopup(context) => {
-				self.goto_line_popup.open(context);
+			InternalEvent::OpenGotoLinePopup(max_line) => {
+				self.goto_line_popup.open(max_line);
 			}
 			InternalEvent::GotoLine(line) => {
 				if self.blame_file_popup.is_visible() {

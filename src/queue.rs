@@ -2,7 +2,7 @@ use crate::{
 	components::FuzzyFinderTarget,
 	popups::{
 		AppOption, BlameFileOpen, FileRevOpen, FileTreeOpen,
-		GotoLineContext, InspectCommitOpen,
+		InspectCommitOpen,
 	},
 	tabs::StashingOptions,
 };
@@ -158,7 +158,7 @@ pub enum InternalEvent {
 	///
 	CommitSearch(LogFilterSearchOptions),
 	///
-	OpenGotoLinePopup(GotoLineContext),
+	OpenGotoLinePopup(usize),
 	///
 	GotoLine(usize),
 }

@@ -40,7 +40,7 @@ pub use externaleditor::ExternalEditorPopup;
 pub use fetch::FetchPopup;
 pub use file_revlog::{FileRevOpen, FileRevlogPopup};
 pub use fuzzy_find::FuzzyFindPopup;
-pub use goto_line::{GotoLineContext, GotoLinePopup};
+pub use goto_line::GotoLinePopup;
 pub use help::HelpPopup;
 pub use inspect_commit::{InspectCommitOpen, InspectCommitPopup};
 pub use log_search::LogSearchPopupPopup;
