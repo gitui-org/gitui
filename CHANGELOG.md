@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * print slightly nicer errors when failing to create a directory [[@linkmauve](https://github.com/linkmauve)] (https://github.com/gitui-org/gitui/pull/2728)
 * When the terminal is insufficient to display all the commands, the cmdbar_bg configuration color does not fully take effect. ([#2347](https://github.com/extrawurst/gitui/issues/2347))
 * disable blame and history popup keybinds for untracked files [[@kpbaks](https://github.com/kpbaks)] ([#2489](https://github.com/gitui-org/gitui/pull/2489))
+* when staging the last file in a directory, the first item after the directory is no longer skipped [[@Tillerino](https://github.com/Tillerino)] ([#2748](https://github.com/gitui-org/gitui/issues/2748))
 
 ## [0.27.0] - 2024-01-14
 
