@@ -15,9 +15,7 @@ use crate::{
 use anyhow::{Ok, Result};
 use asyncgit::sync::branch::checkout_remote_branch;
 use asyncgit::sync::status::discard_status;
-use asyncgit::sync::{
-	checkout_branch, BranchInfo, RepoPath,
-};
+use asyncgit::sync::{checkout_branch, BranchInfo, RepoPath};
 use crossterm::event::Event;
 use ratatui::{
 	layout::{Alignment, Rect},
