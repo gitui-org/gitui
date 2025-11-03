@@ -41,7 +41,7 @@ impl CheckoutOptionPopup {
 			queue: env.queue.clone(),
 			repo: env.repo.borrow().clone(),
 			branch: None,
-			option: CheckoutOptions::Unchange,
+			option: CheckoutOptions::KeepLocalChanges,
 			visible: false,
 			key_config: env.key_config.clone(),
 			theme: env.theme.clone(),
@@ -99,10 +99,10 @@ impl CheckoutOptionPopup {
 
 	fn handle_event(&mut self) -> Result<()> {
 		match self.option {
-			CheckoutOptions::Unchange => {
+			CheckoutOptions::KeepLocalChanges => {
 				self.checkout()?;
 			}
-			CheckoutOptions::Discard => {
+			CheckoutOptions::DiscardAllLocalChagnes => {
 				discard_status(&self.repo)?;
 				self.checkout()?;
 			}
