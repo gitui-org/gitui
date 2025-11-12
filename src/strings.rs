@@ -438,6 +438,46 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 	}
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum CheckoutOptions {
+	KeepLocalChanges,
+	DiscardAllLocalChagnes,
+}
+
+impl CheckoutOptions {
+	pub const fn previous(self) -> Self {
+		match self {
+			Self::KeepLocalChanges => Self::DiscardAllLocalChagnes,
+			Self::DiscardAllLocalChagnes => Self::KeepLocalChanges,
+		}
+	}
+
+	pub const fn next(self) -> Self {
+		match self {
+			Self::KeepLocalChanges => Self::DiscardAllLocalChagnes,
+			Self::DiscardAllLocalChagnes => Self::KeepLocalChanges,
+		}
+	}
+
+	pub const fn to_string_pair(
+		self,
+	) -> (&'static str, &'static str) {
+		const CHECKOUT_OPTION_UNCHANGE: &str =
+			" 🟡 Keep local changes";
+		const CHECKOUT_OPTION_DISCARD: &str =
+			" 🔴 Discard all local changes";
+
+		match self {
+			Self::KeepLocalChanges => {
+				("Don't change", CHECKOUT_OPTION_UNCHANGE)
+			}
+			Self::DiscardAllLocalChagnes => {
+				("Discard", CHECKOUT_OPTION_DISCARD)
+			}
+		}
+	}
+}
+
 pub mod commit {
 	use crate::keys::SharedKeyConfig;
 

@@ -10,16 +10,16 @@ use crate::{
 	options::{Options, SharedOptions},
 	popup_stack::PopupStack,
 	popups::{
-		AppOption, BlameFilePopup, BranchListPopup, CommitPopup,
-		CompareCommitsPopup, ConfirmPopup, CreateBranchPopup,
-		CreateRemotePopup, ExternalEditorPopup, FetchPopup,
-		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
-		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
-		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
-		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
-		ResetPopup, RevisionFilesPopup, StashMsgPopup,
-		SubmodulesListPopup, TagCommitPopup, TagListPopup,
-		UpdateRemoteUrlPopup,
+		AppOption, BlameFilePopup, BranchListPopup,
+		CheckoutOptionPopup, CommitPopup, CompareCommitsPopup,
+		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
+		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
+		FuzzyFindPopup, GotoLinePopup, HelpPopup, InspectCommitPopup,
+		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
+		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
+		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
+		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
+		TagListPopup, UpdateRemoteUrlPopup,
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -98,6 +98,7 @@ pub struct App {
 	submodule_popup: SubmodulesListPopup,
 	tags_popup: TagListPopup,
 	reset_popup: ResetPopup,
+	checkout_option_popup: CheckoutOptionPopup,
 	cmdbar: RefCell<CommandBar>,
 	tab: usize,
 	revlog: Revlog,
@@ -219,6 +220,7 @@ impl App {
 			stashing_tab: Stashing::new(&env),
 			stashlist_tab: StashList::new(&env),
 			files_tab: FilesTab::new(&env),
+			checkout_option_popup: CheckoutOptionPopup::new(&env),
 			goto_line_popup: GotoLinePopup::new(&env),
 			tab: 0,
 			queue: env.queue,
@@ -496,6 +498,7 @@ impl App {
 			fetch_popup,
 			tag_commit_popup,
 			reset_popup,
+			checkout_option_popup,
 			create_branch_popup,
 			create_remote_popup,
 			rename_remote_popup,
@@ -536,6 +539,7 @@ impl App {
 			submodule_popup,
 			tags_popup,
 			reset_popup,
+			checkout_option_popup,
 			create_branch_popup,
 			rename_branch_popup,
 			revision_files_popup,
@@ -916,6 +920,9 @@ impl App {
 				if self.blame_file_popup.is_visible() {
 					self.blame_file_popup.goto_line(line);
 				}
+			}
+			InternalEvent::CheckoutOption(branch) => {
+				self.checkout_option_popup.open(branch)?;
 			}
 		}
 
