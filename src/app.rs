@@ -10,16 +10,16 @@ use crate::{
 	options::{Options, SharedOptions},
 	popup_stack::PopupStack,
 	popups::{
-		AppOption, BlameFilePopup, BranchListPopup, CommitPopup,
-		CompareCommitsPopup, ConfirmPopup, CreateBranchPopup,
-		CreateRemotePopup, ExternalEditorPopup, FetchPopup,
-		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
-		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
-		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
-		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
-		ResetPopup, RevisionFilesPopup, StashMsgPopup,
-		SubmodulesListPopup, TagCommitPopup, TagListPopup,
-		UpdateRemoteUrlPopup, GotoLinePopup
+		AppOption, BlameFilePopup, BranchListPopup,
+		CheckoutOptionPopup, CommitPopup, CompareCommitsPopup,
+		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
+		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
+		FuzzyFindPopup, GotoLinePopup, HelpPopup, InspectCommitPopup,
+		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
+		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
+		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
+		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
+		TagListPopup, UpdateRemoteUrlPopup,
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -923,7 +923,7 @@ impl App {
 			}
 			InternalEvent::CheckoutOption(branch) => {
 				self.checkout_option_popup.open(branch)?;
-}
+			}
 		}
 
 		Ok(flags)
