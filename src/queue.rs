@@ -159,6 +159,10 @@ pub enum InternalEvent {
 	///
 	CommitSearch(LogFilterSearchOptions),
 	///
+	OpenGotoLinePopup(usize),
+	///
+	GotoLine(usize),
+	///
 	CheckoutOption(BranchInfo),
 }
 

@@ -10,16 +10,16 @@ use crate::{
 	options::{Options, SharedOptions},
 	popup_stack::PopupStack,
 	popups::{
-		AppOption, BlameFilePopup, BranchListPopup,
-		CheckoutOptionPopup, CommitPopup, CompareCommitsPopup,
-		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
-		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
-		FuzzyFindPopup, HelpPopup, InspectCommitPopup,
-		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
-		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
-		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
-		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
-		TagListPopup, UpdateRemoteUrlPopup,
+		AppOption, BlameFilePopup, BranchListPopup, CommitPopup,
+		CompareCommitsPopup, ConfirmPopup, CreateBranchPopup,
+		CreateRemotePopup, ExternalEditorPopup, FetchPopup,
+		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
+		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
+		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
+		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
+		ResetPopup, RevisionFilesPopup, StashMsgPopup,
+		SubmodulesListPopup, TagCommitPopup, TagListPopup,
+		UpdateRemoteUrlPopup, GotoLinePopup
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -113,6 +113,7 @@ pub struct App {
 	popup_stack: PopupStack,
 	options: SharedOptions,
 	repo_path_text: String,
+	goto_line_popup: GotoLinePopup,
 
 	// "Flags"
 	requires_redraw: Cell<bool>,
@@ -220,6 +221,7 @@ impl App {
 			stashlist_tab: StashList::new(&env),
 			files_tab: FilesTab::new(&env),
 			checkout_option_popup: CheckoutOptionPopup::new(&env),
+			goto_line_popup: GotoLinePopup::new(&env),
 			tab: 0,
 			queue: env.queue,
 			theme: env.theme,
@@ -483,6 +485,7 @@ impl App {
 			msg_popup,
 			confirm_popup,
 			commit_popup,
+			goto_line_popup,
 			blame_file_popup,
 			file_revlog_popup,
 			stashmsg_popup,
@@ -548,7 +551,8 @@ impl App {
 			fetch_popup,
 			options_popup,
 			confirm_popup,
-			msg_popup
+			msg_popup,
+			goto_line_popup
 		]
 	);
 
@@ -909,9 +913,17 @@ impl App {
 			InternalEvent::CommitSearch(options) => {
 				self.revlog.search(options);
 			}
+			InternalEvent::OpenGotoLinePopup(max_line) => {
+				self.goto_line_popup.open(max_line);
+			}
+			InternalEvent::GotoLine(line) => {
+				if self.blame_file_popup.is_visible() {
+					self.blame_file_popup.goto_line(line);
+				}
+			}
 			InternalEvent::CheckoutOption(branch) => {
 				self.checkout_option_popup.open(branch)?;
-			}
+}
 		}
 
 		Ok(flags)
