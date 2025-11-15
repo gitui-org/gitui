@@ -130,7 +130,7 @@ impl<J: 'static + AsyncJob> AsyncSingleJob<J> {
 			let self_clone = (*self).clone();
 			rayon_core::spawn(move || {
 				if let Err(e) = self_clone.run_job(task) {
-					log::error!("async job error: {}", e);
+					log::error!("async job error: {e}");
 				}
 			});
 

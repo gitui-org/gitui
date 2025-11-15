@@ -18,7 +18,6 @@ pub struct Theme {
 	selection_fg: Color,
 	use_selection_fg: bool,
 	cmdbar_bg: Color,
-	cmdbar_extra_lines_bg: Color,
 	disabled_fg: Color,
 	diff_line_add: Color,
 	diff_line_delete: Color,
@@ -211,17 +210,13 @@ impl Theme {
 		self.line_break.clone()
 	}
 
-	pub fn commandbar(&self, enabled: bool, line: usize) -> Style {
+	pub fn commandbar(&self, enabled: bool) -> Style {
 		if enabled {
 			Style::default().fg(self.command_fg)
 		} else {
 			Style::default().fg(self.disabled_fg)
 		}
-		.bg(if line == 0 {
-			self.cmdbar_bg
-		} else {
-			self.cmdbar_extra_lines_bg
-		})
+		.bg(self.cmdbar_bg)
 	}
 
 	pub fn commit_hash(&self, selected: bool) -> Style {
@@ -313,7 +308,7 @@ impl Theme {
 		let mut theme = Self::default();
 
 		if let Ok(patch) = Self::load_patch(theme_path).map_err(|e| {
-			log::error!("theme error [{:?}]: {e}", theme_path);
+			log::error!("theme error [{theme_path:?}]: {e}");
 			e
 		}) {
 			theme.apply(patch);
@@ -322,15 +317,9 @@ impl Theme {
 			theme = old_theme;
 
 			if theme.save_patch(theme_path).is_ok() {
-				log::info!(
-					"Converted old theme to new format. ({:?})",
-					theme_path
-				);
+				log::info!("Converted old theme to new format. ({theme_path:?})");
 			} else {
-				log::warn!(
-					"Failed to save theme in new format. ({:?})",
-					theme_path
-				);
+				log::warn!("Failed to save theme in new format. ({theme_path:?})");
 			}
 		}
 
@@ -347,7 +336,6 @@ impl Default for Theme {
 			selection_fg: Color::White,
 			use_selection_fg: true,
 			cmdbar_bg: Color::Blue,
-			cmdbar_extra_lines_bg: Color::Blue,
 			disabled_fg: Color::DarkGray,
 			diff_line_add: Color::Green,
 			diff_line_delete: Color::Red,

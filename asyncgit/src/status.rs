@@ -135,7 +135,7 @@ impl AsyncStatus {
 				&arc_current,
 				&arc_last,
 			) {
-				log::error!("fetch_helper: {}", e);
+				log::error!("fetch_helper: {e}");
 			}
 
 			arc_pending.fetch_sub(1, Ordering::Relaxed);
@@ -158,9 +158,7 @@ impl AsyncStatus {
 	) -> Result<()> {
 		let res = Self::get_status(repo, status_type, config)?;
 		log::trace!(
-			"status fetched: {} (type: {:?})",
-			hash_request,
-			status_type,
+			"status fetched: {hash_request} (type: {status_type:?})",
 		);
 
 		{

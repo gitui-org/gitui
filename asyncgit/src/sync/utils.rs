@@ -26,10 +26,16 @@ pub struct Head {
 
 ///
 pub fn repo_open_error(repo_path: &RepoPath) -> Option<String> {
-	Repository::open_ext(
+	if let Err(e) = Repository::open_ext(
 		repo_path.gitpath(),
 		RepositoryOpenFlags::FROM_ENV,
 		Vec::<&Path>::new(),
+	) {
+		return Some(e.to_string());
+	}
+
+	gix::ThreadSafeRepository::discover_with_environment_overrides(
+		repo_path.gitpath(),
 	)
 	.map_or_else(|e| Some(e.to_string()), |_| None)
 }
