@@ -165,6 +165,13 @@ impl SignBuilder {
 						SignBuilderError::SSHSigningKey(
 							err.to_string(),
 						)
+					})
+					.map(|value| {
+						if value.starts_with("key::") {
+							value.replacen("key::", "", 1)
+						} else {
+							value
+						}
 					})?;
 
 				let mut pub_key_temp_file = None;
