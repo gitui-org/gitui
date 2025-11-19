@@ -1,6 +1,6 @@
 //! Sign commit data.
 
-use std::path::PathBuf;
+use tempfile::NamedTempFile;
 
 /// Error type for [`SignBuilder`], used to create [`Sign`]'s
 #[derive(thiserror::Error, Debug)]
@@ -159,47 +159,50 @@ impl SignBuilder {
 					.get_string("gpg.ssh.program")
 					.unwrap_or_else(|_| "ssh-keygen".to_string());
 
-				let signing_key = config
+				let mut signing_key = config
 					.get_string("user.signingKey")
 					.map_err(|err| {
 						SignBuilderError::SSHSigningKey(
 							err.to_string(),
 						)
-					})
-					.and_then(|signing_key| {
-						Self::signing_key_into_path(&signing_key)
 					})?;
+
+				let mut pub_key_temp_file = None;
+				if signing_key.starts_with("ssh-") {
+					let named_temp_file =
+						Self::signing_key_into_temp_file(
+							signing_key.as_str(),
+						)?;
+					signing_key = format!(
+						"{}",
+						named_temp_file.path().display()
+					);
+					pub_key_temp_file = Some(named_temp_file);
+				}
 
 				Ok(Box::new(SSHSign {
 					program,
-					signing_key,
+					signing_key_path: signing_key,
+					_pub_key_temp_file: pub_key_temp_file,
 				}))
 			}
 			_ => Err(SignBuilderError::InvalidFormat(format)),
 		}
 	}
 
-	fn signing_key_into_path(
+	fn signing_key_into_temp_file(
 		signing_key: &str,
-	) -> Result<PathBuf, SignBuilderError> {
-		let key_path = PathBuf::from(signing_key);
-		if signing_key.starts_with("ssh-") {
-			use std::io::Write;
-			use tempfile::NamedTempFile;
-			let mut temp_file =
-				NamedTempFile::new().map_err(|err| {
-					SignBuilderError::SSHSigningKey(err.to_string())
-				})?;
-			writeln!(temp_file, "{signing_key}").map_err(|err| {
-				SignBuilderError::SSHSigningKey(err.to_string())
-			})?;
-			let temp_file = temp_file.keep().map_err(|err| {
-				SignBuilderError::SSHSigningKey(err.to_string())
-			})?;
-			Ok(temp_file.1)
-		} else {
-			Ok(key_path)
-		}
+	) -> Result<NamedTempFile, SignBuilderError> {
+		use std::io::Write;
+		use tempfile::NamedTempFile;
+		let mut temp_file = NamedTempFile::new().map_err(|err| {
+			SignBuilderError::SSHSigningKey(err.to_string())
+		})?;
+		writeln!(temp_file, "{signing_key}").map_err(|err| {
+			SignBuilderError::SSHSigningKey(err.to_string())
+		})?;
+		let temp_file = temp_file;
+		Ok(temp_file)
 	}
 }
 
@@ -280,7 +283,8 @@ impl Sign for GPGSign {
 /// Sign commit data using `ssh-keygen`
 pub struct SSHSign {
 	program: String,
-	signing_key: PathBuf,
+	signing_key_path: String,
+	_pub_key_temp_file: Option<NamedTempFile>,
 }
 
 impl Sign for SSHSign {
@@ -300,7 +304,7 @@ impl Sign for SSHSign {
 			.arg("-n")
 			.arg("git")
 			.arg("-f")
-			.arg(&self.signing_key);
+			.arg(&self.signing_key_path);
 
 		if &self.program == "ssh-keygen" {
 			cmd.arg("-P").arg("\"\"");
@@ -322,14 +326,6 @@ impl Sign for SSHSign {
 		let output = child
 			.wait_with_output()
 			.map_err(|e| SignError::Output(e.to_string()))?;
-
-		let tmp_path = std::env::temp_dir();
-		if self.signing_key.starts_with(tmp_path) {
-			// Not handling error, as its not that bad. OS maintenance tasks will take care of it at a later point.
-			let _ = std::fs::remove_file(PathBuf::from(
-				&self.signing_key,
-			));
-		}
 
 		if !output.status.success() {
 			let error_msg = std::str::from_utf8(&output.stderr)
@@ -357,7 +353,7 @@ impl Sign for SSHSign {
 
 	#[cfg(test)]
 	fn signing_key(&self) -> String {
-		format!("{}", self.signing_key.display())
+		format!("{}", self.signing_key_path)
 	}
 }
 
@@ -474,6 +470,7 @@ mod tests {
 
 	#[test]
 	fn test_ssh_keyliteral_config() -> Result<()> {
+		use std::path::PathBuf;
 		let (_tmp_dir, repo) = repo_init_empty()?;
 
 		{
