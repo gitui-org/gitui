@@ -76,9 +76,9 @@ impl DrawableComponent for InspectCommitPopup {
 				Constraint::Percentage(50),
 			],
 			80..100 => [Constraint::Max(32), Constraint::Fill(1)],
-			100..120 => [Constraint::Max(40), Constraint::Fill(1)],
-			120..140 => [Constraint::Max(48), Constraint::Fill(1)],
-			_ => [Constraint::Max(52), Constraint::Fill(1)],
+			100..120 => [Constraint::Max(38), Constraint::Fill(1)],
+			120..152 => [Constraint::Max(42), Constraint::Fill(1)],
+			_ => [Constraint::Max(50), Constraint::Fill(1)],
 		};
 
 		let chunks = Layout::default()
