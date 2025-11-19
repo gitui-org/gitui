@@ -314,7 +314,7 @@ impl Sign for SSHSign {
 			.arg(&self.signing_key_path);
 
 		if &self.program == "ssh-keygen" {
-			cmd.arg("-P").arg("\"\"");
+			cmd.arg("-U");
 		}
 
 		log::trace!("signing command: {cmd:?}");
