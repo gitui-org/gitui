@@ -297,7 +297,6 @@ mod tests {
 	};
 
 	#[test]
-	#[should_panic]
 	fn test_get_status_with_workdir() {
 		let (git_dir, _repo) = repo_init_bare().unwrap();
 
