@@ -280,3 +280,50 @@ pub fn get_status(
 
 	Ok(res)
 }
+
+#[cfg(test)]
+mod tests {
+	use std::{fs::File, io::Write, path::Path};
+
+	use tempfile::TempDir;
+
+	use crate::{
+		sync::{
+			status::{get_status, StatusType},
+			tests::repo_init_bare,
+			RepoPath,
+		},
+		StatusItem, StatusItemType,
+	};
+
+	#[test]
+	#[should_panic]
+	fn test_get_status_with_workdir() {
+		let (git_dir, _repo) = repo_init_bare().unwrap();
+
+		let separate_workdir = TempDir::new().unwrap();
+
+		let file_path = Path::new("foo");
+		File::create(separate_workdir.path().join(file_path))
+			.unwrap()
+			.write_all(b"a")
+			.unwrap();
+
+		let repo_path = RepoPath::Workdir {
+			gitdir: git_dir.path().into(),
+			workdir: separate_workdir.path().into(),
+		};
+
+		let status =
+			get_status(&repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+
+		assert_eq!(
+			status,
+			vec![StatusItem {
+				path: "foo".into(),
+				status: StatusItemType::New
+			}]
+		);
+	}
+}
