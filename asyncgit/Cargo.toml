@@ -39,7 +39,7 @@ rayon = "1.11"
 rayon-core = "1.13"
 scopetime = { path = "../scopetime", version = "0.1" }
 serde = { version = "1.0", features = ["derive"] }
-ssh-key = { version = "0.6.7", features = ["crypto", "encryption"] }
+tempfile = "3"
 thiserror = "2.0"
 unicode-truncate = "2.0"
 url = "2.5"
@@ -49,4 +49,3 @@ env_logger = "0.11"
 invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
 serial_test = "3.2"
-tempfile = "3"
