@@ -1,5 +1,6 @@
 use crate::{
 	accessors,
+	args::CliArgs,
 	cmdbar::CommandBar,
 	components::{
 		command_pump, event_pump, CommandInfo, Component,
@@ -152,13 +153,14 @@ impl App {
 	///
 	#[allow(clippy::too_many_lines)]
 	pub fn new(
-		repo: RepoPathRef,
+		cliargs: CliArgs,
 		sender_git: Sender<AsyncGitNotification>,
 		sender_app: Sender<AsyncAppNotification>,
 		input: Input,
 		theme: Theme,
 		key_config: KeyConfig,
 	) -> Result<Self> {
+		let repo = RefCell::new(cliargs.repo_path.clone());
 		log::trace!("open repo at: {:?}", &repo);
 
 		let repo_path_text =
@@ -174,7 +176,20 @@ impl App {
 			sender_app,
 		};
 
-		let tab = env.options.borrow().current_tab();
+		let mut select_file: Option<PathBuf> = None;
+		let tab = if let Some(file) = cliargs.select_file {
+			// convert to relative git path
+			if let Ok(abs) = file.canonicalize() {
+				if let Ok(path) = abs.strip_prefix(
+					env.repo.borrow().gitpath().canonicalize()?,
+				) {
+					select_file = Some(Path::new(".").join(path));
+				}
+			}
+			2
+		} else {
+			env.options.borrow().current_tab()
+		};
 
 		let mut app = Self {
 			input,
@@ -219,7 +234,7 @@ impl App {
 			status_tab: Status::new(&env),
 			stashing_tab: Stashing::new(&env),
 			stashlist_tab: StashList::new(&env),
-			files_tab: FilesTab::new(&env),
+			files_tab: FilesTab::new(&env, select_file),
 			checkout_option_popup: CheckoutOptionPopup::new(&env),
 			goto_line_popup: GotoLinePopup::new(&env),
 			tab: 0,
