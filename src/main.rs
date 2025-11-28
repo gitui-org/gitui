@@ -165,7 +165,7 @@ macro_rules! log_eprintln {
 fn main() -> Result<()> {
 	let app_start = Instant::now();
 
-	let mut cliargs = process_cmdline()?;
+	let cliargs = process_cmdline()?;
 
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
@@ -192,10 +192,12 @@ fn main() -> Result<()> {
 		Updater::Ticker
 	};
 
+	let mut args = cliargs;
+
 	loop {
 		let quit_state = run_app(
 			app_start,
-			cliargs.clone(),
+			args.clone(),
 			theme.clone(),
 			key_config.clone(),
 			&input,
@@ -205,11 +207,11 @@ fn main() -> Result<()> {
 
 		match quit_state {
 			QuitState::OpenSubmodule(p) => {
-				cliargs = CliArgs {
+				args = CliArgs {
 					repo_path: p,
 					select_file: None,
-					theme: cliargs.theme,
-					notify_watcher: cliargs.notify_watcher,
+					theme: args.theme,
+					notify_watcher: args.notify_watcher,
 				}
 			}
 			_ => break,
