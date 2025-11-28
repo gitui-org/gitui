@@ -294,8 +294,17 @@ pub fn discard_status(repo_path: &RepoPath) -> Result<bool> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::sync::{commit, stage_add_file, tests::repo_init};
+	use crate::{
+		sync::{
+			commit, stage_add_file,
+			status::{get_status, StatusType},
+			tests::{repo_init, repo_init_bare},
+			RepoPath,
+		},
+		StatusItem, StatusItemType,
+	};
 	use std::{fs::File, io::Write, path::Path};
+	use tempfile::TempDir;
 
 	#[test]
 	fn test_discard_status() {
@@ -324,5 +333,35 @@ mod tests {
 			get_status(repo_path, StatusType::WorkingDir, None)
 				.unwrap();
 		assert_eq!(statuses.len(), 0);
+	}
+
+	#[test]
+	fn test_get_status_with_workdir() {
+		let (git_dir, _repo) = repo_init_bare().unwrap();
+
+		let separate_workdir = TempDir::new().unwrap();
+
+		let file_path = Path::new("foo");
+		File::create(separate_workdir.path().join(file_path))
+			.unwrap()
+			.write_all(b"a")
+			.unwrap();
+
+		let repo_path = RepoPath::Workdir {
+			gitdir: git_dir.path().into(),
+			workdir: separate_workdir.path().into(),
+		};
+
+		let status =
+			get_status(&repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+
+		assert_eq!(
+			status,
+			vec![StatusItem {
+				path: "foo".into(),
+				status: StatusItemType::New
+			}]
+		);
 	}
 }
