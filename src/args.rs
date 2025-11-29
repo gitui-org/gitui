@@ -20,6 +20,8 @@ const WORKDIR_FLAG_ID: &str = "workdir";
 const FILE_FLAG_ID: &str = "file";
 const GIT_DIR_FLAG_ID: &str = "directory";
 const WATCHER_FLAG_ID: &str = "watcher";
+const KEY_BINDINGS_FLAG_ID: &str = "key_bindings";
+const KEY_SYMBOLS_FLAG_ID: &str = "key_symbols";
 const DEFAULT_THEME: &str = "theme.ron";
 const DEFAULT_GIT_DIR: &str = ".";
 
@@ -29,6 +31,8 @@ pub struct CliArgs {
 	pub select_file: Option<PathBuf>,
 	pub repo_path: RepoPath,
 	pub notify_watcher: bool,
+	pub key_bindings_path: Option<PathBuf>,
+	pub key_symbols_path: Option<PathBuf>,
 }
 
 pub fn process_cmdline() -> Result<CliArgs> {
@@ -80,11 +84,21 @@ pub fn process_cmdline() -> Result<CliArgs> {
 	let notify_watcher: bool =
 		*arg_matches.get_one(WATCHER_FLAG_ID).unwrap_or(&false);
 
+	let key_bindings_path = arg_matches
+		.get_one::<String>(KEY_BINDINGS_FLAG_ID)
+		.map(PathBuf::from);
+
+	let key_symbols_path = arg_matches
+		.get_one::<String>(KEY_SYMBOLS_FLAG_ID)
+		.map(PathBuf::from);
+
 	Ok(CliArgs {
 		theme,
 		select_file,
 		repo_path,
 		notify_watcher,
+		key_bindings_path,
+		key_symbols_path,
 	})
 }
 
@@ -103,6 +117,22 @@ fn app() -> ClapApp {
 
 {all-args}{after-help}
 		",
+		)
+			.arg(
+			Arg::new(KEY_BINDINGS_FLAG_ID)
+				.help("Use a custom keybindings file")
+				.short('k')
+				.long("key-bindings")
+				.value_name("KEY_LIST_FILENAME")
+				.num_args(1),
+		)
+			.arg(
+			Arg::new(KEY_SYMBOLS_FLAG_ID)
+				.help("Use a custom symbols file")
+				.short('s')
+				.long("key-symbols")
+				.value_name("KEY_SYMBOLS_FILENAME")
+				.num_args(1),
 		)
 		.arg(
 			Arg::new(THEME_FLAG_ID)
