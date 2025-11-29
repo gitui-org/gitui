@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use crossterm::event::{KeyCode, KeyModifiers};
 use std::{fs::canonicalize, path::PathBuf, rc::Rc};
 
@@ -38,27 +38,16 @@ impl KeyConfig {
 		key_bindings_path: Option<&PathBuf>,
 		key_symbols_path: Option<&PathBuf>,
 	) -> Result<Self> {
-		let keys = if let Some(path) = key_bindings_path {
-			if !path.exists() {
-				return Err(anyhow!(
-					"The custom key bindings file dosen't exists"
-				));
-			}
-			KeysList::init(path.clone())
-		} else {
-			KeysList::init(Self::get_config_file()?)
-		};
-
-		let symbols = if let Some(path) = key_symbols_path {
-			if !path.exists() {
-				return Err(anyhow!(
-					"The custom key symbols file dosen't exists"
-				));
-			}
-			KeySymbols::init(path.clone())
-		} else {
-			KeySymbols::init(Self::get_symbols_file()?)
-		};
+		let keys = KeysList::init(
+			key_bindings_path
+				.unwrap_or(&Self::get_config_file()?)
+				.clone(),
+		);
+		let symbols = KeySymbols::init(
+			key_symbols_path
+				.unwrap_or(&Self::get_symbols_file()?)
+				.clone(),
+		);
 
 		Ok(Self { keys, symbols })
 	}
