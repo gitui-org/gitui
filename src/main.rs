@@ -215,6 +215,8 @@ fn main() -> Result<()> {
 					select_file: None,
 					theme: args.theme,
 					notify_watcher: args.notify_watcher,
+					key_bindings_path: args.key_bindings_path,
+					key_symbols_path: args.key_symbols_path,
 				}
 			}
 			_ => break,
