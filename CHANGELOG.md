@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
 * add "go to line" command for the blame view [[@andrea-berling](https://github.com/andrea-berling)] ([#2262](https://github.com/extrawurst/gitui/pull/2262))
 * add `--file` cli flag to open the files tab with the given file already selected [[@laktak](https://github.com/laktak)] ([#2510](https://github.com/gitui-org/gitui/issues/2510))
+* add the ability to specify a custom keybinding/symbols file via the cli [[@0x61nas](https://github.com/0x61nas)] ([#2731](https://github.com/gitui-org/gitui/pull/2731))
 
 ### Changed
 * execute git-hooks directly if possible (on *nix) else use sh instead of bash (without reading SHELL variable) [[@Joshix](https://github.com/Joshix-1)] ([#2483](https://github.com/extrawurst/gitui/pull/2483))
