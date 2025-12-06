@@ -65,6 +65,7 @@ mod bug_report;
 mod clipboard;
 mod cmdbar;
 mod components;
+mod gitui;
 mod input;
 mod keys;
 mod notify_mutex;
@@ -85,12 +86,9 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use app::QuitState;
-use asyncgit::{
-	sync::{utils::repo_work_dir, RepoPath},
-	AsyncGitNotification,
-};
+use asyncgit::{sync::RepoPath, AsyncGitNotification};
 use backtrace::Backtrace;
-use crossbeam_channel::{never, tick, unbounded, Receiver, Select};
+use crossbeam_channel::{Receiver, Select};
 use crossterm::{
 	terminal::{
 		disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
@@ -98,12 +96,11 @@ use crossterm::{
 	},
 	ExecutableCommand,
 };
-use input::{Input, InputEvent, InputState};
+use gitui::Gitui;
+use input::InputEvent;
 use keys::KeyConfig;
 use ratatui::backend::CrosstermBackend;
 use scopeguard::defer;
-use scopetime::scope_time;
-use spinner::Spinner;
 use std::{
 	io::{self, Stdout},
 	panic,
@@ -111,7 +108,6 @@ use std::{
 	time::{Duration, Instant},
 };
 use ui::style::Theme;
-use watcher::RepoWatcher;
 
 type Terminal = ratatui::Terminal<CrosstermBackend<io::Stdout>>;
 
@@ -187,7 +183,6 @@ fn main() -> Result<()> {
 
 	let mut terminal =
 		start_terminal(io::stdout(), &cliargs.repo_path)?;
-	let input = Input::new();
 
 	let updater = if cliargs.notify_watcher {
 		Updater::NotifyWatcher
@@ -202,8 +197,7 @@ fn main() -> Result<()> {
 			app_start,
 			args.clone(),
 			theme.clone(),
-			key_config.clone(),
-			&input,
+			&key_config,
 			updater,
 			&mut terminal,
 		)?;
@@ -230,106 +224,15 @@ fn run_app(
 	app_start: Instant,
 	cliargs: CliArgs,
 	theme: Theme,
-	key_config: KeyConfig,
-	input: &Input,
+	key_config: &KeyConfig,
 	updater: Updater,
 	terminal: &mut Terminal,
 ) -> Result<QuitState, anyhow::Error> {
-	let (tx_git, rx_git) = unbounded();
-	let (tx_app, rx_app) = unbounded();
-
-	let rx_input = input.receiver();
-
-	let (rx_ticker, rx_watcher) = match updater {
-		Updater::NotifyWatcher => {
-			let repo_watcher = RepoWatcher::new(
-				repo_work_dir(&cliargs.repo_path)?.as_str(),
-			);
-
-			(never(), repo_watcher.receiver())
-		}
-		Updater::Ticker => (tick(TICK_INTERVAL), never()),
-	};
-
-	let spinner_ticker = tick(SPINNER_INTERVAL);
-
-	let mut app = App::new(
-		cliargs,
-		tx_git,
-		tx_app,
-		input.clone(),
-		theme,
-		key_config,
-	)?;
-
-	let mut spinner = Spinner::default();
-	let mut first_update = true;
+	let mut gitui = Gitui::new(cliargs, theme, key_config, updater)?;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 
-	loop {
-		let event = if first_update {
-			first_update = false;
-			QueueEvent::Notify
-		} else {
-			select_event(
-				&rx_input,
-				&rx_git,
-				&rx_app,
-				&rx_ticker,
-				&rx_watcher,
-				&spinner_ticker,
-			)?
-		};
-
-		{
-			if matches!(event, QueueEvent::SpinnerUpdate) {
-				spinner.update();
-				spinner.draw(terminal)?;
-				continue;
-			}
-
-			scope_time!("loop");
-
-			match event {
-				QueueEvent::InputEvent(ev) => {
-					if matches!(
-						ev,
-						InputEvent::State(InputState::Polling)
-					) {
-						//Note: external ed closed, we need to re-hide cursor
-						terminal.hide_cursor()?;
-					}
-					app.event(ev)?;
-				}
-				QueueEvent::Tick | QueueEvent::Notify => {
-					app.update()?;
-				}
-				QueueEvent::AsyncEvent(ev) => {
-					if !matches!(
-						ev,
-						AsyncNotification::Git(
-							AsyncGitNotification::FinishUnchanged
-						)
-					) {
-						app.update_async(ev)?;
-					}
-				}
-				QueueEvent::SpinnerUpdate => unreachable!(),
-			}
-
-			draw(terminal, &app)?;
-
-			spinner.set_state(app.any_work_pending());
-			spinner.draw(terminal)?;
-
-			if app.is_quit() {
-				break;
-			}
-		}
-	}
-
-	Ok(app.quit_state())
+	gitui.run_main_loop(terminal)
 }
 
 fn setup_terminal() -> Result<()> {
@@ -353,7 +256,10 @@ fn shutdown_terminal() {
 	}
 }
 
-fn draw(terminal: &mut Terminal, app: &App) -> io::Result<()> {
+fn draw<B: ratatui::backend::Backend>(
+	terminal: &mut ratatui::Terminal<B>,
+	app: &App,
+) -> io::Result<()> {
 	if app.requires_redraw() {
 		terminal.clear()?;
 	}
