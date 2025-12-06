@@ -40,10 +40,12 @@ pub fn amend(
 		return Err(Error::SignAmendNonLastCommit);
 	}
 
+	let committer = signature_allow_undefined_name(&repo)?;
+
 	let new_id = commit.amend(
 		Some("HEAD"),
 		None,
-		None,
+		Some(&committer), // Passing a value will overwrite the committer.
 		None,
 		Some(msg),
 		Some(&tree),
@@ -305,6 +307,55 @@ mod tests {
 		assert_eq!(head, new_id);
 
 		Ok(())
+	}
+
+	#[test]
+	fn test_amend_with_different_user() {
+		let file_path1 = Path::new("foo");
+		let file_path2 = Path::new("foo2");
+		let (_td, repo) = repo_init_empty().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		File::create(root.join(file_path1))
+			.unwrap()
+			.write_all(b"test1")
+			.unwrap();
+
+		stage_add_file(repo_path, file_path1).unwrap();
+		let id = commit(repo_path, "commit msg").unwrap();
+
+		let amended_details =
+			get_commit_details(repo_path, id).unwrap();
+
+		assert_eq!(amended_details.committer, None);
+
+		File::create(root.join(file_path2))
+			.unwrap()
+			.write_all(b"test2")
+			.unwrap();
+
+		stage_add_file(repo_path, file_path2).unwrap();
+
+		repo.config()
+			.unwrap()
+			.set_str("user.name", "changed name")
+			.unwrap();
+		repo.config()
+			.unwrap()
+			.set_str("user.email", "changed@example.com")
+			.unwrap();
+
+		let new_id = amend(repo_path, id, "amended").unwrap();
+
+		let amended_details =
+			get_commit_details(repo_path, new_id).unwrap();
+		assert_eq!(amended_details.author.name, "name");
+		assert_eq!(amended_details.author.email, "email");
+		let committer = amended_details.committer.unwrap();
+		assert_eq!(committer.name, "changed name");
+		assert_eq!(committer.email, "changed@example.com");
 	}
 
 	#[test]

@@ -67,7 +67,8 @@ pub use diff::get_diff_commit;
 pub use git2::BranchType;
 pub use hooks::{
 	hooks_commit_msg, hooks_post_commit, hooks_pre_commit,
-	hooks_prepare_commit_msg, HookResult, PrepareCommitMsgSource,
+	hooks_pre_push, hooks_prepare_commit_msg, HookResult,
+	PrepareCommitMsgSource,
 };
 pub use hunks::{reset_hunk, stage_hunk, unstage_hunk};
 pub use ignore::add_to_ignore;
@@ -84,7 +85,7 @@ pub use remotes::{
 	get_remote_url, get_remotes, push::AsyncProgress, rename_remote,
 	tags::PushTagsProgress, update_remote_url, validate_remote_name,
 };
-pub(crate) use repository::repo;
+pub(crate) use repository::{gix_repo, repo};
 pub use repository::{RepoPath, RepoPathRef};
 pub use reset::{reset_repo, reset_stage, reset_workdir};
 pub use reword::reword;

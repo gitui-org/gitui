@@ -6,31 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-* execute git-hooks directly if possible (on *nix) else use sh instead of bash (without reading SHELL variable) [[@Joshix](https://github.com/Joshix-1)] ([#2483](https://github.com/extrawurst/gitui/pull/2483))
+
+**discard changes on checkout**
+![discard-changes-on-checkout](assets/discard-changes-on-checkout.png)
+
+**go to line in blame**
+![blame-goto-line](assets/blame-goto-line.png)
 
 ### Added
-* Files and status tab support pageUp and pageDown  [[@fatpandac](https://github.com/fatpandac)] ([#1951](https://github.com/extrawurst/gitui/issues/1951))
+* support choosing checkout branch method when status is not empty [[@fatpandac](https://github.com/fatpandac)] ([#2404](https://github.com/extrawurst/gitui/issues/2404))
+* support pre-push hook [[@xlai89](https://github.com/xlai89)] ([#1933](https://github.com/extrawurst/gitui/issues/1933))
+* message tab supports pageUp and pageDown  [[@xlai89](https://github.com/xlai89)] ([#2623](https://github.com/extrawurst/gitui/issues/2623))
+* files and status tab support pageUp and pageDown  [[@fatpandac](https://github.com/fatpandac)] ([#1951](https://github.com/extrawurst/gitui/issues/1951))
 * support loading custom syntax highlighting themes from a file [[@acuteenvy](https://github.com/acuteenvy)] ([#2565](https://github.com/gitui-org/gitui/pull/2565))
-* Select syntax highlighting theme out of the defaults from syntect [[@vasilismanol](https://github.com/vasilismanol)] ([#1931](https://github.com/extrawurst/gitui/issues/1931))
+* select syntax highlighting theme out of the defaults from syntect [[@vasilismanol](https://github.com/vasilismanol)] ([#1931](https://github.com/extrawurst/gitui/issues/1931))
 * new command-line option to override the default log file path (`--logfile`) [[@acuteenvy](https://github.com/acuteenvy)] ([#2539](https://github.com/gitui-org/gitui/pull/2539))
 * dx: `make check` checks Cargo.toml dependency ordering using `cargo sort` [[@naseschwarz](https://github.com/naseschwarz)]
 * add `use_selection_fg` to theme file to allow customizing selection foreground color [[@Upsylonbare](https://github.com/Upsylonbare)] ([#2515](https://github.com/gitui-org/gitui/pull/2515))
+* add "go to line" command for the blame view [[@andrea-berling](https://github.com/andrea-berling)] ([#2262](https://github.com/extrawurst/gitui/pull/2262))
+* add `--file` cli flag to open the files tab with the given file already selected [[@laktak](https://github.com/laktak)] ([#2510](https://github.com/gitui-org/gitui/issues/2510))
+* add the ability to specify a custom keybinding/symbols file via the cli [[@0x61nas](https://github.com/0x61nas)] ([#2731](https://github.com/gitui-org/gitui/pull/2731))
 
 ### Changed
+* execute git-hooks directly if possible (on *nix) else use sh instead of bash (without reading SHELL variable) [[@Joshix](https://github.com/Joshix-1)] ([#2483](https://github.com/extrawurst/gitui/pull/2483))
 * improve error messages [[@acuteenvy](https://github.com/acuteenvy)] ([#2617](https://github.com/gitui-org/gitui/pull/2617))
-* increase MSRV from 1.70 to 1.81 [[@naseschwarz](https://github.com/naseschwarz)] ([#2094](https://github.com/gitui-org/gitui/issues/2094))
 * improve syntax highlighting file detection [[@acuteenvy](https://github.com/acuteenvy)] ([#2524](https://github.com/extrawurst/gitui/pull/2524))
-* Updated project links to point to `gitui-org` instead of `extrawurst`  [[@vasleymus](https://github.com/vasleymus)] ([#2538](https://github.com/gitui-org/gitui/pull/2538))
-* After commit: jump back to unstaged area [[@tommady](https://github.com/tommady)] ([#2476](https://github.com/extrawurst/gitui/issues/2476))
-* The default key to close the commit error message popup is now the Escape key [[@wessamfathi](https://github.com/wessamfathi)] ([#2552](https://github.com/extrawurst/gitui/issues/2552))
+* after commit: jump back to unstaged area [[@tommady](https://github.com/tommady)] ([#2476](https://github.com/extrawurst/gitui/issues/2476))
+* the default key to close the commit error message popup is now the Escape key [[@wessamfathi](https://github.com/wessamfathi)] ([#2552](https://github.com/extrawurst/gitui/issues/2552))
 * use OSC52 copying in case other methods fail [[@naseschwarz](https://github.com/naseschwarz)] ([#2366](https://github.com/gitui-org/gitui/issues/2366))
 * push: respect `branch.*.merge` when push default is upstream [[@vlad-anger](https://github.com/vlad-anger)] ([#2542](https://github.com/gitui-org/gitui/pull/2542))
 * set the terminal title to `gitui ({repo_path})` [[@acuteenvy](https://github.com/acuteenvy)] ([#2462](https://github.com/gitui-org/gitui/issues/2462))
 * respect `.mailmap` [[@acuteenvy](https://github.com/acuteenvy)] ([#2406](https://github.com/gitui-org/gitui/issues/2406))
+* use `gitoxide` for `get_tags` [[@cruessler](https://github.com/cruessler)] ([#2664](https://github.com/gitui-org/gitui/issues/2664))
+* increase MSRV to 1.82
 
 ### Fixes
 * resolve `core.hooksPath` relative to `GIT_WORK_TREE` [[@naseschwarz](https://github.com/naseschwarz)] ([#2571](https://github.com/gitui-org/gitui/issues/2571))
-* yanking commit ranges no longer generates incorrect dotted range notations, but lists each individual commit [[@naseschwarz](https://github.com/naseschwarz)] (https://github.com/gitui-org/gitui/issues/2576)
+* yanking commit ranges no longer generates incorrect dotted range notations, but lists each individual commit [[@naseschwarz](https://github.com/naseschwarz)] ([#2576](https://github.com/gitui-org/gitui/issues/2576))
+* print slightly nicer errors when failing to create a directory [[@linkmauve](https://github.com/linkmauve)] ([#2728](https://github.com/gitui-org/gitui/pull/2728))
+* when the terminal is insufficient to display all the commands, the cmdbar_bg configuration color does not fully take effect. ([#2347](https://github.com/extrawurst/gitui/issues/2347))
+* disable blame and history popup keybinds for untracked files [[@kpbaks](https://github.com/kpbaks)] ([#2489](https://github.com/gitui-org/gitui/pull/2489))
+* overwrites committer on amend of unsigned commits [[@cruessler](https://github.com/cruessler)] ([#2784](https://github.com/gitui-org/gitui/issues/2784))
+* Updated project links to point to `gitui-org` instead of `extrawurst`  [[@vasleymus](https://github.com/vasleymus)] ([#2538](https://github.com/gitui-org/gitui/pull/2538))
 
 ## [0.27.0] - 2024-01-14
 
@@ -69,7 +86,7 @@ but this also allows us now to define colors in the common hex format:
 Checkout [THEMES.md](./THEMES.md) for more info.
 
 ### Added
-* due to github runner changes, the regular mac build is now arm64, so we added support for intel x86 apple build in nightlies and releases (via separat artifact)
+* due to github runner changes, the regular mac build is now arm64, so we added support for intel x86 apple build in nightlies and releases (via separate artifact)
 * support `BUILD_GIT_COMMIT_ID` enabling builds from `git archive` generated source tarballs or other outside a git repo [[@alerque](https://github.com/alerque)] ([#2187](https://github.com/gitui-org/gitui/pull/2187))
 
 ### Fixes
@@ -906,7 +923,7 @@ Thanks for your interest and support over this year! Read more about the 1 year 
 - log tab refreshes when head changes ([#78](https://github.com/gitui-org/gitui/issues/78))
 - performance optimization of the log tab in big repos
 - more readable default color for the commit hash in the log tab
-- more error/panic resiliance (`unwrap`/`panic` denied by clippy now) [[@MCord](https://github.com/MCord)](<[#77](https://github.com/gitui-org/gitui/issues/77)>)
+- more error/panic resilience (`unwrap`/`panic` denied by clippy now) [[@MCord](https://github.com/MCord)](<[#77](https://github.com/gitui-org/gitui/issues/77)>)
 
 ### Fixes
 

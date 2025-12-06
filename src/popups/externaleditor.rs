@@ -58,7 +58,7 @@ impl ExternalEditorPopup {
 		};
 
 		if !path.exists() {
-			bail!("file not found: {:?}", path);
+			bail!("file not found: {path:?}");
 		}
 
 		io::stdout().execute(LeaveAlternateScreen)?;
@@ -113,7 +113,7 @@ impl ExternalEditorPopup {
 			.current_dir(work_dir)
 			.args(args)
 			.status()
-			.map_err(|e| anyhow!("\"{}\": {}", command, e))?;
+			.map_err(|e| anyhow!("\"{command}\": {e}"))?;
 
 		Ok(())
 	}

@@ -98,18 +98,13 @@ impl AsyncProgress for ProgressNotification {
 }
 
 ///
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum PushType {
 	///
+	#[default]
 	Branch,
 	///
 	Tag,
-}
-
-impl Default for PushType {
-	fn default() -> Self {
-		Self::Branch
-	}
 }
 
 #[cfg(test)]
@@ -134,7 +129,7 @@ pub fn push_branch(
 	)
 }
 
-//TODO: clenaup
+//TODO: cleanup
 #[allow(clippy::too_many_arguments)]
 pub fn push_raw(
 	repo_path: &RepoPath,

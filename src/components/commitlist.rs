@@ -45,6 +45,9 @@ pub struct CommitList {
 	items: ItemBatch,
 	highlights: Option<Rc<IndexSet<CommitId>>>,
 	commits: IndexSet<CommitId>,
+	/// The marked commits.
+	/// `self.marked[].0` holds the commit index into `self.items.items` - used for ordering the list.
+	/// `self.marked[].1` is the commit id of the marked commit.
 	marked: Vec<(usize, CommitId)>,
 	scroll_state: (Instant, f32),
 	tags: Option<Tags>,
@@ -112,15 +115,6 @@ impl CommitList {
 	///
 	pub fn marked_count(&self) -> usize {
 		self.marked.len()
-	}
-
-	///
-	#[expect(
-		clippy::missing_const_for_fn,
-		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
-	)]
-	pub fn marked(&self) -> &[(usize, CommitId)] {
-		&self.marked
 	}
 
 	///
@@ -571,7 +565,7 @@ impl CommitList {
 		Line::from(txt)
 	}
 
-	fn get_text(&self, height: usize, width: usize) -> Vec<Line> {
+	fn get_text(&self, height: usize, width: usize) -> Vec<Line<'_>> {
 		let selection = self.relative_selection();
 
 		let mut txt: Vec<Line> = Vec::with_capacity(height);
@@ -633,8 +627,7 @@ impl CommitList {
 			let filtered_branches: Vec<_> = remote_branches
 				.iter()
 				.filter(|remote_branch| {
-					self.local_branches.get(&e.id).map_or(
-						true,
+					self.local_branches.get(&e.id).is_none_or(
 						|local_branch| {
 							local_branch.iter().any(|local_branch| {
 								let has_corresponding_local_branch =

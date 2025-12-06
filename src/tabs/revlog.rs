@@ -250,7 +250,7 @@ impl Revlog {
 			self.search,
 			LogSearch::Off | LogSearch::Results(_)
 		) {
-			log::info!("start search: {:?}", options);
+			log::info!("start search: {options:?}");
 
 			let filter = filter_commit_by_search(
 				LogFilterSearch::new(options.clone()),
@@ -586,19 +586,19 @@ impl Component for Revlog {
 						self.queue.push(InternalEvent::OpenPopup(
 							StackablePopupOpen::CompareCommits(
 								InspectCommitOpen::new(
-									self.list.marked()[0].1,
+									self.list.marked_commits()[0],
 								),
 							),
 						));
 						return Ok(EventState::Consumed);
 					} else if self.list.marked_count() == 2 {
 						//compare two marked commits
-						let marked = self.list.marked();
+						let marked = self.list.marked_commits();
 						self.queue.push(InternalEvent::OpenPopup(
 							StackablePopupOpen::CompareCommits(
 								InspectCommitOpen {
-									commit_id: marked[0].1,
-									compare_id: Some(marked[1].1),
+									commit_id: marked[0],
+									compare_id: Some(marked[1]),
 									tags: None,
 								},
 							),

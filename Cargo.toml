@@ -4,7 +4,7 @@ version = "0.27.0"
 authors = ["extrawurst <mail@rusticorn.com>"]
 description = "blazing fast terminal-ui for git"
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.82"
 exclude = [".github/*", ".vscode/*", "assets/*"]
 homepage = "https://github.com/gitui-org/gitui"
 repository = "https://github.com/gitui-org/gitui"
@@ -14,15 +14,34 @@ categories = ["command-line-utilities"]
 keywords = ["git", "gui", "cli", "terminal", "ui"]
 build = "build.rs"
 
+[workspace]
+members = [
+    "asyncgit",
+    "filetreelist",
+    "git2-hooks",
+    "git2-testing",
+    "scopetime",
+]
+
+[features]
+default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
+ghemoji = ["gh-emoji"]
+# regex-* features are mutually exclusive.
+regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
+regex-onig = ["syntect/regex-onig", "two-face/syntect-onig"]
+timing = ["scopetime/enabled"]
+trace-libgit = ["asyncgit/trace-libgit"]
+vendor-openssl = ["asyncgit/vendor-openssl"]
+
 [dependencies]
 anyhow = "1.0"
 asyncgit = { path = "./asyncgit", version = "0.27.0", default-features = false }
 backtrace = "0.3"
 base64 = "0.22"
-bitflags = "2.9"
+bitflags = "2.10"
 bugreport = "0.5.1"
 bwrap = { version = "1.3", features = ["use_std"] }
-bytesize = { version = "2.0", default-features = false }
+bytesize = { version = "2.3", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.5", features = ["env", "cargo"] }
 crossbeam-channel = "0.5"
@@ -36,23 +55,22 @@ indexmap = "2"
 itertools = "0.14"
 log = "0.4"
 notify = "8"
-notify-debouncer-mini = "0.6"
+notify-debouncer-mini = "0.7"
 once_cell = "1"
-# pin until upgrading this does not introduce a duplicate dependency
-parking_lot_core = "=0.9.10"
+parking_lot_core = "0.9"
 ratatui = { version = "0.29", default-features = false, features = [
     'crossterm',
     'serde',
 ] }
-rayon-core = "1.12"
-ron = "0.10"
+rayon-core = "1.13"
+ron = "0.12"
 scopeguard = "1.2"
 scopetime = { path = "./scopetime", version = "0.1" }
 serde = "1.0"
 shellexpand = "3.1"
 simplelog = { version = "0.12", default-features = false }
-struct-patch = "0.9"
-syntect = { version = "5.2", default-features = false, features = [
+struct-patch = "0.10"
+syntect = { version = "5.3", default-features = false, features = [
     "parsing",
     "default-syntaxes",
     "default-themes",
@@ -60,11 +78,14 @@ syntect = { version = "5.2", default-features = false, features = [
     "html",
 ] }
 tui-textarea = "0.7"
-two-face = { version = "0.4.3", default-features = false }
+two-face = { version = "0.4.4", default-features = false }
 unicode-segmentation = "1.12"
 unicode-truncate = "2.0"
 unicode-width = "0.2"
-which = "7.0"
+which = "8.0"
+
+[build-dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 env_logger = "0.11"
@@ -73,30 +94,8 @@ insta = { version = "1.41.0", features = ["filters"] }
 pretty_assertions = "1.4"
 tempfile = "3"
 
-[build-dependencies]
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-
 [badges]
 maintenance = { status = "actively-developed" }
-
-[features]
-default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
-ghemoji = ["gh-emoji"]
-# regex-* features are mutually exclusive.
-regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
-regex-onig = ["syntect/regex-onig", "two-face/syntect-onig"]
-timing = ["scopetime/enabled"]
-trace-libgit = ["asyncgit/trace-libgit"]
-vendor-openssl = ["asyncgit/vendor-openssl"]
-
-[workspace]
-members = [
-    "asyncgit",
-    "filetreelist",
-    "git2-hooks",
-    "git2-testing",
-    "scopetime",
-]
 
 [profile.release]
 lto = true

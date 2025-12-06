@@ -1,5 +1,39 @@
+//!
+//! The gitui program is a text-based UI for working with a Git repository.
+//! The main navigation occurs between a number of tabs.
+//! When you execute commands, the program may use popups to communicate
+//! with the user. It is possible to customize the keybindings.
+//!
+//!
+//! ## Internal Modules
+//! The top-level modules of gitui can be grouped as follows:
+//!
+//! - User Interface
+//!   - [tabs] for main navigation
+//!   - [components] for visual elements used on tabs
+//!   - [popups] for temporary dialogs
+//!   - [ui] for tooling like scrollbars
+//! - Git Interface
+//!   - [asyncgit] (crate) for async operations on repository
+//! - Distribution and Documentation
+//!   - Project files
+//!   - Github CI
+//!   - Installation files
+//!   - Usage guides
+//!
+//! ## Included Crates
+//! Some crates are part of the gitui repository:
+//! - [asyncgit] for Git operations in the background.
+//!   - git2-hooks (used by asyncgit).
+//!     - git2-testing (used by git2-hooks).
+//!   - invalidstring used by asyncgit for testing with invalid strings.
+//! - [filetreelist] for a tree view of files.
+//! - [scopetime] for measuring execution time.
+//!
+
 #![forbid(unsafe_code)]
 #![deny(
+	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,
@@ -11,16 +45,15 @@
 	clippy::unwrap_used,
 	clippy::filetype_is_file,
 	clippy::cargo,
-	clippy::unwrap_used,
 	clippy::panic,
 	clippy::match_like_matches_macro
 )]
-#![allow(clippy::module_name_repetitions)]
 #![allow(
 	clippy::multiple_crate_versions,
 	clippy::bool_to_int_with_if,
 	clippy::module_name_repetitions,
-	clippy::empty_docs
+	clippy::empty_docs,
+	clippy::unnecessary_debug_formatting
 )]
 
 //TODO:
@@ -47,7 +80,10 @@ mod tabs;
 mod ui;
 mod watcher;
 
-use crate::{app::App, args::process_cmdline};
+use crate::{
+	app::App,
+	args::{process_cmdline, CliArgs},
+};
 use anyhow::{anyhow, bail, Result};
 use app::QuitState;
 use asyncgit::{sync::RepoPath, AsyncGitNotification};
@@ -130,9 +166,12 @@ fn main() -> Result<()> {
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
 
-	let key_config = KeyConfig::init()
-		.map_err(|e| log_eprintln!("KeyConfig loading error: {e}"))
-		.unwrap_or_default();
+	let key_config = KeyConfig::init(
+		cliargs.key_bindings_path.as_ref(),
+		cliargs.key_symbols_path.as_ref(),
+	)
+	.map_err(|e| log_eprintln!("KeyConfig loading error: {e}"))
+	.unwrap_or_default();
 	let theme = Theme::init(&cliargs.theme);
 
 	setup_terminal()?;
@@ -142,8 +181,8 @@ fn main() -> Result<()> {
 
 	set_panic_handler()?;
 
-	let mut repo_path = cliargs.repo_path;
-	let mut terminal = start_terminal(io::stdout(), &repo_path)?;
+	let mut terminal =
+		start_terminal(io::stdout(), &cliargs.repo_path)?;
 
 	let updater = if cliargs.notify_watcher {
 		Updater::NotifyWatcher
@@ -151,10 +190,12 @@ fn main() -> Result<()> {
 		Updater::Ticker
 	};
 
+	let mut args = cliargs;
+
 	loop {
 		let quit_state = run_app(
 			app_start,
-			repo_path.clone(),
+			args.clone(),
 			theme.clone(),
 			&key_config,
 			updater,
@@ -163,7 +204,14 @@ fn main() -> Result<()> {
 
 		match quit_state {
 			QuitState::OpenSubmodule(p) => {
-				repo_path = p;
+				args = CliArgs {
+					repo_path: p,
+					select_file: None,
+					theme: args.theme,
+					notify_watcher: args.notify_watcher,
+					key_bindings_path: args.key_bindings_path,
+					key_symbols_path: args.key_symbols_path,
+				}
 			}
 			_ => break,
 		}
@@ -174,13 +222,13 @@ fn main() -> Result<()> {
 
 fn run_app(
 	app_start: Instant,
-	repo: RepoPath,
+	cliargs: CliArgs,
 	theme: Theme,
 	key_config: &KeyConfig,
 	updater: Updater,
 	terminal: &mut Terminal,
 ) -> Result<QuitState, anyhow::Error> {
-	let mut gitui = Gitui::new(repo, theme, key_config, updater)?;
+	let mut gitui = Gitui::new(cliargs, theme, key_config, updater)?;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 
@@ -218,7 +266,7 @@ fn draw<B: ratatui::backend::Backend>(
 
 	terminal.draw(|f| {
 		if let Err(e) = app.draw(f) {
-			log::error!("failed to draw: {:?}", e);
+			log::error!("failed to draw: {e:?}");
 		}
 	})?;
 
@@ -228,8 +276,8 @@ fn draw<B: ratatui::backend::Backend>(
 fn ensure_valid_path(repo_path: &RepoPath) -> Result<()> {
 	match asyncgit::sync::repo_open_error(repo_path) {
 		Some(e) => {
-			log::error!("{e}");
-			bail!(e)
+			log::error!("invalid repo path: {e}");
+			bail!("invalid repo path: {e}")
 		}
 		None => Ok(()),
 	}

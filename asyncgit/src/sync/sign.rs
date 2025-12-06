@@ -281,7 +281,7 @@ pub struct SSHSign {
 }
 
 impl SSHSign {
-	/// Create new [`SSHDiskKeySign`] for sign.
+	/// Create new `SSHDiskKeySign` for sign.
 	pub fn new(mut key: PathBuf) -> Result<Self, SignBuilderError> {
 		key.set_extension("");
 		if key.is_file() {

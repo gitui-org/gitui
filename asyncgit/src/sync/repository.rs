@@ -67,3 +67,16 @@ pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
 
 	Ok(repo)
 }
+
+pub fn gix_repo(repo_path: &RepoPath) -> Result<gix::Repository> {
+	let mut repo: gix::Repository = gix::ThreadSafeRepository::discover_with_environment_overrides(
+		repo_path.gitpath(),
+	)
+	.map(Into::into)?;
+
+	if let Some(workdir) = repo_path.workdir() {
+		repo.set_workdir(Some(workdir.into()))?;
+	}
+
+	Ok(repo)
+}

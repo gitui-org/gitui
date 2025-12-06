@@ -1,10 +1,7 @@
-use std::{cell::RefCell, time::Instant};
+use std::time::Instant;
 
 use anyhow::Result;
-use asyncgit::{
-	sync::{utils::repo_work_dir, RepoPath},
-	AsyncGitNotification,
-};
+use asyncgit::{sync::utils::repo_work_dir, AsyncGitNotification};
 use crossbeam_channel::{never, tick, unbounded, Receiver};
 use scopetime::scope_time;
 
@@ -13,6 +10,7 @@ use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::{
 	app::{App, QuitState},
+	args::CliArgs,
 	draw,
 	input::{Input, InputEvent, InputState},
 	keys::KeyConfig,
@@ -35,7 +33,7 @@ pub struct Gitui {
 
 impl Gitui {
 	pub(crate) fn new(
-		path: RepoPath,
+		cliargs: CliArgs,
 		theme: Theme,
 		key_config: &KeyConfig,
 		updater: Updater,
@@ -47,8 +45,9 @@ impl Gitui {
 
 		let (rx_ticker, rx_watcher) = match updater {
 			Updater::NotifyWatcher => {
-				let repo_watcher =
-					RepoWatcher::new(repo_work_dir(&path)?.as_str());
+				let repo_watcher = RepoWatcher::new(
+					repo_work_dir(&cliargs.repo_path)?.as_str(),
+				);
 
 				(never(), repo_watcher.receiver())
 			}
@@ -56,7 +55,7 @@ impl Gitui {
 		};
 
 		let app = App::new(
-			RefCell::new(path),
+			cliargs,
 			tx_git,
 			tx_app,
 			input.clone(),
@@ -203,8 +202,8 @@ mod tests {
 	use ratatui::{backend::TestBackend, Terminal};
 
 	use crate::{
-		gitui::Gitui, keys::KeyConfig, ui::style::Theme,
-		AsyncNotification, Updater,
+		args::CliArgs, gitui::Gitui, keys::KeyConfig,
+		ui::style::Theme, AsyncNotification, Updater,
 	};
 
 	// Macro adapted from: https://insta.rs/docs/cmd/
@@ -228,12 +227,20 @@ mod tests {
 
 		let (temp_dir, _repo) = repo_init_suffix(Some("-insta"));
 		let path: RepoPath = temp_dir.path().to_str().unwrap().into();
+		let cliargs = CliArgs {
+			theme: PathBuf::from("theme.ron"),
+			select_file: None,
+			repo_path: path,
+			notify_watcher: false,
+			key_bindings_path: None,
+			key_symbols_path: None,
+		};
 
 		let theme = Theme::init(&PathBuf::new());
 		let key_config = KeyConfig::default();
 
 		let mut gitui =
-			Gitui::new(path, theme, &key_config, Updater::Ticker)
+			Gitui::new(cliargs, theme, &key_config, Updater::Ticker)
 				.unwrap();
 
 		let mut terminal =

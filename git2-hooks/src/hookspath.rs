@@ -146,7 +146,11 @@ impl HookPaths {
 		S: AsRef<OsStr>,
 	{
 		let hook = self.hook.clone();
-		log::trace!("run hook '{:?}' in '{:?}'", hook, self.pwd);
+		log::trace!(
+			"run hook '{}' in '{}'",
+			hook.display(),
+			self.pwd.display()
+		);
 
 		let run_command = |command: &mut Command| {
 			command
@@ -250,7 +254,7 @@ fn is_executable(path: &Path) -> bool {
 	let metadata = match path.metadata() {
 		Ok(metadata) => metadata,
 		Err(e) => {
-			log::error!("metadata error: {}", e);
+			log::error!("metadata error: {e}");
 			return false;
 		}
 	};
@@ -276,6 +280,7 @@ trait CommandExt {
 	/// or if it used with either `CREATE_NEW_CONSOLE` or `DETACHED_PROCESS`.
 	///
 	/// See: <https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags>
+	#[cfg(windows)]
 	const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 	fn with_no_window(&mut self) -> &mut Self;

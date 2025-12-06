@@ -2,18 +2,20 @@ use crate::components::{
 	visibility_blocking, CommandBlocking, CommandInfo, Component,
 	DrawableComponent, EventState,
 };
+use crate::queue::{InternalEvent, NeedsUpdate};
+use crate::strings::CheckoutOptions;
+use crate::try_or_popup;
 use crate::{
 	app::Environment,
 	keys::{key_match, SharedKeyConfig},
 	queue::Queue,
-	strings, try_or_popup,
+	strings,
 	ui::{self, style::SharedTheme},
 };
-use anyhow::Result;
-use asyncgit::{
-	cached,
-	sync::{CommitId, RepoPath, ResetType},
-};
+use anyhow::{Ok, Result};
+use asyncgit::sync::branch::checkout_remote_branch;
+use asyncgit::sync::status::discard_status;
+use asyncgit::sync::{checkout_branch, BranchInfo, RepoPath};
 use crossterm::event::Event;
 use ratatui::{
 	layout::{Alignment, Rect},
@@ -22,45 +24,24 @@ use ratatui::{
 	Frame,
 };
 
-const fn type_to_string(
-	kind: ResetType,
-) -> (&'static str, &'static str) {
-	const RESET_TYPE_DESC_SOFT: &str =
-		"  🟢 Keep all changes. Stage differences";
-	const RESET_TYPE_DESC_MIXED: &str =
-		" 🟡 Keep all changes. Unstage differences";
-	const RESET_TYPE_DESC_HARD: &str =
-		"  🔴 Discard all local changes";
-
-	match kind {
-		ResetType::Soft => ("Soft", RESET_TYPE_DESC_SOFT),
-		ResetType::Mixed => ("Mixed", RESET_TYPE_DESC_MIXED),
-		ResetType::Hard => ("Hard", RESET_TYPE_DESC_HARD),
-	}
-}
-
-pub struct ResetPopup {
+pub struct CheckoutOptionPopup {
 	queue: Queue,
 	repo: RepoPath,
-	commit: Option<CommitId>,
-	kind: ResetType,
-	git_branch_name: cached::BranchName,
+	branch: Option<BranchInfo>,
+	option: CheckoutOptions,
 	visible: bool,
 	key_config: SharedKeyConfig,
 	theme: SharedTheme,
 }
 
-impl ResetPopup {
+impl CheckoutOptionPopup {
 	///
 	pub fn new(env: &Environment) -> Self {
 		Self {
 			queue: env.queue.clone(),
 			repo: env.repo.borrow().clone(),
-			commit: None,
-			kind: ResetType::Soft,
-			git_branch_name: cached::BranchName::new(
-				env.repo.clone(),
-			),
+			branch: None,
+			option: CheckoutOptions::KeepLocalChanges,
 			visible: false,
 			key_config: env.key_config.clone(),
 			theme: env.theme.clone(),
@@ -72,29 +53,16 @@ impl ResetPopup {
 
 		txt.push(Line::from(vec![
 			Span::styled(
-				String::from("Branch: "),
+				String::from("Switch to: "),
 				self.theme.text(true, false),
 			),
 			Span::styled(
-				self.git_branch_name.last().unwrap_or_default(),
-				self.theme.branch(false, true),
-			),
-		]));
-
-		txt.push(Line::from(vec![
-			Span::styled(
-				String::from("Reset to: "),
-				self.theme.text(true, false),
-			),
-			Span::styled(
-				self.commit
-					.map(|c| c.to_string())
-					.unwrap_or_default(),
+				self.branch.as_ref().expect("No branch").name.clone(),
 				self.theme.commit_hash(false),
 			),
 		]));
 
-		let (kind_name, kind_desc) = type_to_string(self.kind);
+		let (kind_name, kind_desc) = self.option.to_string_pair();
 
 		txt.push(Line::from(vec![
 			Span::styled(
@@ -109,55 +77,57 @@ impl ResetPopup {
 	}
 
 	///
-	pub fn open(&mut self, id: CommitId) -> Result<()> {
+	pub fn open(&mut self, branch: BranchInfo) -> Result<()> {
 		self.show()?;
 
-		self.commit = Some(id);
+		self.branch = Some(branch);
 
 		Ok(())
 	}
 
-	///
-	#[allow(clippy::unnecessary_wraps)]
-	pub fn update(&mut self) -> Result<()> {
-		self.git_branch_name.lookup().map(Some).unwrap_or(None);
-
-		Ok(())
-	}
-
-	fn reset(&mut self) {
-		if let Some(id) = self.commit {
-			try_or_popup!(
-				self,
-				"reset:",
-				asyncgit::sync::reset_repo(&self.repo, id, self.kind)
-			);
+	fn checkout(&self) -> Result<()> {
+		if let Some(branch) = &self.branch {
+			if branch.is_local() {
+				checkout_branch(&self.repo, &branch.name)?;
+			} else {
+				checkout_remote_branch(&self.repo, branch)?;
+			}
 		}
 
+		Ok(())
+	}
+
+	fn handle_event(&mut self) -> Result<()> {
+		match self.option {
+			CheckoutOptions::KeepLocalChanges => {
+				self.checkout()?;
+			}
+			CheckoutOptions::DiscardAllLocalChagnes => {
+				discard_status(&self.repo)?;
+				self.checkout()?;
+			}
+		}
+
+		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		self.queue.push(InternalEvent::SelectBranch);
 		self.hide();
+
+		Ok(())
 	}
 
 	fn change_kind(&mut self, incr: bool) {
-		self.kind = if incr {
-			match self.kind {
-				ResetType::Soft => ResetType::Mixed,
-				ResetType::Mixed => ResetType::Hard,
-				ResetType::Hard => ResetType::Soft,
-			}
+		self.option = if incr {
+			self.option.next()
 		} else {
-			match self.kind {
-				ResetType::Soft => ResetType::Hard,
-				ResetType::Mixed => ResetType::Soft,
-				ResetType::Hard => ResetType::Mixed,
-			}
+			self.option.previous()
 		};
 	}
 }
 
-impl DrawableComponent for ResetPopup {
+impl DrawableComponent for CheckoutOptionPopup {
 	fn draw(&self, f: &mut Frame, area: Rect) -> Result<()> {
 		if self.is_visible() {
-			const SIZE: (u16, u16) = (55, 5);
+			const SIZE: (u16, u16) = (55, 4);
 			let area =
 				ui::centered_rect_absolute(SIZE.0, SIZE.1, area);
 
@@ -170,7 +140,7 @@ impl DrawableComponent for ResetPopup {
 						Block::default()
 							.borders(Borders::ALL)
 							.title(Span::styled(
-								"Reset",
+								"Checkout options",
 								self.theme.title(true),
 							))
 							.border_style(self.theme.block(true)),
@@ -184,7 +154,7 @@ impl DrawableComponent for ResetPopup {
 	}
 }
 
-impl Component for ResetPopup {
+impl Component for CheckoutOptionPopup {
 	fn commands(
 		&self,
 		out: &mut Vec<CommandInfo>,
@@ -239,7 +209,11 @@ impl Component for ResetPopup {
 				{
 					self.change_kind(false);
 				} else if key_match(key, self.key_config.keys.enter) {
-					self.reset();
+					try_or_popup!(
+						self,
+						"checkout error:",
+						self.handle_event()
+					);
 				}
 			}
 
