@@ -9,11 +9,12 @@ use super::{utils::bytes2string, RepoPath};
 use crate::{
 	error::{Error, Result},
 	sync::{
-		remotes::get_default_remote_for_push_in_repo,
+		gix_repo, remotes::get_default_remote_for_push_in_repo,
 		repository::repo, utils::get_head_repo, CommitId,
 	},
 };
 use git2::{Branch, BranchType, Repository};
+use gix::remote::Direction;
 use scopetime::scope_time;
 use std::collections::HashSet;
 
@@ -128,76 +129,121 @@ pub fn get_branches_info(
 ) -> Result<Vec<BranchInfo>> {
 	scope_time!("get_branches_info");
 
-	let repo = repo(repo_path)?;
+	let gix_repo = gix_repo(repo_path)?;
+	let platform = gix_repo.references()?;
+	let head_name = gix_repo.head_name().ok().flatten();
 
-	let (filter, remotes_with_tracking) = if local {
-		(BranchType::Local, HashSet::default())
-	} else {
-		let remotes: HashSet<_> = repo
-			.branches(Some(BranchType::Local))?
-			.filter_map(|b| {
-				let branch = b.ok()?.0;
-				let upstream = branch.upstream();
-				upstream
-					.ok()?
-					.name_bytes()
-					.ok()
-					.map(ToOwned::to_owned)
-			})
-			.collect();
-		(BranchType::Remote, remotes)
-	};
+	let mut branches_for_display: Vec<_> = if local {
+		platform
+			.local_branches()?
+			.flatten()
+			.filter_map(|mut branch| {
+				let branch_name = branch.name();
+				let name = branch_name.shorten().to_string();
+				let reference = branch_name.to_owned().to_string();
 
-	let mut branches_for_display: Vec<BranchInfo> = repo
-		.branches(Some(filter))?
-		.map(|b| {
-			let branch = b?.0;
-			let top_commit = branch.get().peel_to_commit()?;
-			let reference = bytes2string(branch.get().name_bytes())?;
-			let upstream = branch.upstream();
+				// There is no `gitoxide` equivalent of [`Branch::is_head`][branch-is-head]. This will
+				// also not change in the future as it would require reading and resolving the `HEAD`
+				// reference each time it is called. It is more efficient for us to read the `HEAD`
+				// reference once and then do the individual comparisons ourselves.
+				//
+				// This implementation is based on [`git_branch_is_head`][libgit2-git-branch-is-head].
+				//
+				// [branch-is-head]: https://docs.rs/git2/latest/git2/struct.Branch.html#method.is_head
+				// [libgit2-git-branch-is-head]: https://github.com/libgit2/libgit2/blob/58d9363f02f1fa39e46d49b604f27008e75b72f2/src/libgit2/branch.c#L773-L800
+				let is_head =
+					head_name.as_ref().is_some_and(|head_name| {
+						head_name.as_ref() == branch_name
+					});
 
-			let remote = repo
-				.branch_upstream_remote(&reference)
-				.ok()
-				.as_ref()
-				.and_then(git2::Buf::as_str)
-				.map(String::from);
+				let top_commit = branch.peel_to_commit().ok()?;
+				let upstream = branch.remote_tracking_ref_name(
+					// Using `Fetch` replicates the behaviour of `Branch::upstream` as much as possible.
+					//
+					// See https://docs.rs/git2/latest/git2/struct.Branch.html#method.upstream
+					Direction::Fetch,
+				);
 
-			let name_bytes = branch.name_bytes()?;
+				let upstream_branch = match upstream {
+					Some(Ok(reference)) => Some(UpstreamBranch {
+						reference: reference.into_owned().to_string(),
+					}),
+					_ => None,
+				};
 
-			let upstream_branch =
-				upstream.ok().and_then(|upstream| {
-					bytes2string(upstream.get().name_bytes())
-						.ok()
-						.map(|reference| UpstreamBranch { reference })
-				});
+				let remote = branch
+					.remote_name(
+						// Using `Fetch` replicates the behaviour of `Repository::branch_upstream_remote` as much as possible.
+						//
+						// See https://docs.rs/git2/latest/git2/struct.Repository.html#method.branch_upstream_remote
+						Direction::Fetch,
+					)
+					.map(|name| name.as_bstr().to_string());
 
-			let details = if local {
-				BranchDetails::Local(LocalBranch {
-					is_head: branch.is_head(),
+				let details = BranchDetails::Local(LocalBranch {
+					is_head,
 					has_upstream: upstream_branch.is_some(),
 					upstream: upstream_branch,
 					remote,
-				})
-			} else {
-				BranchDetails::Remote(RemoteBranch {
-					has_tracking: remotes_with_tracking
-						.contains(name_bytes),
-				})
-			};
+				});
 
-			Ok(BranchInfo {
-				name: bytes2string(name_bytes)?,
-				reference,
-				top_commit_message: bytes2string(
-					top_commit.summary_bytes().unwrap_or_default(),
-				)?,
-				top_commit: top_commit.id().into(),
-				details,
+				Some(BranchInfo {
+					name,
+					reference,
+					top_commit_message: top_commit
+						.message()
+						.ok()?
+						.title
+						.to_string(),
+					top_commit: top_commit.into(),
+					details,
+				})
 			})
-		})
-		.filter_map(Result::ok)
-		.collect();
+			.collect()
+	} else {
+		let remotes_with_tracking: HashSet<_> = platform
+			.local_branches()?
+			.flatten()
+			.filter_map(|branch| {
+				let upstream = branch.remote_tracking_ref_name(
+					// Using `Fetch` replicates the behaviour of `Branch::upstream` as much as possible.
+					//
+					// See https://docs.rs/git2/latest/git2/struct.Branch.html#method.upstream
+					Direction::Fetch,
+				)?;
+				Some(upstream.ok()?.into_owned())
+			})
+			.collect();
+
+		platform
+			.remote_branches()?
+			.flatten()
+			.filter_map(|mut branch| {
+				let branch_name = branch.name();
+				let name = branch_name.shorten().to_string();
+				let reference = branch_name.to_owned().to_string();
+
+				let details = BranchDetails::Remote(RemoteBranch {
+					has_tracking: remotes_with_tracking
+						.contains(branch_name),
+				});
+
+				let top_commit = branch.peel_to_commit().ok()?;
+
+				Some(BranchInfo {
+					name,
+					reference,
+					top_commit_message: top_commit
+						.message()
+						.ok()?
+						.title
+						.to_string(),
+					top_commit: top_commit.into(),
+					details,
+				})
+			})
+			.collect()
+	};
 
 	branches_for_display.sort_by(|a, b| a.name.cmp(&b.name));
 
