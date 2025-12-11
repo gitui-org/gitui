@@ -2,7 +2,6 @@
 use super::{repo, CommitId, RepoPath};
 use crate::Result;
 use git2::Oid;
-use std::ops::ControlFlow;
 
 /// Checks if `commits` range is topologically continuous
 ///
@@ -27,17 +26,11 @@ pub fn is_continuous(
 				return Ok(false);
 			}
 
-			match revwalked.iter().zip(commits).try_fold(
-				Ok(true),
-				|acc, (r, c)| match acc
-					.map(|acc| acc && (&(CommitId::from(*r)) == c))
-				{
-					ok @ Ok(true) => ControlFlow::Continue(ok),
-					otherwise => ControlFlow::Break(otherwise),
+			Ok(revwalked.iter().zip(commits).all(
+				|(oid, commit_id)| {
+					&(CommitId::from(*oid)) == commit_id
 				},
-			) {
-				ControlFlow::Continue(v) | ControlFlow::Break(v) => v,
-			}
+			))
 		}
 	}
 }
