@@ -1,14 +1,13 @@
 use super::{repository::repo, RepoPath};
 use crate::{
 	error::Result,
-	sync::remotes::{
-		proxy_auto, tags::tags_missing_remote, Callbacks,
-	},
-};
-use crate::{
-	sync::branch::get_branch_upstream_merge,
-	sync::config::{
-		push_default_strategy_config_repo, PushDefaultStrategyConfig,
+	sync::{
+		branch::get_branch_upstream_merge,
+		config::{
+			push_default_strategy_config_repo,
+			PushDefaultStrategyConfig,
+		},
+		remotes::{proxy_auto, tags::tags_missing_remote, Callbacks},
 	},
 };
 use git2::{BranchType, Direction, Oid};
