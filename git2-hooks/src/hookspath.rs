@@ -183,10 +183,23 @@ impl HookPaths {
 			if let (Some(mut stdin_handle), Some(input)) =
 				(child.stdin.take(), stdin)
 			{
-				use std::io::Write;
-				// Ignore broken pipe errors - the hook may exit without reading stdin
-				let _ = stdin_handle.write_all(input);
-				drop(stdin_handle);
+				use std::io::{ErrorKind, Write};
+
+				// Write stdin to hook process
+				// Ignore broken pipe - hook may exit early without reading all input
+				let _ =
+					stdin_handle.write_all(input).inspect_err(|e| {
+						match e.kind() {
+							ErrorKind::BrokenPipe => {
+								log::debug!(
+									"Hook closed stdin early"
+								);
+							}
+							_ => log::warn!(
+								"Failed to write stdin to hook: {e}"
+							),
+						}
+					});
 			}
 
 			child.wait_with_output()
