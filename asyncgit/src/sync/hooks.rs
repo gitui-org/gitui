@@ -209,7 +209,6 @@ pub fn hooks_pre_push(
 }
 
 /// Build a single pre-push update line for a branch.
-#[allow(clippy::implicit_hasher)]
 fn pre_push_branch_update(
 	repo_path: &RepoPath,
 	branch_name: &str,
@@ -236,7 +235,6 @@ fn pre_push_branch_update(
 }
 
 /// Build pre-push updates for tags that are missing on the remote.
-#[allow(clippy::implicit_hasher)]
 fn pre_push_tag_updates(
 	repo_path: &RepoPath,
 	remote: &str,
