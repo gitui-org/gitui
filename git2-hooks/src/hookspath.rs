@@ -241,15 +241,15 @@ impl HookPaths {
 		let stdout =
 			String::from_utf8_lossy(&output.stdout).to_string();
 
+		// Get exit code, or fail if process was killed by signal
+		let code =
+			output.status.code().ok_or(HooksError::NoExitCode)?;
+
 		Ok(HookResult::Run(crate::HookRunResponse {
 			hook,
 			stdout,
 			stderr,
-			code: if output.status.success() {
-				None
-			} else {
-				output.status.code()
-			},
+			code,
 		}))
 	}
 }

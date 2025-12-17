@@ -57,8 +57,8 @@ pub struct HookRunResponse {
 	pub stdout: String,
 	/// stderr output emitted by hook
 	pub stderr: String,
-	/// exit code as reported back from process calling the hook (None if successful)
-	pub code: Option<i32>,
+	/// exit code as reported back from process calling the hook (0 = success)
+	pub code: i32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -73,15 +73,15 @@ impl HookResult {
 	/// helper to check if result is ok (hook succeeded with exit code 0)
 	pub const fn is_ok(&self) -> bool {
 		match self {
-			Self::Run(response) => response.code.is_none(),
-			Self::NoHookFound => false,
+			Self::Run(response) => response.code == 0,
+			Self::NoHookFound => true,
 		}
 	}
 
 	/// helper to check if result was run and not successful (non-zero exit code)
 	pub const fn is_not_successful(&self) -> bool {
 		match self {
-			Self::Run(response) => response.code.is_some(),
+			Self::Run(response) => response.code != 0,
 			Self::NoHookFound => false,
 		}
 	}
@@ -90,7 +90,7 @@ impl HookResult {
 impl HookRunResponse {
 	/// Check if the hook succeeded (exit code 0)
 	pub const fn is_successful(&self) -> bool {
-		self.code.is_none()
+		self.code == 0
 	}
 }
 
@@ -424,7 +424,7 @@ exit 0
 
 		let stdout = response.stdout.as_str().trim_ascii_end();
 
-		assert_eq!(response.code, Some(42));
+		assert_eq!(response.code, 42);
 		assert_eq!(response.hook, hook.hook);
 		assert_eq!(stdout, TEXT, "{:?} != {TEXT:?}", stdout);
 		assert!(response.stderr.is_empty());
@@ -561,7 +561,7 @@ exit 1
 			unreachable!()
 		};
 
-		assert_eq!(response.code.unwrap(), 1);
+		assert_eq!(response.code, 1);
 		assert_eq!(&response.stdout, "rejected\n");
 	}
 
@@ -640,7 +640,7 @@ sys.exit(1)
 			unreachable!()
 		};
 
-		assert_eq!(response.code.unwrap(), 1);
+		assert_eq!(response.code, 1);
 		assert_eq!(&response.stdout, "rejected\n");
 
 		assert_eq!(msg, String::from("msg\n"));
@@ -735,7 +735,7 @@ exit 2
 			unreachable!()
 		};
 
-		assert_eq!(response.code.unwrap(), 2);
+		assert_eq!(response.code, 2);
 		assert_eq!(&response.stdout, "rejected\n");
 
 		assert_eq!(
@@ -790,7 +790,7 @@ exit 3
 		let HookResult::Run(response) = res else {
 			unreachable!()
 		};
-		assert_eq!(response.code.unwrap(), 3);
+		assert_eq!(response.code, 3);
 		assert_eq!(&response.stdout, "failed\n");
 	}
 
