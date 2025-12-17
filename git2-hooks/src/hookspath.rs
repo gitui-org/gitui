@@ -184,7 +184,8 @@ impl HookPaths {
 				(child.stdin.take(), stdin)
 			{
 				use std::io::Write;
-				stdin_handle.write_all(input)?;
+				// Ignore broken pipe errors - the hook may exit without reading stdin
+				let _ = stdin_handle.write_all(input);
 				drop(stdin_handle);
 			}
 
