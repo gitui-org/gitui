@@ -49,7 +49,7 @@ impl From<git2_hooks::HookResult> for HookResult {
 }
 
 /// Retrieve advertised refs from the remote for the upcoming push.
-pub fn advertised_remote_refs(
+fn advertised_remote_refs(
 	repo_path: &RepoPath,
 	remote: Option<&str>,
 	url: &str,
