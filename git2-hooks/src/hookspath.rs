@@ -145,6 +145,20 @@ impl HookPaths {
 		I: IntoIterator<Item = S> + Copy,
 		S: AsRef<OsStr>,
 	{
+		self.run_hook_os_str_with_stdin(args, None)
+	}
+
+	/// this function calls hook scripts with stdin input based on conventions documented here
+	/// see <https://git-scm.com/docs/githooks>
+	pub fn run_hook_os_str_with_stdin<I, S>(
+		&self,
+		args: I,
+		stdin: Option<&[u8]>,
+	) -> Result<HookResult>
+	where
+		I: IntoIterator<Item = S> + Copy,
+		S: AsRef<OsStr>,
+	{
 		let hook = self.hook.clone();
 		log::trace!(
 			"run hook '{}' in '{}'",
@@ -153,11 +167,23 @@ impl HookPaths {
 		);
 
 		let run_command = |command: &mut Command| {
-			command
+			let mut child = command
 				.args(args)
 				.current_dir(&self.pwd)
 				.with_no_window()
-				.output()
+				.stdin(std::process::Stdio::piped())
+				.stdout(std::process::Stdio::piped())
+				.stderr(std::process::Stdio::piped())
+				.spawn()?;
+
+			if let Some(input) = stdin {
+				use std::io::Write;
+				if let Some(mut stdin_handle) = child.stdin.take() {
+					stdin_handle.write_all(input)?;
+				}
+			}
+
+			child.wait_with_output()
 		};
 
 		let output = if cfg!(windows) {
@@ -210,21 +236,21 @@ impl HookPaths {
 			}
 		}?;
 
-		if output.status.success() {
-			Ok(HookResult::Ok { hook })
-		} else {
-			let stderr =
-				String::from_utf8_lossy(&output.stderr).to_string();
-			let stdout =
-				String::from_utf8_lossy(&output.stdout).to_string();
+		let stderr =
+			String::from_utf8_lossy(&output.stderr).to_string();
+		let stdout =
+			String::from_utf8_lossy(&output.stdout).to_string();
 
-			Ok(HookResult::RunNotSuccessful {
-				code: output.status.code(),
-				stdout,
-				stderr,
-				hook,
-			})
-		}
+		Ok(HookResult::Run(crate::HookRunResponse {
+			hook,
+			stdout,
+			stderr,
+			code: if output.status.success() {
+				None
+			} else {
+				output.status.code()
+			},
+		}))
 	}
 }
 

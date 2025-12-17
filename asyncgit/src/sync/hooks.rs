@@ -15,13 +15,17 @@ pub enum HookResult {
 impl From<git2_hooks::HookResult> for HookResult {
 	fn from(v: git2_hooks::HookResult) -> Self {
 		match v {
-			git2_hooks::HookResult::Ok { .. }
-			| git2_hooks::HookResult::NoHookFound => Self::Ok,
-			git2_hooks::HookResult::RunNotSuccessful {
-				stdout,
-				stderr,
-				..
-			} => Self::NotOk(format!("{stdout}{stderr}")),
+			git2_hooks::HookResult::NoHookFound => Self::Ok,
+			git2_hooks::HookResult::Run(response) => {
+				if response.is_successful() {
+					Self::Ok
+				} else {
+					Self::NotOk(format!(
+						"{}{}",
+						response.stdout, response.stderr
+					))
+				}
+			}
 		}
 	}
 }
@@ -73,12 +77,26 @@ pub fn hooks_prepare_commit_msg(
 }
 
 /// see `git2_hooks::hooks_pre_push`
-pub fn hooks_pre_push(repo_path: &RepoPath) -> Result<HookResult> {
+pub fn hooks_pre_push(
+	repo_path: &RepoPath,
+	remote: Option<&str>,
+	url: &str,
+	branch_name: Option<&str>,
+	remote_branch_name: Option<&str>,
+) -> Result<HookResult> {
 	scope_time!("hooks_pre_push");
 
 	let repo = repo(repo_path)?;
 
-	Ok(git2_hooks::hooks_pre_push(&repo, None)?.into())
+	Ok(git2_hooks::hooks_pre_push(
+		&repo,
+		None,
+		remote,
+		url,
+		branch_name,
+		remote_branch_name,
+	)?
+	.into())
 }
 
 #[cfg(test)]

@@ -84,10 +84,23 @@ impl PushTagsPopup {
 		&mut self,
 		cred: Option<BasicAuthCredential>,
 	) -> Result<()> {
+		let remote = get_default_remote(&self.repo.borrow())?;
+
+		// get remote URL for pre-push hook
+		let remote_url = asyncgit::sync::get_remote_url(
+			&self.repo.borrow(),
+			&remote,
+		)?
+		.unwrap_or_default();
+
 		// run pre push hook - can reject push
-		if let HookResult::NotOk(e) =
-			hooks_pre_push(&self.repo.borrow())?
-		{
+		if let HookResult::NotOk(e) = hooks_pre_push(
+			&self.repo.borrow(),
+			Some(&remote),
+			&remote_url,
+			None,
+			None,
+		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"pre-push hook failed:\n{e}"
@@ -100,7 +113,7 @@ impl PushTagsPopup {
 		self.pending = true;
 		self.progress = None;
 		self.git_push.request(PushTagsRequest {
-			remote: get_default_remote(&self.repo.borrow())?,
+			remote,
 			basic_credential: cred,
 		})?;
 		Ok(())
