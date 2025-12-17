@@ -171,16 +171,20 @@ impl HookPaths {
 				.args(args)
 				.current_dir(&self.pwd)
 				.with_no_window()
-				.stdin(std::process::Stdio::piped())
+				.stdin(if stdin.is_some() {
+					std::process::Stdio::piped()
+				} else {
+					std::process::Stdio::null()
+				})
 				.stdout(std::process::Stdio::piped())
 				.stderr(std::process::Stdio::piped())
 				.spawn()?;
 
-			if let Some(mut stdin_handle) = child.stdin.take() {
+			if let (Some(mut stdin_handle), Some(input)) =
+				(child.stdin.take(), stdin)
+			{
 				use std::io::Write;
-				if let Some(input) = stdin {
-					stdin_handle.write_all(input)?;
-				}
+				stdin_handle.write_all(input)?;
 				drop(stdin_handle);
 			}
 
