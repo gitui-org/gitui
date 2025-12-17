@@ -301,7 +301,7 @@ jobs:
 
   test-homebrew:
     name: Test Homebrew Formula (macOS)
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
