@@ -68,7 +68,7 @@ pub use git2::BranchType;
 pub use hooks::{
 	advertised_remote_refs, hooks_commit_msg, hooks_post_commit,
 	hooks_pre_commit, hooks_pre_push, hooks_prepare_commit_msg,
-	HookResult, PrePushRef, PrePushTarget, PrepareCommitMsgSource,
+	HookResult, PrePushTarget, PrepareCommitMsgSource,
 };
 pub use hunks::{reset_hunk, stage_hunk, unstage_hunk};
 pub use ignore::add_to_ignore;

@@ -171,6 +171,7 @@ impl PushPopup {
 				branch: &self.branch,
 				delete: self.modifier.delete(),
 			},
+			cred.clone(),
 		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(

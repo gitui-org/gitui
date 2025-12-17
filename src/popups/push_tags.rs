@@ -110,6 +110,7 @@ impl PushTagsPopup {
 			Some(&remote),
 			&remote_url,
 			&asyncgit::sync::PrePushTarget::Tags,
+			cred.clone(),
 		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(

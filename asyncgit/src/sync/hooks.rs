@@ -48,6 +48,7 @@ pub fn advertised_remote_refs(
 	repo_path: &RepoPath,
 	remote: Option<&str>,
 	url: &str,
+	basic_credential: Option<crate::sync::cred::BasicAuthCredential>,
 ) -> Result<HashMap<String, Oid>> {
 	let repo = repo(repo_path)?;
 	let mut remote_handle = if let Some(name) = remote {
@@ -56,7 +57,7 @@ pub fn advertised_remote_refs(
 		repo.remote_anonymous(url)?
 	};
 
-	let callbacks = Callbacks::new(None, None);
+	let callbacks = Callbacks::new(None, basic_credential);
 	let conn = remote_handle.connect_auth(
 		Direction::Push,
 		Some(callbacks.callbacks()),
@@ -146,6 +147,7 @@ pub fn hooks_pre_push(
 	remote: Option<&str>,
 	url: &str,
 	push: &PrePushTarget<'_>,
+	basic_credential: Option<crate::sync::cred::BasicAuthCredential>,
 ) -> Result<HookResult> {
 	scope_time!("hooks_pre_push");
 
@@ -158,7 +160,12 @@ pub fn hooks_pre_push(
 		return Ok(HookResult::Ok);
 	}
 
-	let advertised = advertised_remote_refs(repo_path, remote, url)?;
+	let advertised = advertised_remote_refs(
+		repo_path,
+		remote,
+		url,
+		basic_credential,
+	)?;
 	let updates = match push {
 		PrePushTarget::Branch { branch, delete } => {
 			let remote_ref = branch_push_destination_ref(
