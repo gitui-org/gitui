@@ -169,7 +169,6 @@ impl PushPopup {
 			&remote_url,
 			&asyncgit::sync::PrePushTarget::Branch {
 				branch: &self.branch,
-				remote_branch: None,
 				delete: self.modifier.delete(),
 			},
 		)? {

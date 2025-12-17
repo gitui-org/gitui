@@ -5,6 +5,12 @@ use crate::{
 		proxy_auto, tags::tags_missing_remote, Callbacks,
 	},
 };
+use crate::{
+	sync::branch::get_branch_upstream_merge,
+	sync::config::{
+		push_default_strategy_config_repo, PushDefaultStrategyConfig,
+	},
+};
 use git2::{BranchType, Direction, Oid};
 pub use git2_hooks::{PrePushRef, PrepareCommitMsgSource};
 use scopetime::scope_time;
@@ -65,6 +71,29 @@ pub fn advertised_remote_refs(
 	Ok(map)
 }
 
+fn branch_push_destination_ref(
+	repo_path: &RepoPath,
+	branch: &str,
+	delete: bool,
+) -> Result<String> {
+	let repo = repo(repo_path)?;
+	let push_default_strategy =
+		push_default_strategy_config_repo(&repo)?;
+
+	if !delete
+		&& push_default_strategy
+			== PushDefaultStrategyConfig::Upstream
+	{
+		if let Ok(Some(branch_upstream_merge)) =
+			get_branch_upstream_merge(repo_path, branch)
+		{
+			return Ok(branch_upstream_merge);
+		}
+	}
+
+	Ok(format!("refs/heads/{branch}"))
+}
+
 /// see `git2_hooks::hooks_commit_msg`
 pub fn hooks_commit_msg(
 	repo_path: &RepoPath,
@@ -123,17 +152,18 @@ pub fn hooks_pre_push(
 	let repo = repo(repo_path)?;
 	let advertised = advertised_remote_refs(repo_path, remote, url)?;
 	let updates = match push {
-		PrePushTarget::Branch {
-			branch,
-			remote_branch,
-			delete,
-		} => vec![pre_push_branch_update(
-			repo_path,
-			branch,
-			*remote_branch,
-			*delete,
-			&advertised,
-		)?],
+		PrePushTarget::Branch { branch, delete } => {
+			let remote_ref = branch_push_destination_ref(
+				repo_path, branch, *delete,
+			)?;
+			vec![pre_push_branch_update(
+				repo_path,
+				branch,
+				&remote_ref,
+				*delete,
+				&advertised,
+			)?]
+		}
 		PrePushTarget::Tags => {
 			// If remote is None, use url per git spec
 			let remote = remote.unwrap_or(url);
@@ -152,7 +182,7 @@ pub fn hooks_pre_push(
 fn pre_push_branch_update(
 	repo_path: &RepoPath,
 	branch_name: &str,
-	remote_branch_name: Option<&str>,
+	remote_ref: &str,
 	delete: bool,
 	advertised: &HashMap<String, Oid>,
 ) -> Result<PrePushRef> {
@@ -167,10 +197,7 @@ fn pre_push_branch_update(
 		})
 		.flatten();
 
-	let remote_branch = remote_branch_name.unwrap_or(branch_name);
-	let remote_ref = format!("refs/heads/{remote_branch}");
-
-	let remote_oid = advertised.get(&remote_ref).copied();
+	let remote_oid = advertised.get(remote_ref).copied();
 
 	Ok(PrePushRef::new(
 		local_ref, local_oid, remote_ref, remote_oid,
@@ -213,8 +240,6 @@ pub enum PrePushTarget<'a> {
 	Branch {
 		/// Local branch name being pushed.
 		branch: &'a str,
-		/// Optional remote branch name if different from local.
-		remote_branch: Option<&'a str>,
 		/// Whether this is a delete push.
 		delete: bool,
 	},
