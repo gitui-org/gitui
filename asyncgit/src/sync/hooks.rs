@@ -443,4 +443,107 @@ mod tests {
 
 		assert_eq!(msg, String::from("msg\n"));
 	}
+
+	#[test]
+	fn test_pre_push_hook_receives_correct_stdin() {
+		let (_td, repo) = repo_init().unwrap();
+
+		// Create a pre-push hook that captures and validates stdin
+		let hook = b"#!/bin/sh
+# Validate we receive correct format
+stdin=$(cat)
+
+# Check we receive 4 space-separated fields
+field_count=$(echo \"$stdin\" | awk '{print NF}')
+if [ \"$field_count\" != \"4\" ]; then
+    echo \"ERROR: Expected 4 fields, got $field_count\" >&2
+    exit 1
+fi
+
+# Check format contains refs/heads/
+if ! echo \"$stdin\" | grep -q \"^refs/heads/\"; then
+    echo \"ERROR: Invalid ref format\" >&2
+    exit 1
+fi
+
+# Validate arguments
+if [ \"$1\" != \"origin\" ]; then
+    echo \"ERROR: Wrong remote: $1\" >&2
+    exit 1
+fi
+
+exit 0
+        ";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_PUSH,
+			hook,
+		);
+
+		// Directly test the git2-hooks layer with a simple update
+		let branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let commit_id = repo.head().unwrap().target().unwrap();
+		let update = git2_hooks::PrePushRef::new(
+			format!("refs/heads/{}", branch),
+			Some(commit_id),
+			format!("refs/heads/{}", branch),
+			None,
+		);
+
+		let res = git2_hooks::hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://github.com/test/repo.git",
+			&[update],
+		)
+		.unwrap();
+
+		// Hook should succeed
+		assert!(res.is_ok());
+	}
+
+	#[test]
+	fn test_pre_push_hook_rejects_based_on_stdin() {
+		let (_td, repo) = repo_init().unwrap();
+
+		// Create a hook that rejects pushes to master branch
+		let hook = b"#!/bin/sh
+stdin=$(cat)
+if echo \"$stdin\" | grep -q \"refs/heads/master\"; then
+    echo \"Direct pushes to master not allowed\" >&2
+    exit 1
+fi
+exit 0
+        ";
+
+		git2_hooks::create_hook(
+			&repo,
+			git2_hooks::HOOK_PRE_PUSH,
+			hook,
+		);
+
+		// Try to push master branch
+		let commit_id = repo.head().unwrap().target().unwrap();
+		let update = git2_hooks::PrePushRef::new(
+			"refs/heads/master",
+			Some(commit_id),
+			"refs/heads/master",
+			None,
+		);
+
+		let res = git2_hooks::hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://github.com/test/repo.git",
+			&[update],
+		)
+		.unwrap();
+
+		// Hook should reject
+		assert!(res.is_not_successful());
+	}
 }
