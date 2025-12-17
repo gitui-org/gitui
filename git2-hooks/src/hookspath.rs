@@ -176,11 +176,12 @@ impl HookPaths {
 				.stderr(std::process::Stdio::piped())
 				.spawn()?;
 
-			if let Some(input) = stdin {
+			if let Some(mut stdin_handle) = child.stdin.take() {
 				use std::io::Write;
-				if let Some(mut stdin_handle) = child.stdin.take() {
+				if let Some(input) = stdin {
 					stdin_handle.write_all(input)?;
 				}
+				drop(stdin_handle);
 			}
 
 			child.wait_with_output()

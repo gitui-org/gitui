@@ -26,12 +26,15 @@ fn exec_copy_with_args(
 		.spawn()
 		.map_err(|e| anyhow!("`{command:?}`: {e:?}"))?;
 
-	process
+	let mut stdin = process
 		.stdin
-		.as_mut()
-		.ok_or_else(|| anyhow!("`{command:?}`"))?
+		.take()
+		.ok_or_else(|| anyhow!("`{command:?}`"))?;
+
+	stdin
 		.write_all(text.as_bytes())
 		.map_err(|e| anyhow!("`{command:?}`: {e:?}"))?;
+	drop(stdin);
 
 	let out = process
 		.wait_with_output()
