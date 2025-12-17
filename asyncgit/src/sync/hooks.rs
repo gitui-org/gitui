@@ -71,26 +71,38 @@ pub fn advertised_remote_refs(
 	Ok(map)
 }
 
-fn branch_push_destination_ref(
+/// Determine the remote ref name for a branch push.
+///
+/// Respects `push.default=upstream` config when set and upstream is configured.
+/// Otherwise defaults to `refs/heads/{branch}`. Delete operations always use
+/// the simple ref name.
+fn get_remote_ref_for_push(
 	repo_path: &RepoPath,
 	branch: &str,
 	delete: bool,
 ) -> Result<String> {
+	// For delete operations, always use the simple ref name
+	// regardless of push.default configuration
+	if delete {
+		return Ok(format!("refs/heads/{branch}"));
+	}
+
 	let repo = repo(repo_path)?;
 	let push_default_strategy =
 		push_default_strategy_config_repo(&repo)?;
 
-	if !delete
-		&& push_default_strategy
-			== PushDefaultStrategyConfig::Upstream
-	{
-		if let Ok(Some(branch_upstream_merge)) =
+	// When push.default=upstream, use the configured upstream ref if available
+	if push_default_strategy == PushDefaultStrategyConfig::Upstream {
+		if let Ok(Some(upstream_ref)) =
 			get_branch_upstream_merge(repo_path, branch)
 		{
-			return Ok(branch_upstream_merge);
+			return Ok(upstream_ref);
 		}
+		// If upstream strategy is set but no upstream is configured,
+		// fall through to default behavior
 	}
 
+	// Default: push to remote branch with same name as local
 	Ok(format!("refs/heads/{branch}"))
 }
 
@@ -167,9 +179,8 @@ pub fn hooks_pre_push(
 	)?;
 	let updates = match push {
 		PrePushTarget::Branch { branch, delete } => {
-			let remote_ref = branch_push_destination_ref(
-				repo_path, branch, *delete,
-			)?;
+			let remote_ref =
+				get_remote_ref_for_push(repo_path, branch, *delete)?;
 			vec![pre_push_branch_update(
 				repo_path,
 				branch,
