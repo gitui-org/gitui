@@ -150,6 +150,14 @@ pub fn hooks_pre_push(
 	scope_time!("hooks_pre_push");
 
 	let repo = repo(repo_path)?;
+	if !git2_hooks::hook_available(
+		&repo,
+		None,
+		git2_hooks::HOOK_PRE_PUSH,
+	)? {
+		return Ok(HookResult::Ok);
+	}
+
 	let advertised = advertised_remote_refs(repo_path, remote, url)?;
 	let updates = match push {
 		PrePushTarget::Branch { branch, delete } => {

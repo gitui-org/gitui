@@ -48,6 +48,16 @@ pub const HOOK_PRE_PUSH: &str = "pre-push";
 
 const HOOK_COMMIT_MSG_TEMP_FILE: &str = "COMMIT_EDITMSG";
 
+/// Check if a given hook is present considering config/paths and optional extra paths.
+pub fn hook_available(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+	hook: &str,
+) -> Result<bool> {
+	let hook = HookPaths::new(repo, other_paths, hook)?;
+	Ok(hook.found())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrePushRef {
 	pub local_ref: String,
