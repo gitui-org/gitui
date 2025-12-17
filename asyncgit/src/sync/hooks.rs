@@ -32,10 +32,16 @@ impl From<git2_hooks::HookResult> for HookResult {
 				if response.is_successful() {
 					Self::Ok
 				} else {
-					Self::NotOk(format!(
-						"{}{}",
-						response.stdout, response.stderr
-					))
+					Self::NotOk(if response.stderr.is_empty() {
+						response.stdout
+					} else if response.stdout.is_empty() {
+						response.stderr
+					} else {
+						format!(
+							"{}\n{}",
+							response.stdout, response.stderr
+						)
+					})
 				}
 			}
 		}
