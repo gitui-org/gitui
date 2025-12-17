@@ -161,22 +161,17 @@ impl PushPopup {
 			return Ok(());
 		};
 
-		// build pre-push updates (single branch)
-		let repo = self.repo.borrow();
-		let branch_update = asyncgit::sync::pre_push_branch_update(
-			&repo,
-			Some(&remote),
-			&self.branch,
-			None,
-			self.modifier.delete(),
-		)?;
-
 		// run pre push hook - can reject push
+		let repo = self.repo.borrow();
 		if let HookResult::NotOk(e) = hooks_pre_push(
 			&repo,
 			Some(&remote),
 			&remote_url,
-			&[branch_update],
+			&asyncgit::sync::PrePushTarget::Branch {
+				branch: &self.branch,
+				remote_branch: None,
+				delete: self.modifier.delete(),
+			},
 		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(

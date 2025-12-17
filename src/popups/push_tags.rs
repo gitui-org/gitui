@@ -103,17 +103,13 @@ impl PushTagsPopup {
 			return Ok(());
 		};
 
-		// build updates for tags we are going to push
-		let repo = self.repo.borrow();
-		let updates =
-			asyncgit::sync::pre_push_tag_updates(&repo, &remote)?;
-
 		// run pre push hook - can reject push
+		let repo = self.repo.borrow();
 		if let HookResult::NotOk(e) = hooks_pre_push(
 			&repo,
 			Some(&remote),
 			&remote_url,
-			&updates,
+			&asyncgit::sync::PrePushTarget::Tags,
 		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(

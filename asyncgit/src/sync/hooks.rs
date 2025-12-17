@@ -1,10 +1,14 @@
 use super::{repository::repo, RepoPath};
 use crate::{
-	error::Result, sync::remotes::tags::tags_missing_remote,
+	error::Result,
+	sync::remotes::{
+		proxy_auto, tags::tags_missing_remote, Callbacks,
+	},
 };
-use git2::BranchType;
+use git2::{BranchType, Direction, Oid};
 pub use git2_hooks::{PrePushRef, PrepareCommitMsgSource};
 use scopetime::scope_time;
+use std::collections::HashMap;
 
 ///
 #[derive(Debug, PartialEq, Eq)]
@@ -33,36 +37,32 @@ impl From<git2_hooks::HookResult> for HookResult {
 	}
 }
 
-fn pre_push_branch_update(
-	repo: &git2::Repository,
+/// Retrieve advertised refs from the remote for the upcoming push.
+pub fn advertised_remote_refs(
+	repo_path: &RepoPath,
 	remote: Option<&str>,
-	branch_name: &str,
-	remote_branch_name: Option<&str>,
-	delete: bool,
-) -> PrePushRef {
-	let local_ref = format!("refs/heads/{branch_name}");
-	let local_oid = (!delete)
-		.then(|| {
-			repo.find_branch(branch_name, BranchType::Local)
-				.ok()
-				.and_then(|branch| branch.get().peel_to_commit().ok())
-				.map(|commit| commit.id())
-		})
-		.flatten();
+	url: &str,
+) -> Result<HashMap<String, Oid>> {
+	let repo = repo(repo_path)?;
+	let mut remote_handle = if let Some(name) = remote {
+		repo.find_remote(name)?
+	} else {
+		repo.remote_anonymous(url)?
+	};
 
-	let remote_branch = remote_branch_name.unwrap_or(branch_name);
-	let remote_ref = format!("refs/heads/{remote_branch}");
+	let callbacks = Callbacks::new(None, None);
+	let conn = remote_handle.connect_auth(
+		Direction::Push,
+		Some(callbacks.callbacks()),
+		Some(proxy_auto()),
+	)?;
 
-	let remote_oid = remote.and_then(|remote_name| {
-		repo.find_reference(&format!(
-			"refs/remotes/{remote_name}/{remote_branch}"
-		))
-		.ok()
-		.and_then(|r| r.peel_to_commit().ok())
-		.map(|c| c.id())
-	});
+	let mut map = HashMap::new();
+	for head in conn.list()? {
+		map.insert(head.name().to_string(), head.oid());
+	}
 
-	PrePushRef::new(local_ref, local_oid, remote_ref, remote_oid)
+	Ok(map)
 }
 
 /// see `git2_hooks::hooks_commit_msg`
@@ -116,27 +116,45 @@ pub fn hooks_pre_push(
 	repo_path: &RepoPath,
 	remote: Option<&str>,
 	url: &str,
-	updates: &[PrePushRef],
+	push: &PrePushTarget<'_>,
 ) -> Result<HookResult> {
 	scope_time!("hooks_pre_push");
 
 	let repo = repo(repo_path)?;
+	let advertised = advertised_remote_refs(repo_path, remote, url)?;
+	let updates = match push {
+		PrePushTarget::Branch {
+			branch,
+			remote_branch,
+			delete,
+		} => vec![pre_push_branch_update(
+			repo_path,
+			branch,
+			*remote_branch,
+			*delete,
+			&advertised,
+		)?],
+		PrePushTarget::Tags => {
+			// If remote is None, use url per git spec
+			let remote = remote.unwrap_or(url);
+			pre_push_tag_updates(repo_path, remote, &advertised)?
+		}
+	};
 
-	Ok(
-		git2_hooks::hooks_pre_push(
-			&repo, None, remote, url, updates,
-		)?
-		.into(),
-	)
+	Ok(git2_hooks::hooks_pre_push(
+		&repo, None, remote, url, &updates,
+	)?
+	.into())
 }
 
 /// Build a single pre-push update line for a branch.
-pub fn pre_push_branch_update(
+#[allow(clippy::implicit_hasher)]
+fn pre_push_branch_update(
 	repo_path: &RepoPath,
-	remote: Option<&str>,
 	branch_name: &str,
 	remote_branch_name: Option<&str>,
 	delete: bool,
+	advertised: &HashMap<String, Oid>,
 ) -> Result<PrePushRef> {
 	let repo = repo(repo_path)?;
 	let local_ref = format!("refs/heads/{branch_name}");
@@ -152,14 +170,7 @@ pub fn pre_push_branch_update(
 	let remote_branch = remote_branch_name.unwrap_or(branch_name);
 	let remote_ref = format!("refs/heads/{remote_branch}");
 
-	let remote_oid = remote.and_then(|remote_name| {
-		repo.find_reference(&format!(
-			"refs/remotes/{remote_name}/{remote_branch}"
-		))
-		.ok()
-		.and_then(|r| r.peel_to_commit().ok())
-		.map(|c| c.id())
-	});
+	let remote_oid = advertised.get(&remote_ref).copied();
 
 	Ok(PrePushRef::new(
 		local_ref, local_oid, remote_ref, remote_oid,
@@ -167,9 +178,11 @@ pub fn pre_push_branch_update(
 }
 
 /// Build pre-push updates for tags that are missing on the remote.
-pub fn pre_push_tag_updates(
+#[allow(clippy::implicit_hasher)]
+fn pre_push_tag_updates(
 	repo_path: &RepoPath,
 	remote: &str,
+	advertised: &HashMap<String, Oid>,
 ) -> Result<Vec<PrePushRef>> {
 	let repo = repo(repo_path)?;
 	let tags = tags_missing_remote(repo_path, remote, None)?;
@@ -180,17 +193,33 @@ pub fn pre_push_tag_updates(
 			let tag_oid = reference.target().or_else(|| {
 				reference.peel_to_commit().ok().map(|c| c.id())
 			});
-
+			let remote_ref = tag_ref.clone();
+			let advertised_oid = advertised.get(&remote_ref).copied();
 			updates.push(PrePushRef::new(
 				tag_ref.clone(),
 				tag_oid,
-				tag_ref,
-				None,
+				remote_ref,
+				advertised_oid,
 			));
 		}
 	}
 
 	Ok(updates)
+}
+
+/// What is being pushed.
+pub enum PrePushTarget<'a> {
+	/// Push a single branch.
+	Branch {
+		/// Local branch name being pushed.
+		branch: &'a str,
+		/// Optional remote branch name if different from local.
+		remote_branch: Option<&'a str>,
+		/// Whether this is a delete push.
+		delete: bool,
+	},
+	/// Push tags.
+	Tags,
 }
 
 #[cfg(test)]
