@@ -38,7 +38,7 @@ pub use error::HooksError;
 use error::Result;
 use hookspath::HookPaths;
 
-use git2::Repository;
+use git2::{Oid, Repository};
 
 pub const HOOK_POST_COMMIT: &str = "post-commit";
 pub const HOOK_PRE_COMMIT: &str = "pre-commit";
@@ -47,6 +47,46 @@ pub const HOOK_PREPARE_COMMIT_MSG: &str = "prepare-commit-msg";
 pub const HOOK_PRE_PUSH: &str = "pre-push";
 
 const HOOK_COMMIT_MSG_TEMP_FILE: &str = "COMMIT_EDITMSG";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrePushRef {
+	pub local_ref: String,
+	pub local_oid: Option<Oid>,
+	pub remote_ref: String,
+	pub remote_oid: Option<Oid>,
+}
+
+impl PrePushRef {
+	#[must_use]
+	pub fn new(
+		local_ref: impl Into<String>,
+		local_oid: Option<Oid>,
+		remote_ref: impl Into<String>,
+		remote_oid: Option<Oid>,
+	) -> Self {
+		Self {
+			local_ref: local_ref.into(),
+			local_oid,
+			remote_ref: remote_ref.into(),
+			remote_oid,
+		}
+	}
+
+	fn format_oid(oid: Option<Oid>) -> String {
+		oid.map_or_else(|| "0".repeat(40), |id| id.to_string())
+	}
+
+	#[must_use]
+	pub fn to_line(&self) -> String {
+		format!(
+			"{} {} {} {}",
+			self.local_ref,
+			Self::format_oid(self.local_oid),
+			self.remote_ref,
+			Self::format_oid(self.remote_oid)
+		)
+	}
+}
 
 /// Response from running a hook
 #[derive(Debug, PartialEq, Eq)]
@@ -192,17 +232,12 @@ pub fn hooks_post_commit(
 ///   `<local-ref> SP <local-object-name> SP <remote-ref> SP <remote-object-name> LF`
 ///
 /// If `remote` is `None` or empty, the `url` is used for both arguments as per Git spec.
-///
-/// Parameters:
-/// - `branch_name`: Optional local branch name being pushed (e.g., "main"). If `None`, stdin will be empty.
-/// - `remote_branch_name`: Optional remote branch name (if different from local)
 pub fn hooks_pre_push(
 	repo: &Repository,
 	other_paths: Option<&[&str]>,
 	remote: Option<&str>,
 	url: &str,
-	branch_name: Option<&str>,
-	remote_branch_name: Option<&str>,
+	updates: &[PrePushRef],
 ) -> Result<HookResult> {
 	let hook = HookPaths::new(repo, other_paths, HOOK_PRE_PUSH)?;
 
@@ -219,44 +254,11 @@ pub fn hooks_pre_push(
 	// Build stdin according to Git pre-push hook spec:
 	// <local-ref> SP <local-object-name> SP <remote-ref> SP <remote-object-name> LF
 
-	let stdin_data = if let Some(branch) = branch_name {
-		// Get local branch reference and commit
-		let local_branch =
-			repo.find_branch(branch, git2::BranchType::Local)?;
-		let local_ref = format!("refs/heads/{branch}");
-		let local_commit = local_branch.get().peel_to_commit()?;
-		let local_sha = local_commit.id().to_string();
-
-		// Determine remote branch name (same as local if not specified)
-		let remote_branch = remote_branch_name.unwrap_or(branch);
-		let remote_ref = format!("refs/heads/{remote_branch}");
-
-		// Try to get remote commit SHA from the actual push target remote
-		// We need to look up refs/remotes/<remote>/<branch>, not the upstream
-		let remote_sha = if let Some(remote_name) = remote {
-			// Try to find the remote tracking branch for the push target
-			let remote_ref_name =
-				format!("refs/remotes/{remote_name}/{remote_branch}");
-			if let Ok(remote_ref) =
-				repo.find_reference(&remote_ref_name)
-			{
-				// Remote branch exists, get its SHA
-				remote_ref.peel_to_commit()?.id().to_string()
-			} else {
-				// Remote branch doesn't exist yet (new branch on remote)
-				"0".repeat(40)
-			}
-		} else {
-			// No remote specified (shouldn't happen in practice)
-			"0".repeat(40)
-		};
-
-		// Format: refs/heads/branch local_sha refs/heads/branch remote_sha\n
-		format!("{local_ref} {local_sha} {remote_ref} {remote_sha}\n")
-	} else {
-		// No branch specified (e.g., pushing tags), use empty stdin
-		String::new()
-	};
+	let mut stdin_data = String::new();
+	for update in updates {
+		stdin_data.push_str(&update.to_line());
+		stdin_data.push('\n');
+	}
 
 	hook.run_hook_os_str_with_stdin(
 		[remote_name, url],
@@ -329,6 +331,48 @@ mod tests {
 	use git2_testing::{repo_init, repo_init_bare};
 	use pretty_assertions::assert_eq;
 	use tempfile::TempDir;
+
+	fn branch_update(
+		repo: &Repository,
+		remote: Option<&str>,
+		branch: &str,
+		remote_branch: Option<&str>,
+		delete: bool,
+	) -> PrePushRef {
+		let local_ref = format!("refs/heads/{branch}");
+		let local_oid = (!delete).then(|| {
+			repo.find_branch(branch, git2::BranchType::Local)
+				.unwrap()
+				.get()
+				.peel_to_commit()
+				.unwrap()
+				.id()
+		});
+
+		let remote_branch = remote_branch.unwrap_or(branch);
+		let remote_ref = format!("refs/heads/{remote_branch}");
+		let remote_oid = remote.and_then(|remote_name| {
+			repo.find_reference(&format!(
+				"refs/remotes/{remote_name}/{remote_branch}"
+			))
+			.ok()
+			.and_then(|r| r.peel_to_commit().ok())
+			.map(|c| c.id())
+		});
+
+		PrePushRef::new(local_ref, local_oid, remote_ref, remote_oid)
+	}
+
+	fn stdin_from_updates(updates: &[PrePushRef]) -> String {
+		updates
+			.iter()
+			.map(|u| format!("{}\n", u.to_line()))
+			.collect()
+	}
+
+	fn head_branch(repo: &Repository) -> String {
+		repo.head().unwrap().shorthand().unwrap().to_string()
+	}
 
 	#[test]
 	fn test_smoke() {
@@ -756,13 +800,21 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("origin"),
 			"https://example.com/repo.git",
-			None,
-			None,
+			&updates,
 		)
 		.unwrap();
 
@@ -778,13 +830,22 @@ echo 'failed'
 exit 3
 	";
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("origin"),
 			"https://example.com/repo.git",
-			None,
-			None,
+			&updates,
 		)
 		.unwrap();
 		let HookResult::Run(response) = res else {
@@ -806,13 +867,16 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
+		let branch = head_branch(&repo);
+		let updates =
+			[branch_update(&repo, None, &branch, None, false)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			None,
 			"https://example.com/repo.git",
-			None,
-			None,
+			&updates,
 		)
 		.unwrap();
 
@@ -836,13 +900,21 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("origin"),
 			"https://example.com/repo.git",
-			None,
-			None,
+			&updates,
 		)
 		.unwrap();
 
@@ -866,9 +938,116 @@ exit 0
 			response.stdout
 		);
 		assert!(
-			response.stdout.contains("stdin_length=0"),
-			"Expected stdin to be empty (length 0), got: {}",
+			response.stdout.contains("stdin_length=")
+				&& !response.stdout.contains("stdin_length=0"),
+			"Expected stdin to be non-empty, got: {}",
 			response.stdout
+		);
+	}
+
+	#[test]
+	fn test_pre_push_multiple_updates() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+cat
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let branch_update = branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		);
+
+		// create a tag to add a second refspec
+		let head_commit =
+			repo.head().unwrap().peel_to_commit().unwrap();
+		repo.tag_lightweight("v1", head_commit.as_object(), false)
+			.unwrap();
+		let tag_ref = repo.find_reference("refs/tags/v1").unwrap();
+		let tag_oid = tag_ref.target().unwrap();
+		let tag_update = PrePushRef::new(
+			"refs/tags/v1",
+			Some(tag_oid),
+			"refs/tags/v1",
+			None,
+		);
+
+		let updates = [branch_update, tag_update];
+		let expected_stdin = stdin_from_updates(&updates);
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			unreachable!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(
+			response.is_successful(),
+			"Hook should succeed: stdout {} stderr {}",
+			response.stdout,
+			response.stderr
+		);
+		assert_eq!(
+			response.stdout, expected_stdin,
+			"stdin should include all refspec lines"
+		);
+	}
+
+	#[test]
+	fn test_pre_push_delete_ref_uses_zero_oid() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+cat
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			true,
+		)];
+		let expected_stdin = stdin_from_updates(&updates);
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			unreachable!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
+		assert!(
+			response
+				.stdout
+				.contains("0000000000000000000000000000000000000000"),
+			"delete pushes must use zero oid for new object"
 		);
 	}
 
@@ -893,13 +1072,21 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("origin"),
 			"https://github.com/user/repo.git",
-			None,
-			None,
+			&updates,
 		)
 		.unwrap();
 
@@ -922,28 +1109,34 @@ exit 0
 		let (_td, repo) = repo_init();
 
 		// Hook that checks stdin content
-		// Currently we pass empty stdin, this test documents that behavior
 		let hook = b"#!/bin/sh
-stdin_content=$(cat)
-if [ -z \"$stdin_content\" ]; then
-    echo \"stdin is empty (expected for current implementation)\"
-    exit 0
-else
-    echo \"stdin_length=${#stdin_content}\"
-    echo \"stdin_content=$stdin_content\"
-    exit 0
-fi
-	";
+	stdin_content=$(cat)
+	if [ -z \"$stdin_content\" ]; then
+	    echo \"stdin was unexpectedly empty\" >&2
+	    exit 1
+	fi
+	echo \"stdin_length=${#stdin_content}\"
+	echo \"stdin_content=$stdin_content\"
+	exit 0
+		";
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
 
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("origin"),
 			"https://github.com/user/repo.git",
-			None,
-			None,
+			&updates,
 		)
 		.unwrap();
 
@@ -953,10 +1146,9 @@ fi
 
 		assert!(response.is_successful(), "Hook should succeed");
 
-		// Verify stdin is currently empty
 		assert!(
-			response.stdout.contains("stdin is empty"),
-			"Expected stdin to be empty, got: {}",
+			response.stdout.contains("stdin_length="),
+			"Expected stdin to be non-empty, got: {}",
 			response.stdout
 		);
 	}
@@ -1000,13 +1192,21 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("origin"),
 			"https://github.com/user/repo.git",
-			Some("master"),
-			None,
+			&updates,
 		)
 		.unwrap();
 
@@ -1130,13 +1330,21 @@ exit 1
 
 		// Push to "backup" remote (which doesn't have master yet)
 		// This is different from the upstream "origin"
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("backup"),
+			&branch,
+			None,
+			false,
+		)];
+
 		let res = hooks_pre_push(
 			&repo,
 			None,
 			Some("backup"),
 			"https://github.com/user/backup-repo.git",
-			Some("master"),
-			None,
+			&updates,
 		)
 		.unwrap();
 

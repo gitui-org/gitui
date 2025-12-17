@@ -67,7 +67,8 @@ pub use diff::get_diff_commit;
 pub use git2::BranchType;
 pub use hooks::{
 	hooks_commit_msg, hooks_post_commit, hooks_pre_commit,
-	hooks_pre_push, hooks_prepare_commit_msg, HookResult,
+	hooks_pre_push, hooks_prepare_commit_msg, pre_push_branch_update,
+	pre_push_tag_updates, HookResult, PrePushRef,
 	PrepareCommitMsgSource,
 };
 pub use hunks::{reset_hunk, stage_hunk, unstage_hunk};
