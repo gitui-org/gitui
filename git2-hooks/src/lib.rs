@@ -242,6 +242,9 @@ pub fn hooks_post_commit(
 ///   `<local-ref> SP <local-object-name> SP <remote-ref> SP <remote-object-name> LF`
 ///
 /// If `remote` is `None` or empty, the `url` is used for both arguments as per Git spec.
+///
+/// Note: The hook is called even when `updates` is empty (matching Git's behavior).
+/// This can occur when pushing tags that already exist on the remote.
 pub fn hooks_pre_push(
 	repo: &Repository,
 	other_paths: Option<&[&str]>,
