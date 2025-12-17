@@ -90,8 +90,18 @@ impl PushTagsPopup {
 		let remote_url = asyncgit::sync::get_remote_url(
 			&self.repo.borrow(),
 			&remote,
-		)?
-		.unwrap_or_default();
+		)?;
+
+		// If remote doesn't have a URL configured, we can't push
+		let Some(remote_url) = remote_url else {
+			log::error!("remote '{remote}' has no URL configured");
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"Remote '{remote}' has no URL configured"
+			)));
+			self.pending = false;
+			self.visible = false;
+			return Ok(());
+		};
 
 		// run pre push hook - can reject push
 		if let HookResult::NotOk(e) = hooks_pre_push(

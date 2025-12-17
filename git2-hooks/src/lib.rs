@@ -231,12 +231,23 @@ pub fn hooks_pre_push(
 		let remote_branch = remote_branch_name.unwrap_or(branch);
 		let remote_ref = format!("refs/heads/{remote_branch}");
 
-		// Try to get remote commit SHA from upstream
-		// If there's no upstream (new branch), use 40 zeros as per Git spec
-		let remote_sha = if let Ok(upstream) = local_branch.upstream()
-		{
-			upstream.get().peel_to_commit()?.id().to_string()
+		// Try to get remote commit SHA from the actual push target remote
+		// We need to look up refs/remotes/<remote>/<branch>, not the upstream
+		let remote_sha = if let Some(remote_name) = remote {
+			// Try to find the remote tracking branch for the push target
+			let remote_ref_name =
+				format!("refs/remotes/{remote_name}/{remote_branch}");
+			if let Ok(remote_ref) =
+				repo.find_reference(&remote_ref_name)
+			{
+				// Remote branch exists, get its SHA
+				remote_ref.peel_to_commit()?.id().to_string()
+			} else {
+				// Remote branch doesn't exist yet (new branch on remote)
+				"0".repeat(40)
+			}
 		} else {
+			// No remote specified (shouldn't happen in practice)
 			"0".repeat(40)
 		};
 
@@ -1015,6 +1026,128 @@ exit 0
 		assert!(
 			response.stdout.contains("SUCCESS"),
 			"Expected hook to validate stdin format.\nstdout: {}\nstderr: {}",
+			response.stdout,
+			response.stderr
+		);
+	}
+
+	#[test]
+	fn test_pre_push_uses_push_target_remote_not_upstream() {
+		let (_td, repo) = repo_init();
+
+		// repo_init() already creates an initial commit on master
+		// Get the current HEAD commit
+		let head = repo.head().unwrap();
+		let local_commit = head.target().unwrap();
+
+		// Set up scenario:
+		// - Local master is at local_commit (latest)
+		// - origin/master exists at local_commit (fully synced - upstream)
+		// - backup/master exists at old_commit (behind/different)
+		// - Branch tracks origin/master as upstream
+		// - We push to "backup" remote
+		// - Expected: remote SHA should be old_commit
+		// - Bug (before fix): remote SHA was from upstream origin/master
+
+		// Create origin/master tracking branch (at same commit as local)
+		repo.reference(
+			"refs/remotes/origin/master",
+			local_commit,
+			true,
+			"create origin/master",
+		)
+		.unwrap();
+
+		// Create backup/master at a different commit (simulating it's behind)
+		// We can't create a reference to a non-existent commit, so we'll
+		// create an actual old commit first
+		let sig = repo.signature().unwrap();
+		let tree_id = {
+			let mut index = repo.index().unwrap();
+			index.write_tree().unwrap()
+		};
+		let tree = repo.find_tree(tree_id).unwrap();
+		let old_commit = repo
+			.commit(
+				None, // Don't update any refs
+				&sig,
+				&sig,
+				"old backup commit",
+				&tree,
+				&[], // No parents
+			)
+			.unwrap();
+
+		// Now create backup/master pointing to this old commit
+		repo.reference(
+			"refs/remotes/backup/master",
+			old_commit,
+			true,
+			"create backup/master at old commit",
+		)
+		.unwrap();
+
+		// Configure branch.master.remote and branch.master.merge to set upstream
+		{
+			let mut config = repo.config().unwrap();
+			config.set_str("branch.master.remote", "origin").unwrap();
+			config
+				.set_str("branch.master.merge", "refs/heads/master")
+				.unwrap();
+		}
+
+		// Hook that extracts and prints the remote SHA
+		let hook = format!(
+			r#"#!/bin/sh
+stdin_content=$(cat)
+echo "stdin: $stdin_content"
+
+# Extract the 4th field (remote SHA)
+remote_sha=$(echo "$stdin_content" | awk '{{print $4}}')
+echo "remote_sha=$remote_sha"
+
+# When pushing to backup, we should get backup/master's old SHA
+# NOT the SHA from origin/master upstream
+if [ "$remote_sha" = "{}" ]; then
+    echo "BUG: Got origin/master SHA (upstream) instead of backup/master SHA" >&2
+    exit 1
+fi
+
+if [ "$remote_sha" = "{}" ]; then
+    echo "SUCCESS: Got correct backup/master SHA"
+    exit 0
+fi
+
+echo "ERROR: Got unexpected SHA: $remote_sha" >&2
+echo "Expected backup/master: {}" >&2
+echo "Or origin/master (bug): {}" >&2
+exit 1
+"#,
+			local_commit, old_commit, old_commit, local_commit
+		);
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook.as_bytes());
+
+		// Push to "backup" remote (which doesn't have master yet)
+		// This is different from the upstream "origin"
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("backup"),
+			"https://github.com/user/backup-repo.git",
+			Some("master"),
+			None,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			panic!("Expected Run result, got: {res:?}")
+		};
+
+		// This test now passes after fix
+		assert!(
+			response.is_successful(),
+			"Hook should receive backup/master SHA, not upstream origin/master SHA.\nstdout: {}\nstderr: {}",
 			response.stdout,
 			response.stderr
 		);
