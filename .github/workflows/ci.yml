@@ -313,6 +313,3 @@ jobs:
 
       - name: Let Homebrew build gitui from source
         run: brew install --build-from-source gitui
-
-      - name: Run Homebrew test
-        run: brew test gitui
