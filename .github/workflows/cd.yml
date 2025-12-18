@@ -5,7 +5,10 @@ on:
    tags:
      - '*'
   workflow_dispatch:
-
+    
+permissions:
+  contents: write
+  
 jobs:
   release:
     strategy:
@@ -107,10 +110,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       id: release_notes
       uses: ffurrer2/extract-release-notes@v2
+      
     - name: Release
       uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         body: ${{ steps.release_notes.outputs.release_notes }}
         prerelease: ${{ contains(github.ref, '-') }}

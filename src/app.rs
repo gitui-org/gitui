@@ -1,5 +1,6 @@
 use crate::{
 	accessors,
+	args::CliArgs,
 	cmdbar::CommandBar,
 	components::{
 		command_pump, event_pump, CommandInfo, Component,
@@ -10,16 +11,16 @@ use crate::{
 	options::{Options, SharedOptions},
 	popup_stack::PopupStack,
 	popups::{
-		AppOption, BlameFilePopup, BranchListPopup, CommitPopup,
-		CompareCommitsPopup, ConfirmPopup, CreateBranchPopup,
-		CreateRemotePopup, ExternalEditorPopup, FetchPopup,
-		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
-		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
-		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
-		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
-		ResetPopup, RevisionFilesPopup, StashMsgPopup,
-		SubmodulesListPopup, TagCommitPopup, TagListPopup,
-		UpdateRemoteUrlPopup,
+		AppOption, BlameFilePopup, BranchListPopup,
+		CheckoutOptionPopup, CommitPopup, CompareCommitsPopup,
+		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
+		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
+		FuzzyFindPopup, GotoLinePopup, HelpPopup, InspectCommitPopup,
+		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
+		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
+		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
+		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
+		TagListPopup, UpdateRemoteUrlPopup,
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -98,6 +99,7 @@ pub struct App {
 	submodule_popup: SubmodulesListPopup,
 	tags_popup: TagListPopup,
 	reset_popup: ResetPopup,
+	checkout_option_popup: CheckoutOptionPopup,
 	cmdbar: RefCell<CommandBar>,
 	tab: usize,
 	revlog: Revlog,
@@ -151,13 +153,14 @@ impl App {
 	///
 	#[allow(clippy::too_many_lines)]
 	pub fn new(
-		repo: RepoPathRef,
+		cliargs: CliArgs,
 		sender_git: Sender<AsyncGitNotification>,
 		sender_app: Sender<AsyncAppNotification>,
 		input: Input,
 		theme: Theme,
 		key_config: KeyConfig,
 	) -> Result<Self> {
+		let repo = RefCell::new(cliargs.repo_path.clone());
 		log::trace!("open repo at: {:?}", &repo);
 
 		let repo_path_text =
@@ -173,7 +176,20 @@ impl App {
 			sender_app,
 		};
 
-		let tab = env.options.borrow().current_tab();
+		let mut select_file: Option<PathBuf> = None;
+		let tab = if let Some(file) = cliargs.select_file {
+			// convert to relative git path
+			if let Ok(abs) = file.canonicalize() {
+				if let Ok(path) = abs.strip_prefix(
+					env.repo.borrow().gitpath().canonicalize()?,
+				) {
+					select_file = Some(Path::new(".").join(path));
+				}
+			}
+			2
+		} else {
+			env.options.borrow().current_tab()
+		};
 
 		let mut app = Self {
 			input,
@@ -218,7 +234,8 @@ impl App {
 			status_tab: Status::new(&env),
 			stashing_tab: Stashing::new(&env),
 			stashlist_tab: StashList::new(&env),
-			files_tab: FilesTab::new(&env),
+			files_tab: FilesTab::new(&env, select_file),
+			checkout_option_popup: CheckoutOptionPopup::new(&env),
 			goto_line_popup: GotoLinePopup::new(&env),
 			tab: 0,
 			queue: env.queue,
@@ -496,6 +513,7 @@ impl App {
 			fetch_popup,
 			tag_commit_popup,
 			reset_popup,
+			checkout_option_popup,
 			create_branch_popup,
 			create_remote_popup,
 			rename_remote_popup,
@@ -536,6 +554,7 @@ impl App {
 			submodule_popup,
 			tags_popup,
 			reset_popup,
+			checkout_option_popup,
 			create_branch_popup,
 			rename_branch_popup,
 			revision_files_popup,
@@ -916,6 +935,9 @@ impl App {
 				if self.blame_file_popup.is_visible() {
 					self.blame_file_popup.goto_line(line);
 				}
+			}
+			InternalEvent::CheckoutOption(branch) => {
+				self.checkout_option_popup.open(branch)?;
 			}
 		}
 

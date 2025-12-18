@@ -104,6 +104,11 @@ impl BranchInfo {
 
 		None
 	}
+
+	/// returns whether branch is local
+	pub const fn is_local(&self) -> bool {
+		matches!(self.details, BranchDetails::Local(_))
+	}
 }
 
 ///
