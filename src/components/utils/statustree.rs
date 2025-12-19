@@ -51,17 +51,13 @@ impl StatusTree {
 
 		let last_selection =
 			self.selected_item().map(|e| e.info.full_path);
-		let last_selection_index = self.selection.unwrap_or(0);
 
 		self.tree = FileTreeItems::new(list, &last_collapsed)?;
 		self.selection = last_selection.as_ref().map_or_else(
 			|| self.tree.items().first().map(|_| 0),
 			|last_selection| {
-				self.find_last_selection(
-					last_selection,
-					last_selection_index,
-				)
-				.or_else(|| self.tree.items().first().map(|_| 0))
+				self.find_last_selection(last_selection)
+					.or_else(|| self.tree.items().first().map(|_| 0))
 			},
 		);
 
@@ -196,19 +192,18 @@ impl StatusTree {
 	fn find_last_selection(
 		&self,
 		last_selection: &str,
-		last_index: usize,
 	) -> Option<usize> {
 		if self.is_empty() {
 			return None;
 		}
 
-		if let Ok(i) = self.tree.items().binary_search_by(|e| {
+		let res = self.tree.items().binary_search_by(|e| {
 			e.info.full_path.as_str().cmp(last_selection)
-		}) {
-			return Some(i);
+		});
+		match res {
+			Ok(i) => Some(i),
+			Err(i) => Some(cmp::min(i, self.tree.len() - 1)),
 		}
-
-		Some(cmp::min(last_index, self.tree.len() - 1))
 	}
 
 	fn selection_updown(
@@ -520,7 +515,7 @@ mod tests {
 		res.update(&string_vec_to_status(&["a", "b"])).unwrap();
 		res.selection = Some(1);
 
-		res.update(&string_vec_to_status(&["d", "c", "a"])).unwrap();
+		res.update(&string_vec_to_status(&["a", "c", "d"])).unwrap();
 		assert_eq!(res.selection, Some(1));
 	}
 
@@ -543,6 +538,33 @@ mod tests {
 		);
 		assert!(res.is_visible_index(res.selection.unwrap()));
 		assert_eq!(res.selection, Some(0));
+	}
+
+	#[test]
+	fn test_next_when_dir_disappears() {
+		let mut tree = StatusTree::default();
+		tree.update(&string_vec_to_status(&["a/b", "c", "d"]))
+			.unwrap();
+		tree.selection = Some(1);
+		assert_eq!(
+			tree.selected_item().unwrap().info.full_path,
+			"a/b"
+		);
+
+		tree.update(&string_vec_to_status(&["c", "d"])).unwrap();
+		assert_eq!(tree.selected_item().unwrap().info.full_path, "c");
+	}
+
+	#[test]
+	fn test_next_when_last_dir_disappears() {
+		let mut tree = StatusTree::default();
+		tree.update(&string_vec_to_status(&["a", "b", "c"]))
+			.unwrap();
+		tree.selection = Some(2);
+		assert_eq!(tree.selected_item().unwrap().info.full_path, "c");
+
+		tree.update(&string_vec_to_status(&["a", "b"])).unwrap();
+		assert_eq!(tree.selected_item().unwrap().info.full_path, "b");
 	}
 
 	#[test]
