@@ -4,7 +4,7 @@ ARGS := "-l"
 #ARGS := "-l -d ~/code/git-bare-test.git -w ~/code/git-bare-test"
 
 _default:
-    @just --choose 2>/dev/null || true
+    @just --choose || true
 
 profile:
 	CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --features timing -- {{ARGS}}
