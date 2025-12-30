@@ -52,14 +52,14 @@ jobs:
           cargo build
 
       - name: Run tests
-        run: make test
+        run: just test
 
       - name: Run clippy
         run: |
-          make clippy
+          just clippy
 
       - name: Build Release
-        run: make build-release
+        run: just build-release
 
       - name: Test Install
         run: cargo install --path "." --force --locked
@@ -126,16 +126,16 @@ jobs:
           sudo apt-get -qq install musl-tools
       - name: Build Debug
         run: |
-          make build-linux-musl-debug
+          just build-linux-musl-debug
           ./target/x86_64-unknown-linux-musl/debug/gitui --version
       - name: Build Release
         run: |
-          make build-linux-musl-release
+          just build-linux-musl-release
           ./target/x86_64-unknown-linux-musl/release/gitui --version
           ls -l ./target/x86_64-unknown-linux-musl/release/gitui
       - name: Test
         run: |
-          make test-linux-musl
+          just test-linux-musl
       - name: Test Install
         run: cargo install --path "." --force --locked
 
@@ -184,10 +184,10 @@ jobs:
 
       - name: Build Debug
         run: |
-          make build-linux-arm-debug
+          just build-linux-arm-debug
       - name: Build Release
         run: |
-          make build-linux-arm-release
+          just build-linux-arm-release
           ls -l ./target/aarch64-unknown-linux-gnu/release/gitui || ls -l ./target/armv7-unknown-linux-gnueabihf/release/gitui || ls -l ./target/arm-unknown-linux-gnueabihf/release/gitui
 
   build-apple-x86:
@@ -223,10 +223,10 @@ jobs:
 
       - name: Build Debug
         run: |
-          make build-apple-x86-debug
+          just build-apple-x86-debug
       - name: Build Release
         run: |
-          make build-apple-x86-release
+          just build-apple-x86-release
           ls -l ./target/x86_64-apple-darwin/release/gitui
 
   linting:
