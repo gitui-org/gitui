@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ![blame-goto-line](assets/blame-goto-line.png)
 
 ### Added
-* support for justfile instead of makefile [[@PokumeKachi](https://github.com/PokumeKachi)]
+* replace the old makefile with a justfile [[@PokumeKachi](https://github.com/PokumeKachi)]
 * support choosing checkout branch method when status is not empty [[@fatpandac](https://github.com/fatpandac)] ([#2404](https://github.com/extrawurst/gitui/issues/2404))
 * support pre-push hook [[@xlai89](https://github.com/xlai89)] ([#1933](https://github.com/extrawurst/gitui/issues/1933))
 * message tab supports pageUp and pageDown  [[@xlai89](https://github.com/xlai89)] ([#2623](https://github.com/extrawurst/gitui/issues/2623))
