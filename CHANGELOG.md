@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixes
+* fix extremely slow status loading in large repositories by replacing time-based cache invalidation with generation counter [[@DannyStoll1](https://github.com/DannyStoll1)]
+
 ## [0.28.0] - 2025-12-14
 
 **discard changes on checkout**
