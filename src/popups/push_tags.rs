@@ -84,10 +84,34 @@ impl PushTagsPopup {
 		&mut self,
 		cred: Option<BasicAuthCredential>,
 	) -> Result<()> {
+		let remote = get_default_remote(&self.repo.borrow())?;
+
+		// get remote URL for pre-push hook
+		let remote_url = asyncgit::sync::get_remote_url(
+			&self.repo.borrow(),
+			&remote,
+		)?;
+
+		// If remote doesn't have a URL configured, we can't push
+		let Some(remote_url) = remote_url else {
+			log::error!("remote '{remote}' has no URL configured");
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"Remote '{remote}' has no URL configured"
+			)));
+			self.pending = false;
+			self.visible = false;
+			return Ok(());
+		};
+
 		// run pre push hook - can reject push
-		if let HookResult::NotOk(e) =
-			hooks_pre_push(&self.repo.borrow())?
-		{
+		let repo = self.repo.borrow();
+		if let HookResult::NotOk(e) = hooks_pre_push(
+			&repo,
+			Some(&remote),
+			&remote_url,
+			&asyncgit::sync::PrePushTarget::Tags,
+			cred.clone(),
+		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"pre-push hook failed:\n{e}"
@@ -100,7 +124,7 @@ impl PushTagsPopup {
 		self.pending = true;
 		self.progress = None;
 		self.git_push.request(PushTagsRequest {
-			remote: get_default_remote(&self.repo.borrow())?,
+			remote,
 			basic_credential: cred,
 		})?;
 		Ok(())
