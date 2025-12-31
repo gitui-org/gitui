@@ -19,6 +19,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - uses: extractions/setup-just@v4
 
     - name: Get version
       id: get_version
@@ -43,12 +44,12 @@ jobs:
       run: cargo build
     - name: Run tests
       if: matrix.os != 'ubuntu-22.04'
-      run: make test
+      run: just test
     - name: Run clippy
       if: matrix.os != 'ubuntu-22.04'
       run: |
         cargo clean
-        make clippy
+        just clippy
 
     - name: Setup MUSL
       if: matrix.os == 'ubuntu-latest'
@@ -76,29 +77,29 @@ jobs:
       if: matrix.os == 'macos-latest'
       env:
         GITUI_RELEASE: 1
-      run: make release-mac
+      run: just release-mac
     - name: Build Release Mac x86
       if: matrix.os == 'macos-latest'
       env:
         GITUI_RELEASE: 1
       run: |
         rustup target add x86_64-apple-darwin
-        make release-mac-x86
+        just release-mac-x86
     - name: Build Release Linux
       if: matrix.os == 'ubuntu-latest'
       env:
         GITUI_RELEASE: 1
-      run: make release-linux-musl
+      run: just release-linux-musl
     - name: Build Release Win
       if: matrix.os == 'windows-latest'
       env:
         GITUI_RELEASE: 1
-      run: make release-win
+      run: just release-win
     - name: Build Release Linux ARM
       if: matrix.os == 'ubuntu-22.04'
       env:
         GITUI_RELEASE: 1
-      run: make release-linux-arm
+      run: just release-linux-arm
 
     - name: Set SHA
       if: matrix.os == 'macos-latest'

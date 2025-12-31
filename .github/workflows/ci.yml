@@ -23,6 +23,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v4
 
       - name: Restore cargo cache
         uses: Swatinem/rust-cache@v2
@@ -96,6 +97,7 @@ jobs:
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v4
 
       - name: Restore cargo cache
         uses: Swatinem/rust-cache@v2
@@ -148,6 +150,7 @@ jobs:
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v4
 
       - name: Restore cargo cache
         uses: Swatinem/rust-cache@v2
@@ -199,6 +202,7 @@ jobs:
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v4
 
       - name: Restore cargo cache
         uses: Swatinem/rust-cache@v2
