@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>io.github.gitui_org.gitui</id>
+
+  <name>GitUI</name>
+  <summary>Terminal-ui for git</summary>
+
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.gitui_org">
+    <name>cruessler &amp; extrawurst</name>
+  </developer>
+
+  <description>
+    <p>
+      GitUI provides you with the comfort of a git GUI but right in your terminal.
+    </p>
+
+    <p>Features:</p>
+    <ul>
+      <li>Fast and intuitive <em>keyboard-only</em> control.</li>
+      <li>Context-based help (no need to memorize tons of hot-keys).</li>
+      <li>Inspect, commit, and amend changes (including hooks: <code>pre-commit</code>, <code>commit-msg</code>, <code>post-commit</code>, <code>prepare-commit-msg</code>).</li>
+      <li>Stage, unstage, revert and reset files, hunks and lines.</li>
+      <li>Stashing: save, pop, apply, drop, and inspect.</li>
+      <li>Push / fetch to / from remotes.</li>
+      <li>Branch list: create, rename, delete, checkout, and manage remotes.</li>
+      <li>Browse and <em>search</em> the commit log; view diffs of committed changes.</li>
+      <li>Responsive terminal UI.</li>
+      <li>Async git API for fluid control.</li>
+      <li>Submodule support.</li>
+      <li>gpg commit signing with shortcomings (with some limitations).</li>
+    </ul>
+  </description>
+
+  <icon type="stock">io.github.gitui_org.gitui</icon>
+
+  <categories>
+    <category>Development</category>
+    <category>RevisionControl</category>
+  </categories>
+
+  <provides>
+    <binary>gitui</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/gitui-org/gitui</url>
+  <url type="bugtracker">https://github.com/gitui-org/gitui/issues</url>
+
+  <content_rating type="oars-1.1"/>
+
+</component>
