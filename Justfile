@@ -1,19 +1,19 @@
+ARGS := "-l"
+#ARGS := "-l -d ~/code/extern/kubernetes"
+#ARGS := "-l -d ~/code/extern/linux"
+#ARGS := "-l -d ~/code/git-bare-test.git -w ~/code/git-bare-test"
 
-.PHONY: debug build-release release-linux-musl test clippy clippy-pedantic install install-debug sort
-
-ARGS=-l
-# ARGS=-l -d ~/code/extern/kubernetes
-# ARGS=-l -d ~/code/extern/linux
-# ARGS=-l -d ~/code/git-bare-test.git -w ~/code/git-bare-test
+_default:
+    @just --choose || true
 
 profile:
-	CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --features timing -- ${ARGS}
+	CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --features timing -- {{ARGS}}
 
 run-timing:
-	cargo run --features=timing --release -- ${ARGS}
+	cargo run --features=timing --release -- {{ARGS}}
 
 debug:
-	RUST_BACKTRACE=true cargo run --features=timing -- ${ARGS}
+	RUST_BACKTRACE=true cargo run --features=timing -- {{ARGS}}
 
 build-release:
 	cargo build --release --locked
@@ -63,11 +63,9 @@ test-linux-musl:
 
 release-linux-arm: build-linux-arm-release
 	mkdir -p release
-
 	aarch64-linux-gnu-strip target/aarch64-unknown-linux-gnu/release/gitui
 	arm-linux-gnueabihf-strip target/armv7-unknown-linux-gnueabihf/release/gitui
 	arm-linux-gnueabihf-strip target/arm-unknown-linux-gnueabihf/release/gitui
-
 	tar -C ./target/aarch64-unknown-linux-gnu/release/ -czvf ./release/gitui-linux-aarch64.tar.gz ./gitui
 	tar -C ./target/armv7-unknown-linux-gnueabihf/release/ -czvf ./release/gitui-linux-armv7.tar.gz ./gitui
 	tar -C ./target/arm-unknown-linux-gnueabihf/release/ -czvf ./release/gitui-linux-arm.tar.gz ./gitui

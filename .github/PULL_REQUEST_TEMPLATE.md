@@ -11,6 +11,6 @@ It changes the following:
 
 I followed the checklist:
 - [ ] I added unittests
-- [ ] I ran `make check` without errors
+- [ ] I ran `just check` without errors
 - [ ] I tested the overall application
 - [ ] I added an appropriate item to the changelog
