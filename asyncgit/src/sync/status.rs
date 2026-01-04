@@ -202,7 +202,11 @@ pub fn get_status(
 			let iter = status.into_index_worktree_iter(Vec::new())?;
 
 			for item in iter {
-				let item = item?;
+				let Ok(item) = item else {
+					log::warn!("[status] the status iter returned an error for an item: {item:?}");
+
+					continue;
+				};
 
 				let status = item.summary().map(Into::into);
 
