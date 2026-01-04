@@ -83,7 +83,7 @@ build-linux-arm-release:
 	cargo build --release --target=arm-unknown-linux-gnueabihf --locked
 
 test:
-    cargo nextest run --workspace
+	cargo nextest run --workspace
 
 fmt:
 	cargo fmt -- --check
