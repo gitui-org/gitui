@@ -48,5 +48,5 @@ url = "2.5"
 env_logger = "0.11"
 invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
-serial_test = "3.2"
+serial_test = "3.3"
 tempfile = "3"
