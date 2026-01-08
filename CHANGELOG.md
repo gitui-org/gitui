@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ![blame-goto-line](assets/blame-goto-line.png)
 
 ### Added
+* support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
 * support choosing checkout branch method when status is not empty [[@fatpandac](https://github.com/fatpandac)] ([#2404](https://github.com/extrawurst/gitui/issues/2404))
 * support pre-push hook [[@xlai89](https://github.com/xlai89)] ([#1933](https://github.com/extrawurst/gitui/issues/1933))
 * message tab supports pageUp and pageDown  [[@xlai89](https://github.com/xlai89)] ([#2623](https://github.com/extrawurst/gitui/issues/2623))
