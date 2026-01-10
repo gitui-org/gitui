@@ -59,7 +59,7 @@ build-linux-musl-release:
 	cargo build --release --target=x86_64-unknown-linux-musl --locked
 
 test-linux-musl:
-	cargo test --workspace --target=x86_64-unknown-linux-musl
+	cargo nextest run --workspace --target=x86_64-unknown-linux-musl
 
 release-linux-arm: build-linux-arm-release
 	mkdir -p release
@@ -83,7 +83,7 @@ build-linux-arm-release:
 	cargo build --release --target=arm-unknown-linux-gnueabihf --locked
 
 test:
-	cargo test --workspace
+	cargo nextest run --workspace
 
 fmt:
 	cargo fmt -- --check
