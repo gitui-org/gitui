@@ -94,7 +94,7 @@ clippy:
 clippy-nightly:
 	cargo +nightly clippy --workspace --all-features
 
-check: fmt clippy test sort
+check: fmt clippy test sort deny
 
 check-nightly:
 	cargo +nightly c

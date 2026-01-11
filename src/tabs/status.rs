@@ -988,9 +988,9 @@ impl Component for Status {
 							&mut self.vertical_split_index
 						}
 					};
-					if *bottom > 10 {
-						*top += 5;
-						*bottom -= 5;
+					if *top > 10 {
+						*top -= 5;
+						*bottom += 5;
 					}
 					Ok(EventState::Consumed)
 				} else if key_match(k, self.key_config.keys.alt_down)
@@ -1003,9 +1003,9 @@ impl Component for Status {
 							&mut self.vertical_split_index
 						}
 					};
-					if *top > 10 {
-						*top -= 5;
-						*bottom += 5;
+					if *bottom > 10 {
+						*top += 5;
+						*bottom -= 5;
 					}
 					Ok(EventState::Consumed)
 				} else {
