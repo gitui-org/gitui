@@ -31,6 +31,7 @@ regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
 regex-onig = ["syntect/regex-onig", "two-face/syntect-onig"]
 timing = ["scopetime/enabled"]
 trace-libgit = ["asyncgit/trace-libgit"]
+vendor-openssl = ["asyncgit/vendor-openssl"]
 
 [dependencies]
 anyhow = "1.0"

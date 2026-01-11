@@ -14,6 +14,7 @@ keywords = ["git"]
 [features]
 default = ["trace-libgit"]
 trace-libgit = []
+vendor-openssl = ["openssl-sys"]
 
 [dependencies]
 bitflags = "2"
@@ -21,10 +22,6 @@ crossbeam-channel = "0.5"
 dirs = "6.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
-# TLS is provided by platform-native libraries:
-# - Windows: WinHTTP/Schannel (built-in)
-# - macOS: SecureTransport (built-in)
-# - Linux: System OpenSSL (install via package manager)
 git2 = "0.20"
 git2-hooks = { path = "../git2-hooks", version = ">=0.6" }
 gix = { version = "0.77.0", default-features = false, features = [
@@ -34,6 +31,10 @@ gix = { version = "0.77.0", default-features = false, features = [
     "status",
 ] }
 log = "0.4"
+# git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
+# git2 = { git="https://github.com/extrawurst/git2-rs.git", rev="fc13dcc", features = ["vendored-openssl"]}
+# pinning to vendored openssl, using the git2 feature this gets lost with new resolver
+openssl-sys = { version = '0.9', features = ["vendored"], optional = true }
 rayon = "1.11"
 rayon-core = "1.13"
 scopetime = { path = "../scopetime", version = "0.1" }
