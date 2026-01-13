@@ -18,7 +18,9 @@ impl Widget for Mask {
 					//   to the limited number of colors available.
 					// Question 3: Should we pick a reasonable color and add it
 					//   to the theme?
-					cell.set_style(Style::default().fg(Color::Gray));
+					cell.set_style(
+						Style::default().fg(Color::DarkGray),
+					);
 				}
 			}
 		}
