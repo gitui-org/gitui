@@ -120,7 +120,7 @@ pub enum HookResult {
 }
 
 impl HookResult {
-	/// helper to check if result is ok (hook succeeded with exit code 0)
+	/// helper to check if result is ok (hook succeeded with exit code 0 or no hook found)
 	pub const fn is_ok(&self) -> bool {
 		match self {
 			Self::Run(response) => response.code == 0,
@@ -128,12 +128,9 @@ impl HookResult {
 		}
 	}
 
-	/// helper to check if result was run and not successful (non-zero exit code)
-	pub const fn is_not_successful(&self) -> bool {
-		match self {
-			Self::Run(response) => response.code != 0,
-			Self::NoHookFound => false,
-		}
+	/// helper to check if no hook was found
+	pub const fn is_no_hook_found(&self) -> bool {
+		matches!(self, Self::NoHookFound)
 	}
 }
 
@@ -561,7 +558,7 @@ exit 1
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_not_successful());
+		assert!(!res.is_ok());
 	}
 
 	#[test]
@@ -633,7 +630,7 @@ exit 1
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_not_successful());
+		assert!(!res.is_ok());
 	}
 
 	#[test]
@@ -675,7 +672,7 @@ sys.exit(1)
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_not_successful());
+		assert!(!res.is_ok());
 	}
 
 	#[test]

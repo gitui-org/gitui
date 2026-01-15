@@ -480,6 +480,6 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(res.is_not_successful());
+		assert!(!res.is_ok());
 	}
 }
