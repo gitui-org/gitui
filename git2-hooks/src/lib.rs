@@ -128,9 +128,9 @@ impl HookResult {
 		}
 	}
 
-	/// helper to check if no hook was found
-	pub const fn is_no_hook_found(&self) -> bool {
-		matches!(self, Self::NoHookFound)
+	/// helper to check if a hook was found and ran (regardless of success/failure)
+	pub const fn did_run_hook(&self) -> bool {
+		matches!(self, Self::Run(_))
 	}
 }
 
@@ -401,6 +401,7 @@ exit 0
 
 		let res = hooks_post_commit(&repo, None).unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 	}
 
@@ -417,6 +418,7 @@ exit 0
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 
 		assert_eq!(msg, String::from("test"));
@@ -437,6 +439,7 @@ exit 0
 		let mut msg = String::from("test_sth");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 
 		assert_eq!(msg, String::from("test_shell_command"));
@@ -452,6 +455,7 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 	}
 
@@ -511,6 +515,7 @@ exit 0
 		let res =
 			hooks_pre_commit(&repo, Some(&["../.myhooks"])).unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 	}
 
@@ -544,6 +549,7 @@ exit 1
 		let res =
 			hooks_pre_commit(&repo, Some(&["../.myhooks"])).unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 	}
 
@@ -651,6 +657,7 @@ sys.exit(0)
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
+		assert!(res.did_run_hook());
 		assert!(res.is_ok(), "{res:?}");
 	}
 
@@ -714,6 +721,7 @@ exit 0
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 		assert_eq!(msg, String::from("msg\n"));
 	}
@@ -760,6 +768,7 @@ exit 0
 		)
 		.unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 		assert_eq!(msg, String::from("msg:message\n"));
 	}
@@ -828,6 +837,7 @@ exit 0
 		)
 		.unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok());
 	}
 
@@ -890,6 +900,7 @@ exit 0
 		)
 		.unwrap();
 
+		assert!(res.did_run_hook());
 		assert!(res.is_ok(), "Expected Ok result, got: {res:?}");
 	}
 
