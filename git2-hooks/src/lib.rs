@@ -882,9 +882,15 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(
-			res.is_successful(),
-			"Expected Ok result, got: {res:?}"
+		let HookResult::Run(response) = res else {
+			panic!("Expected Run result, got: {res:?}");
+		};
+
+		assert!(response.is_successful());
+		// When remote is None, URL should be passed for both arguments
+		assert_eq!(
+			response.stdout,
+			"arg1=https://example.com/repo.git arg2=https://example.com/repo.git\n"
 		);
 	}
 
