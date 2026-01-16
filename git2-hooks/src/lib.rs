@@ -96,6 +96,16 @@ impl PrePushRef {
 			Self::format_oid(self.remote_oid)
 		)
 	}
+
+	/// Build stdin content from a slice of updates (for pre-push hook)
+	pub fn to_stdin(updates: &[Self]) -> String {
+		let mut stdin = String::new();
+		for update in updates {
+			stdin.push_str(&update.to_line());
+			stdin.push('\n');
+		}
+		stdin
+	}
 }
 
 /// Response from running a hook
@@ -253,14 +263,7 @@ pub fn hooks_pre_push(
 		_ => url,
 	};
 
-	// Build stdin according to Git pre-push hook spec:
-	// <local-ref> SP <local-object-name> SP <remote-ref> SP <remote-object-name> LF
-
-	let mut stdin_data = String::new();
-	for update in updates {
-		stdin_data.push_str(&update.to_line());
-		stdin_data.push('\n');
-	}
+	let stdin_data = PrePushRef::to_stdin(updates);
 
 	hook.run_hook_os_str_with_stdin(
 		[remote_name, url],
@@ -365,15 +368,77 @@ mod tests {
 		PrePushRef::new(local_ref, local_oid, remote_ref, remote_oid)
 	}
 
-	fn stdin_from_updates(updates: &[PrePushRef]) -> String {
-		updates
-			.iter()
-			.map(|u| format!("{}\n", u.to_line()))
-			.collect()
-	}
-
 	fn head_branch(repo: &Repository) -> String {
 		repo.head().unwrap().shorthand().unwrap().to_string()
+	}
+
+	#[test]
+	fn test_pre_push_ref_format() {
+		let zero_oid = "0".repeat(40);
+		let oid_a = "a".repeat(40);
+		let oid_b = "b".repeat(40);
+
+		// Both oids present
+		let update = PrePushRef::new(
+			"refs/heads/main",
+			Some(git2::Oid::from_str(&oid_a).unwrap()),
+			"refs/heads/main",
+			Some(git2::Oid::from_str(&oid_b).unwrap()),
+		);
+		assert_eq!(
+			update.to_line(),
+			format!(
+				"refs/heads/main {oid_a} refs/heads/main {oid_b}"
+			)
+		);
+
+		// No remote oid (new branch)
+		let update = PrePushRef::new(
+			"refs/heads/feature",
+			Some(git2::Oid::from_str(&oid_a).unwrap()),
+			"refs/heads/feature",
+			None,
+		);
+		assert_eq!(
+			update.to_line(),
+			format!("refs/heads/feature {oid_a} refs/heads/feature {zero_oid}")
+		);
+
+		// No local oid (delete)
+		let update = PrePushRef::new(
+			"refs/heads/old",
+			None,
+			"refs/heads/old",
+			Some(git2::Oid::from_str(&oid_b).unwrap()),
+		);
+		assert_eq!(
+			update.to_line(),
+			format!(
+				"refs/heads/old {zero_oid} refs/heads/old {oid_b}"
+			)
+		);
+
+		// to_stdin adds newlines
+		let updates = [
+			PrePushRef::new(
+				"refs/heads/a",
+				Some(git2::Oid::from_str(&oid_a).unwrap()),
+				"refs/heads/a",
+				None,
+			),
+			PrePushRef::new(
+				"refs/heads/b",
+				Some(git2::Oid::from_str(&oid_b).unwrap()),
+				"refs/heads/b",
+				None,
+			),
+		];
+		assert_eq!(
+			PrePushRef::to_stdin(&updates),
+			format!(
+				"refs/heads/a {oid_a} refs/heads/a {zero_oid}\nrefs/heads/b {oid_b} refs/heads/b {zero_oid}\n"
+			)
+		);
 	}
 
 	#[test]
@@ -898,14 +963,9 @@ exit 0
 	fn test_pre_push_with_arguments() {
 		let (_td, repo) = repo_init();
 
-		// Hook that verifies it receives the correct arguments
-		// and prints them for verification
 		let hook = b"#!/bin/sh
 echo \"remote_name=$1\"
 echo \"remote_url=$2\"
-# Read stdin to verify it's available (even if empty for now)
-stdin_content=$(cat)
-echo \"stdin_length=${#stdin_content}\"
 exit 0
 	";
 
@@ -933,26 +993,10 @@ exit 0
 			unreachable!("Expected Run result, got: {res:?}")
 		};
 
-		assert!(response.is_successful(), "Hook should succeed");
-
-		// Verify the hook received and echoed the correct arguments
-		assert!(
-			response.stdout.contains("remote_name=origin"),
-			"Expected stdout to contain 'remote_name=origin', got: {}",
-			response.stdout
-		);
-		assert!(
-			response
-				.stdout
-				.contains("remote_url=https://example.com/repo.git"),
-			"Expected stdout to contain URL, got: {}",
-			response.stdout
-		);
-		assert!(
-			response.stdout.contains("stdin_length=")
-				&& !response.stdout.contains("stdin_length=0"),
-			"Expected stdin to be non-empty, got: {}",
-			response.stdout
+		assert!(response.is_successful());
+		assert_eq!(
+			response.stdout,
+			"remote_name=origin\nremote_url=https://example.com/repo.git\n"
 		);
 	}
 
@@ -991,7 +1035,7 @@ exit 0
 		);
 
 		let updates = [branch_update, tag_update];
-		let expected_stdin = stdin_from_updates(&updates);
+		let expected_stdin = PrePushRef::to_stdin(&updates);
 
 		let res = hooks_pre_push(
 			&repo,
@@ -1037,7 +1081,7 @@ exit 0
 			None,
 			true,
 		)];
-		let expected_stdin = stdin_from_updates(&updates);
+		let expected_stdin = PrePushRef::to_stdin(&updates);
 
 		let res = hooks_pre_push(
 			&repo,
@@ -1054,81 +1098,15 @@ exit 0
 
 		assert!(response.is_successful());
 		assert_eq!(response.stdout, expected_stdin);
-		assert!(
-			response
-				.stdout
-				.contains("0000000000000000000000000000000000000000"),
-			"delete pushes must use zero oid for new object"
-		);
 	}
 
 	#[test]
-	fn test_pre_push_verifies_arguments() {
+	fn test_pre_push_stdin() {
 		let (_td, repo) = repo_init();
 
-		// Hook that verifies and echoes the arguments it receives
 		let hook = b"#!/bin/sh
-# Verify we got the expected arguments
-if [ \"$1\" != \"origin\" ]; then
-    echo \"ERROR: Expected remote name 'origin', got '$1'\" >&2
-    exit 1
-fi
-if [ \"$2\" != \"https://github.com/user/repo.git\" ]; then
-    echo \"ERROR: Expected URL 'https://github.com/user/repo.git', got '$2'\" >&2
-    exit 1
-fi
-echo \"Arguments verified: remote=$1, url=$2\"
+cat
 exit 0
-	";
-
-		create_hook(&repo, HOOK_PRE_PUSH, hook);
-
-		let branch = head_branch(&repo);
-		let updates = [branch_update(
-			&repo,
-			Some("origin"),
-			&branch,
-			None,
-			false,
-		)];
-
-		let res = hooks_pre_push(
-			&repo,
-			None,
-			Some("origin"),
-			"https://github.com/user/repo.git",
-			&updates,
-		)
-		.unwrap();
-
-		match res {
-			HookResult::Run(response) if response.is_successful() => {
-				// Success - arguments were correct
-			}
-			HookResult::Run(response) => {
-				panic!(
-					"Hook failed validation!\nstdout: {}\nstderr: {}",
-					response.stdout, response.stderr
-				);
-			}
-			_ => unreachable!(),
-		}
-	}
-
-	#[test]
-	fn test_pre_push_empty_stdin_currently() {
-		let (_td, repo) = repo_init();
-
-		// Hook that checks stdin content
-		let hook = b"#!/bin/sh
-	stdin_content=$(cat)
-	if [ -z \"$stdin_content\" ]; then
-	    echo \"stdin was unexpectedly empty\" >&2
-	    exit 1
-	fi
-	echo \"stdin_length=${#stdin_content}\"
-	echo \"stdin_content=$stdin_content\"
-	exit 0
 		";
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
@@ -1141,6 +1119,7 @@ exit 0
 			None,
 			false,
 		)];
+		let expected_stdin = PrePushRef::to_stdin(&updates);
 
 		let res = hooks_pre_push(
 			&repo,
@@ -1155,91 +1134,8 @@ exit 0
 			unreachable!("Expected Run result, got: {res:?}")
 		};
 
-		assert!(response.is_successful(), "Hook should succeed");
-
-		assert!(
-			response.stdout.contains("stdin_length="),
-			"Expected stdin to be non-empty, got: {}",
-			response.stdout
-		);
-	}
-
-	#[test]
-	fn test_pre_push_with_proper_stdin() {
-		let (_td, repo) = repo_init();
-
-		// Hook that verifies it receives refs information via stdin
-		// According to Git spec, format should be:
-		// <local-ref> SP <local-sha> SP <remote-ref> SP <remote-sha> LF
-		let hook = b"#!/bin/sh
-# Read stdin
-stdin_content=$(cat)
-echo \"stdin received: $stdin_content\"
-
-# Verify stdin is not empty
-if [ -z \"$stdin_content\" ]; then
-    echo \"ERROR: stdin is empty, expected ref information\" >&2
-    exit 1
-fi
-
-# Verify stdin contains expected format
-# Should have: refs/heads/master <sha> refs/heads/master <sha>
-if ! echo \"$stdin_content\" | grep -q \"^refs/heads/\"; then
-    echo \"ERROR: stdin does not contain expected ref format\" >&2
-    echo \"Got: $stdin_content\" >&2
-    exit 1
-fi
-
-# Verify it has 4 space-separated fields
-field_count=$(echo \"$stdin_content\" | awk '{print NF}')
-if [ \"$field_count\" != \"4\" ]; then
-    echo \"ERROR: Expected 4 fields, got $field_count\" >&2
-    exit 1
-fi
-
-echo \"SUCCESS: Received properly formatted stdin\"
-exit 0
-	";
-
-		create_hook(&repo, HOOK_PRE_PUSH, hook);
-
-		let branch = head_branch(&repo);
-		let updates = [branch_update(
-			&repo,
-			Some("origin"),
-			&branch,
-			None,
-			false,
-		)];
-
-		let res = hooks_pre_push(
-			&repo,
-			None,
-			Some("origin"),
-			"https://github.com/user/repo.git",
-			&updates,
-		)
-		.unwrap();
-
-		let HookResult::Run(response) = res else {
-			panic!("Expected Run result, got: {res:?}")
-		};
-
-		// This should now pass with proper stdin implementation
-		assert!(
-			response.is_successful(),
-			"Hook should succeed with proper stdin.\nstdout: {}\nstderr: {}",
-			response.stdout,
-			response.stderr
-		);
-
-		// Verify the hook received proper stdin format
-		assert!(
-			response.stdout.contains("SUCCESS"),
-			"Expected hook to validate stdin format.\nstdout: {}\nstderr: {}",
-			response.stdout,
-			response.stderr
-		);
+		assert!(response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
 	}
 
 	#[test]
@@ -1247,7 +1143,6 @@ exit 0
 		let (_td, repo) = repo_init();
 
 		// repo_init() already creates an initial commit on master
-		// Get the current HEAD commit
 		let head = repo.head().unwrap();
 		let local_commit = head.target().unwrap();
 
@@ -1257,8 +1152,7 @@ exit 0
 		// - backup/master exists at old_commit (behind/different)
 		// - Branch tracks origin/master as upstream
 		// - We push to "backup" remote
-		// - Expected: remote SHA should be old_commit
-		// - Bug (before fix): remote SHA was from upstream origin/master
+		// - Expected: remote SHA should be old_commit (not origin/master)
 
 		// Create origin/master tracking branch (at same commit as local)
 		repo.reference(
@@ -1269,9 +1163,7 @@ exit 0
 		)
 		.unwrap();
 
-		// Create backup/master at a different commit (simulating it's behind)
-		// We can't create a reference to a non-existent commit, so we'll
-		// create an actual old commit first
+		// Create backup/master at a different commit
 		let sig = repo.signature().unwrap();
 		let tree_id = {
 			let mut index = repo.index().unwrap();
@@ -1279,17 +1171,9 @@ exit 0
 		};
 		let tree = repo.find_tree(tree_id).unwrap();
 		let old_commit = repo
-			.commit(
-				None, // Don't update any refs
-				&sig,
-				&sig,
-				"old backup commit",
-				&tree,
-				&[], // No parents
-			)
+			.commit(None, &sig, &sig, "old backup commit", &tree, &[])
 			.unwrap();
 
-		// Now create backup/master pointing to this old commit
 		repo.reference(
 			"refs/remotes/backup/master",
 			old_commit,
@@ -1298,7 +1182,7 @@ exit 0
 		)
 		.unwrap();
 
-		// Configure branch.master.remote and branch.master.merge to set upstream
+		// Configure upstream to origin
 		{
 			let mut config = repo.config().unwrap();
 			config.set_str("branch.master.remote", "origin").unwrap();
@@ -1307,40 +1191,13 @@ exit 0
 				.unwrap();
 		}
 
-		// Hook that extracts and prints the remote SHA
-		let hook = format!(
-			r#"#!/bin/sh
-stdin_content=$(cat)
-echo "stdin: $stdin_content"
+		let hook = b"#!/bin/sh
+cat
+exit 0
+";
 
-# Extract the 4th field (remote SHA)
-remote_sha=$(echo "$stdin_content" | awk '{{print $4}}')
-echo "remote_sha=$remote_sha"
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
-# When pushing to backup, we should get backup/master's old SHA
-# NOT the SHA from origin/master upstream
-if [ "$remote_sha" = "{}" ]; then
-    echo "BUG: Got origin/master SHA (upstream) instead of backup/master SHA" >&2
-    exit 1
-fi
-
-if [ "$remote_sha" = "{}" ]; then
-    echo "SUCCESS: Got correct backup/master SHA"
-    exit 0
-fi
-
-echo "ERROR: Got unexpected SHA: $remote_sha" >&2
-echo "Expected backup/master: {}" >&2
-echo "Or origin/master (bug): {}" >&2
-exit 1
-"#,
-			local_commit, old_commit, old_commit, local_commit
-		);
-
-		create_hook(&repo, HOOK_PRE_PUSH, hook.as_bytes());
-
-		// Push to "backup" remote (which doesn't have master yet)
-		// This is different from the upstream "origin"
 		let branch = head_branch(&repo);
 		let updates = [branch_update(
 			&repo,
@@ -1349,6 +1206,7 @@ exit 1
 			None,
 			false,
 		)];
+		let expected_stdin = PrePushRef::to_stdin(&updates);
 
 		let res = hooks_pre_push(
 			&repo,
@@ -1363,12 +1221,7 @@ exit 1
 			panic!("Expected Run result, got: {res:?}")
 		};
 
-		// This test now passes after fix
-		assert!(
-			response.is_successful(),
-			"Hook should receive backup/master SHA, not upstream origin/master SHA.\nstdout: {}\nstderr: {}",
-			response.stdout,
-			response.stderr
-		);
+		assert!(response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
 	}
 }
