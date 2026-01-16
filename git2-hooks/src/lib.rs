@@ -67,7 +67,6 @@ pub struct PrePushRef {
 }
 
 impl PrePushRef {
-	#[must_use]
 	pub fn new(
 		local_ref: impl Into<String>,
 		local_oid: Option<Oid>,
@@ -86,7 +85,6 @@ impl PrePushRef {
 		oid.map_or_else(|| "0".repeat(40), |id| id.to_string())
 	}
 
-	#[must_use]
 	pub fn to_line(&self) -> String {
 		format!(
 			"{} {} {} {}",
@@ -882,7 +880,10 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(res.is_successful(), "Expected Ok result, got: {res:?}");
+		assert!(
+			res.is_successful(),
+			"Expected Ok result, got: {res:?}"
+		);
 	}
 
 	#[test]
