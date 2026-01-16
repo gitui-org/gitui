@@ -82,6 +82,8 @@ impl PrePushRef {
 	}
 
 	fn format_oid(oid: Option<Oid>) -> String {
+		// "If the foreign ref does not yet exist the <remote-object-name> will be the all-zeroes object name"
+		// see https://git-scm.com/docs/githooks#_pre_push
 		oid.map_or_else(|| "0".repeat(40), |id| id.to_string())
 	}
 
