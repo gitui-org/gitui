@@ -461,12 +461,8 @@ mod tests {
 		let (_td, repo) = repo_init().unwrap();
 
 		let hook = b"#!/bin/sh
-stdin=$(cat)
-if echo \"$stdin\" | grep -q \"refs/heads/master\"; then
-    echo \"Direct pushes to master not allowed\" >&2
-    exit 1
-fi
-exit 0
+cat
+exit 1
         ";
 
 		git2_hooks::create_hook(
@@ -483,6 +479,9 @@ exit 0
 			None,
 		);
 
+		let expected_stdin =
+			git2_hooks::PrePushRef::to_stdin(&[update.clone()]);
+
 		let res = git2_hooks::hooks_pre_push(
 			&repo,
 			None,
@@ -492,6 +491,11 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(!res.is_successful());
+		let git2_hooks::HookResult::Run(response) = res else {
+			panic!("Expected Run result");
+		};
+		assert!(!response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
+		assert!(expected_stdin.contains("refs/heads/master"));
 	}
 }
