@@ -465,7 +465,7 @@ exit 0
 		let result = hook.run_hook(&[TEXT]).unwrap();
 
 		let HookResult::Run(response) = result else {
-			unreachable!("run_hook should've failed");
+			unreachable!("run_hook should've run");
 		};
 
 		let stdout = response.stdout.as_str().trim_ascii_end();
