@@ -96,8 +96,7 @@ impl RemoteProgress {
 				}
 				Err(e) => {
 					log::error!(
-						"remote progress receiver error: {}",
-						e
+						"remote progress receiver error: {e}",
 					);
 					break;
 				}

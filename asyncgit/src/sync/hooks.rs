@@ -72,6 +72,15 @@ pub fn hooks_prepare_commit_msg(
 	.into())
 }
 
+/// see `git2_hooks::hooks_pre_push`
+pub fn hooks_pre_push(repo_path: &RepoPath) -> Result<HookResult> {
+	scope_time!("hooks_pre_push");
+
+	let repo = repo(repo_path)?;
+
+	Ok(git2_hooks::hooks_pre_push(&repo, None)?.into())
+}
+
 #[cfg(test)]
 mod tests {
 	use std::{ffi::OsString, io::Write as _, path::Path};

@@ -104,20 +104,15 @@ pub struct StatusItem {
 }
 
 ///
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Default, Hash, PartialEq, Eq, Debug)]
 pub enum StatusType {
 	///
+	#[default]
 	WorkingDir,
 	///
 	Stage,
 	///
 	Both,
-}
-
-impl Default for StatusType {
-	fn default() -> Self {
-		Self::WorkingDir
-	}
 }
 
 impl From<StatusType> for StatusShow {
@@ -182,11 +177,23 @@ pub fn get_status(
 
 	let repo: gix::Repository = gix_repo(repo_path)?;
 
-	let mut status = repo.status(gix::progress::Discard)?;
+	let show_untracked = if let Some(config) = show_untracked {
+		config
+	} else {
+		let git2_repo = crate::sync::repository::repo(repo_path)?;
 
-	if let Some(config) = show_untracked {
-		status = status.untracked_files(config.into());
-	}
+		// Calling `untracked_files_config_repo` ensures compatibility with `gitui` <= 0.27.
+		// `untracked_files_config_repo` defaults to `All` while both `libgit2` and `gix` default to
+		// `Normal`. According to [show-untracked-files], `normal` is the default value that `git`
+		// chooses.
+		//
+		// [show-untracked-files]: https://git-scm.com/docs/git-config#Documentation/git-config.txt-statusshowUntrackedFiles
+		untracked_files_config_repo(&git2_repo)?
+	};
+
+	let status = repo
+		.status(gix::progress::Discard)?
+		.untracked_files(show_untracked.into());
 
 	let mut res = Vec::new();
 
@@ -195,7 +202,11 @@ pub fn get_status(
 			let iter = status.into_index_worktree_iter(Vec::new())?;
 
 			for item in iter {
-				let item = item?;
+				let Ok(item) = item else {
+					log::warn!("[status] the status iter returned an error for an item: {item:?}");
+
+					continue;
+				};
 
 				let status = item.summary().map(Into::into);
 
@@ -272,4 +283,89 @@ pub fn get_status(
 	});
 
 	Ok(res)
+}
+
+/// discard all changes in the working directory
+pub fn discard_status(repo_path: &RepoPath) -> Result<bool> {
+	let repo = repo(repo_path)?;
+	let commit = repo.head()?.peel_to_commit()?;
+
+	repo.reset(commit.as_object(), git2::ResetType::Hard, None)?;
+
+	Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::{
+		sync::{
+			commit, stage_add_file,
+			status::{get_status, StatusType},
+			tests::{repo_init, repo_init_bare},
+			RepoPath,
+		},
+		StatusItem, StatusItemType,
+	};
+	use std::{fs::File, io::Write, path::Path};
+	use tempfile::TempDir;
+
+	#[test]
+	fn test_discard_status() {
+		let file_path = Path::new("README.md");
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		let mut file = File::create(root.join(file_path)).unwrap();
+
+		// initial commit
+		stage_add_file(repo_path, file_path).unwrap();
+		commit(repo_path, "commit msg").unwrap();
+
+		writeln!(file, "Test for discard_status").unwrap();
+
+		let statuses =
+			get_status(repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+		assert_eq!(statuses.len(), 1);
+
+		discard_status(repo_path).unwrap();
+
+		let statuses =
+			get_status(repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+		assert_eq!(statuses.len(), 0);
+	}
+
+	#[test]
+	fn test_get_status_with_workdir() {
+		let (git_dir, _repo) = repo_init_bare().unwrap();
+
+		let separate_workdir = TempDir::new().unwrap();
+
+		let file_path = Path::new("foo");
+		File::create(separate_workdir.path().join(file_path))
+			.unwrap()
+			.write_all(b"a")
+			.unwrap();
+
+		let repo_path = RepoPath::Workdir {
+			gitdir: git_dir.path().into(),
+			workdir: separate_workdir.path().into(),
+		};
+
+		let status =
+			get_status(&repo_path, StatusType::WorkingDir, None)
+				.unwrap();
+
+		assert_eq!(
+			status,
+			vec![StatusItem {
+				path: "foo".into(),
+				status: StatusItemType::New
+			}]
+		);
+	}
 }

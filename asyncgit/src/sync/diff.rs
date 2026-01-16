@@ -34,9 +34,10 @@ use std::{
 };
 
 /// type of diff of a single line
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, Debug)]
 pub enum DiffLineType {
 	/// just surrounding line, no change
+	#[default]
 	None,
 	/// header of the hunk
 	Header,
@@ -56,12 +57,6 @@ impl From<git2::DiffLineType> for DiffLineType {
 			| git2::DiffLineType::Addition => Self::Add,
 			_ => Self::None,
 		}
-	}
-}
-
-impl Default for DiffLineType {
-	fn default() -> Self {
-		Self::None
 	}
 }
 

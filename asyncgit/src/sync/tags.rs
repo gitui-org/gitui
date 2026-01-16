@@ -1,5 +1,8 @@
 use super::{get_commits_info, CommitId, RepoPath};
-use crate::{error::Result, sync::repository::repo};
+use crate::{
+	error::Result,
+	sync::{gix_repo, repository::repo},
+};
 use scopetime::scope_time;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -58,10 +61,8 @@ pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 		}
 	};
 
-	let gix_repo: gix::Repository =
-				gix::ThreadSafeRepository::discover_with_environment_overrides(repo_path.gitpath())
-						.map(Into::into)?;
-	let platform = gix_repo.references()?;
+	let repo: gix::Repository = gix_repo(repo_path)?;
+	let platform = repo.references()?;
 	for mut reference in (platform.tags()?).flatten() {
 		let commit = reference.peel_to_commit();
 		let tag = reference.peel_to_tag();

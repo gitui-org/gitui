@@ -1,5 +1,5 @@
 use crate::bug_report;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use asyncgit::sync::RepoPath;
 use clap::{
 	builder::ArgPredicate, crate_authors, crate_description,
@@ -12,10 +12,27 @@ use std::{
 	path::PathBuf,
 };
 
+const BUG_REPORT_FLAG_ID: &str = "bugreport";
+const LOG_FILE_FLAG_ID: &str = "logfile";
+const LOGGING_FLAG_ID: &str = "logging";
+const THEME_FLAG_ID: &str = "theme";
+const WORKDIR_FLAG_ID: &str = "workdir";
+const FILE_FLAG_ID: &str = "file";
+const GIT_DIR_FLAG_ID: &str = "directory";
+const WATCHER_FLAG_ID: &str = "watcher";
+const KEY_BINDINGS_FLAG_ID: &str = "key_bindings";
+const KEY_SYMBOLS_FLAG_ID: &str = "key_symbols";
+const DEFAULT_THEME: &str = "theme.ron";
+const DEFAULT_GIT_DIR: &str = ".";
+
+#[derive(Clone)]
 pub struct CliArgs {
 	pub theme: PathBuf,
+	pub select_file: Option<PathBuf>,
 	pub repo_path: RepoPath,
 	pub notify_watcher: bool,
+	pub key_bindings_path: Option<PathBuf>,
+	pub key_symbols_path: Option<PathBuf>,
 }
 
 pub fn process_cmdline() -> Result<CliArgs> {
@@ -23,20 +40,27 @@ pub fn process_cmdline() -> Result<CliArgs> {
 
 	let arg_matches = app.get_matches();
 
-	if arg_matches.get_flag("bugreport") {
+	if arg_matches.get_flag(BUG_REPORT_FLAG_ID) {
 		bug_report::generate_bugreport();
 		std::process::exit(0);
 	}
-	if arg_matches.get_flag("logging") {
-		let logfile = arg_matches.get_one::<String>("logfile");
+	if arg_matches.get_flag(LOGGING_FLAG_ID) {
+		let logfile = arg_matches.get_one::<String>(LOG_FILE_FLAG_ID);
 		setup_logging(logfile.map(PathBuf::from))?;
 	}
 
-	let workdir =
-		arg_matches.get_one::<String>("workdir").map(PathBuf::from);
-	let gitdir = arg_matches
-		.get_one::<String>("directory")
-		.map_or_else(|| PathBuf::from("."), PathBuf::from);
+	let workdir = arg_matches
+		.get_one::<String>(WORKDIR_FLAG_ID)
+		.map(PathBuf::from);
+	let gitdir =
+		arg_matches.get_one::<String>(GIT_DIR_FLAG_ID).map_or_else(
+			|| PathBuf::from(DEFAULT_GIT_DIR),
+			PathBuf::from,
+		);
+
+	let select_file = arg_matches
+		.get_one::<String>(FILE_FLAG_ID)
+		.map(PathBuf::from);
 
 	let repo_path = if let Some(w) = workdir {
 		RepoPath::Workdir { gitdir, workdir: w }
@@ -45,20 +69,36 @@ pub fn process_cmdline() -> Result<CliArgs> {
 	};
 
 	let arg_theme = arg_matches
-		.get_one::<String>("theme")
-		.map_or_else(|| PathBuf::from("theme.ron"), PathBuf::from);
+		.get_one::<String>(THEME_FLAG_ID)
+		.map_or_else(|| PathBuf::from(DEFAULT_THEME), PathBuf::from);
 
 	let confpath = get_app_config_path()?;
-	fs::create_dir_all(&confpath)?;
+	fs::create_dir_all(&confpath).with_context(|| {
+		format!(
+			"failed to create config directory: {}",
+			confpath.display()
+		)
+	})?;
 	let theme = confpath.join(arg_theme);
 
 	let notify_watcher: bool =
-		*arg_matches.get_one("watcher").unwrap_or(&false);
+		*arg_matches.get_one(WATCHER_FLAG_ID).unwrap_or(&false);
+
+	let key_bindings_path = arg_matches
+		.get_one::<String>(KEY_BINDINGS_FLAG_ID)
+		.map(PathBuf::from);
+
+	let key_symbols_path = arg_matches
+		.get_one::<String>(KEY_SYMBOLS_FLAG_ID)
+		.map(PathBuf::from);
 
 	Ok(CliArgs {
 		theme,
+		select_file,
 		repo_path,
 		notify_watcher,
+		key_bindings_path,
+		key_symbols_path,
 	})
 }
 
@@ -78,41 +118,64 @@ fn app() -> ClapApp {
 {all-args}{after-help}
 		",
 		)
+			.arg(
+			Arg::new(KEY_BINDINGS_FLAG_ID)
+				.help("Use a custom keybindings file")
+				.short('k')
+				.long("key-bindings")
+				.value_name("KEY_LIST_FILENAME")
+				.num_args(1),
+		)
+			.arg(
+			Arg::new(KEY_SYMBOLS_FLAG_ID)
+				.help("Use a custom symbols file")
+				.short('s')
+				.long("key-symbols")
+				.value_name("KEY_SYMBOLS_FILENAME")
+				.num_args(1),
+		)
 		.arg(
-			Arg::new("theme")
+			Arg::new(THEME_FLAG_ID)
 				.help("Set color theme filename loaded from config directory")
 				.short('t')
 				.long("theme")
 				.value_name("THEME_FILE")
-				.default_value("theme.ron")
+				.default_value(DEFAULT_THEME)
 				.num_args(1),
 		)
 		.arg(
-			Arg::new("logging")
+			Arg::new(LOGGING_FLAG_ID)
 				.help("Store logging output into a file (in the cache directory by default)")
 				.short('l')
 				.long("logging")
                 .default_value_if("logfile", ArgPredicate::IsPresent, "true")
 				.action(clap::ArgAction::SetTrue),
 		)
-        .arg(Arg::new("logfile")
+        .arg(Arg::new(LOG_FILE_FLAG_ID)
             .help("Store logging output into the specified file (implies --logging)")
             .long("logfile")
             .value_name("LOG_FILE"))
 		.arg(
-			Arg::new("watcher")
+			Arg::new(WATCHER_FLAG_ID)
 				.help("Use notify-based file system watcher instead of tick-based update. This is more performant, but can cause issues on some platforms. See https://github.com/gitui-org/gitui/blob/master/FAQ.md#watcher for details.")
 				.long("watcher")
 				.action(clap::ArgAction::SetTrue),
 		)
 		.arg(
-			Arg::new("bugreport")
+			Arg::new(BUG_REPORT_FLAG_ID)
 				.help("Generate a bug report")
 				.long("bugreport")
 				.action(clap::ArgAction::SetTrue),
 		)
 		.arg(
-			Arg::new("directory")
+			Arg::new(FILE_FLAG_ID)
+				.help("Select the file in the file tab")
+				.short('f')
+				.long("file")
+				.num_args(1),
+		)
+		.arg(
+			Arg::new(GIT_DIR_FLAG_ID)
 				.help("Set the git directory")
 				.short('d')
 				.long("directory")
@@ -120,7 +183,7 @@ fn app() -> ClapApp {
 				.num_args(1),
 		)
 		.arg(
-			Arg::new("workdir")
+			Arg::new(WORKDIR_FLAG_ID)
 				.help("Set the working directory")
 				.short('w')
 				.long("workdir")
@@ -154,7 +217,12 @@ fn get_app_cache_path() -> Result<PathBuf> {
 		.ok_or_else(|| anyhow!("failed to find os cache dir."))?;
 
 	path.push("gitui");
-	fs::create_dir_all(&path)?;
+	fs::create_dir_all(&path).with_context(|| {
+		format!(
+			"failed to create cache directory: {}",
+			path.display()
+		)
+	})?;
 	Ok(path)
 }
 

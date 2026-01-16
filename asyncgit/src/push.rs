@@ -164,7 +164,7 @@ impl AsyncPush {
 		*last_res = match res {
 			Ok(()) => None,
 			Err(e) => {
-				log::error!("push error: {}", e);
+				log::error!("push error: {e}",);
 				Some(e.to_string())
 			}
 		};

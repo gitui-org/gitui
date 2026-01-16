@@ -250,7 +250,7 @@ impl Revlog {
 			self.search,
 			LogSearch::Off | LogSearch::Results(_)
 		) {
-			log::info!("start search: {:?}", options);
+			log::info!("start search: {options:?}");
 
 			let filter = filter_commit_by_search(
 				LogFilterSearch::new(options.clone()),

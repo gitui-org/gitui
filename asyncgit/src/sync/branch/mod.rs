@@ -104,6 +104,11 @@ impl BranchInfo {
 
 		None
 	}
+
+	/// returns whether branch is local
+	pub const fn is_local(&self) -> bool {
+		matches!(self.details, BranchDetails::Local(_))
+	}
 }
 
 ///
@@ -715,13 +720,13 @@ mod tests_branches {
 			&root.as_os_str().to_str().unwrap().into();
 
 		let branch_name = "master";
-		let upstrem_merge = "refs/heads/master";
+		let upstream_merge = "refs/heads/master";
 
 		let mut config = repo.config().unwrap();
 		config
 			.set_str(
 				&format!("branch.{branch_name}.merge"),
-				upstrem_merge,
+				upstream_merge,
 			)
 			.expect("fail set branch merge config");
 
@@ -732,7 +737,7 @@ mod tests_branches {
 			.is_ok_and(|v| v.as_ref().is_some()));
 		assert_eq!(
 			&upstream_merge_res.unwrap().unwrap(),
-			upstrem_merge
+			upstream_merge
 		);
 	}
 }
@@ -1017,7 +1022,7 @@ mod test_remote_branches {
 	}
 
 	#[test]
-	fn test_checkout_remote_branch_hirachical() {
+	fn test_checkout_remote_branch_hierarchical() {
 		let (r1_dir, _repo) = repo_init_bare().unwrap();
 
 		let (clone1_dir, clone1) =

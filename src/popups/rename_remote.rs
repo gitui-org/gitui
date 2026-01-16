@@ -161,7 +161,7 @@ impl RenameRemotePopup {
 						));
 					}
 					Err(e) => {
-						log::error!("rename remote: {}", e,);
+						log::error!("rename remote: {e}");
 						self.queue.push(InternalEvent::ShowErrorMsg(
 							format!("rename remote error:\n{e}",),
 						));

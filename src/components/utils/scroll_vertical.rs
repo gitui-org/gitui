@@ -8,6 +8,7 @@ use std::cell::Cell;
 pub struct VerticalScroll {
 	top: Cell<usize>,
 	max_top: Cell<usize>,
+	visual_height: Cell<usize>,
 }
 
 impl VerticalScroll {
@@ -15,6 +16,7 @@ impl VerticalScroll {
 		Self {
 			top: Cell::new(0),
 			max_top: Cell::new(0),
+			visual_height: Cell::new(0),
 		}
 	}
 
@@ -33,9 +35,14 @@ impl VerticalScroll {
 		let new_scroll_top = match move_type {
 			ScrollType::Down => old.saturating_add(1),
 			ScrollType::Up => old.saturating_sub(1),
+			ScrollType::PageDown => old
+				.saturating_sub(1)
+				.saturating_add(self.visual_height.get()),
+			ScrollType::PageUp => old
+				.saturating_add(1)
+				.saturating_sub(self.visual_height.get()),
 			ScrollType::Home => 0,
 			ScrollType::End => max,
-			_ => old,
 		};
 
 		let new_scroll_top = new_scroll_top.clamp(0, max);
@@ -81,6 +88,8 @@ impl VerticalScroll {
 		selection_max: usize,
 		visual_height: usize,
 	) -> usize {
+		self.visual_height.set(visual_height);
+
 		let new_top = calc_scroll_top(
 			self.get_top(),
 			visual_height,
@@ -190,6 +199,28 @@ mod tests {
 
 		// completely above the visible area
 		scroll.move_area_to_visible(visual_height, 0, 2);
+		assert_eq!(scroll.get_top(), 0);
+	}
+
+	#[test]
+	fn test_scroll_with_pageup_pagedown() {
+		let scroll = VerticalScroll::new();
+		scroll.max_top.set(10);
+		scroll.visual_height.set(8);
+
+		assert!(scroll.move_top(ScrollType::End));
+		assert_eq!(scroll.get_top(), 10);
+
+		assert!(!scroll.move_top(ScrollType::PageDown));
+		assert_eq!(scroll.get_top(), 10);
+
+		assert!(scroll.move_top(ScrollType::PageUp));
+		assert_eq!(scroll.get_top(), 3);
+
+		assert!(scroll.move_top(ScrollType::PageUp));
+		assert_eq!(scroll.get_top(), 0);
+
+		assert!(!scroll.move_top(ScrollType::PageUp));
 		assert_eq!(scroll.get_top(), 0);
 	}
 }

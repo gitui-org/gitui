@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [nightly, stable, "1.81"]
+        rust: [nightly, stable, "1.82"]
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.rust == 'nightly' }}
 
@@ -46,6 +46,8 @@ jobs:
 
       - name: Rustup Show
         run: rustup show
+
+      - uses: taiki-e/install-action@nextest
 
       - name: Build Debug
         run: |
@@ -92,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.81"]
+        rust: [nightly, stable, "1.82"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -121,6 +123,8 @@ jobs:
       - name: Rustup Show
         run: rustup show
 
+      - uses: taiki-e/install-action@nextest
+
       - name: Setup MUSL
         run: |
           sudo apt-get -qq install musl-tools
@@ -144,7 +148,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.81"]
+        rust: [nightly, stable, "1.82"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -195,7 +199,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.81"]
+        rust: [nightly, stable, "1.82"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -303,26 +307,13 @@ jobs:
     name: Test Homebrew Formula (macOS)
     runs-on: macos-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
 
       - name: Install stable Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
 
-      - name: Install Homebrew
-        run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-      - name: Set up Homebrew in PATH
-        run: |
-          echo "$HOMEBREW_PREFIX/bin:$HOMEBREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" >> $GITHUB_PATH
-
-      - name: Update Homebrew
-        run: brew update
-
       - name: Let Homebrew build gitui from source
-        run: brew install --head --build-from-source gitui
-
-      - name: Run Homebrew test
-        run: brew test gitui
+        run: brew install --build-from-source gitui

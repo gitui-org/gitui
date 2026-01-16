@@ -34,16 +34,24 @@ impl KeyConfig {
 			.map_or_else(|_| Ok(symbols_file), Ok)
 	}
 
-	pub fn init() -> Result<Self> {
-		let keys = KeysList::init(Self::get_config_file()?);
-		let symbols = KeySymbols::init(Self::get_symbols_file()?);
+	pub fn init(
+		key_bindings_path: Option<&PathBuf>,
+		key_symbols_path: Option<&PathBuf>,
+	) -> Result<Self> {
+		let keys = KeysList::init(
+			key_bindings_path
+				.unwrap_or(&Self::get_config_file()?)
+				.clone(),
+		);
+		let symbols = KeySymbols::init(
+			key_symbols_path
+				.unwrap_or(&Self::get_symbols_file()?)
+				.clone(),
+		);
+
 		Ok(Self { keys, symbols })
 	}
 
-	#[expect(
-		clippy::missing_const_for_fn,
-		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
-	)]
 	fn get_key_symbol(&self, k: KeyCode) -> &str {
 		match k {
 			KeyCode::Enter => &self.symbols.enter,
@@ -110,10 +118,6 @@ impl KeyConfig {
 		}
 	}
 
-	#[expect(
-		clippy::missing_const_for_fn,
-		reason = "as of 1.86.0 clippy wants this to be const even though that breaks"
-	)]
 	fn get_modifier_hint(&self, modifier: KeyModifiers) -> &str {
 		match modifier {
 			KeyModifiers::CONTROL => &self.symbols.control,
@@ -193,7 +197,7 @@ mod tests {
 
 		// testing
 		let result = std::panic::catch_unwind(|| {
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				KeysList::default().move_down
@@ -208,7 +212,7 @@ mod tests {
 				&original_key_symbols_path,
 			)
 			.unwrap();
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				KeysList::default().move_down
@@ -220,7 +224,7 @@ mod tests {
 				&original_key_list_path,
 			)
 			.unwrap();
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				GituiKeyEvent::new(
@@ -231,7 +235,7 @@ mod tests {
 			assert_eq!(loaded_config.symbols.esc, "Esc");
 
 			fs::remove_file(&original_key_symbols_path).unwrap();
-			let loaded_config = KeyConfig::init().unwrap();
+			let loaded_config = KeyConfig::init(None, None).unwrap();
 			assert_eq!(
 				loaded_config.keys.move_down,
 				GituiKeyEvent::new(

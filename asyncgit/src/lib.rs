@@ -10,11 +10,13 @@ It wraps libraries like git2 and gix.
 
 #![forbid(missing_docs)]
 #![deny(
+	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,
 	unstable_name_collisions,
-	unused_assignments
+	unused_assignments,
+	deprecated
 )]
 #![deny(clippy::all, clippy::perf, clippy::nursery, clippy::pedantic)]
 #![deny(
@@ -31,7 +33,8 @@ It wraps libraries like git2 and gix.
 	clippy::module_name_repetitions,
 	clippy::must_use_candidate,
 	clippy::missing_errors_doc,
-	clippy::empty_docs
+	clippy::empty_docs,
+	clippy::unnecessary_debug_formatting
 )]
 //TODO:
 #![allow(

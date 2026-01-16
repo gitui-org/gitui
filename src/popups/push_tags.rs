@@ -16,8 +16,8 @@ use asyncgit::{
 			extract_username_password, need_username_password,
 			BasicAuthCredential,
 		},
-		get_default_remote, AsyncProgress, PushTagsProgress,
-		RepoPathRef,
+		get_default_remote, hooks_pre_push, AsyncProgress,
+		HookResult, PushTagsProgress, RepoPathRef,
 	},
 	AsyncGitNotification, AsyncPushTags, PushTagsRequest,
 };
@@ -84,6 +84,19 @@ impl PushTagsPopup {
 		&mut self,
 		cred: Option<BasicAuthCredential>,
 	) -> Result<()> {
+		// run pre push hook - can reject push
+		if let HookResult::NotOk(e) =
+			hooks_pre_push(&self.repo.borrow())?
+		{
+			log::error!("pre-push hook failed: {e}");
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"pre-push hook failed:\n{e}"
+			)));
+			self.pending = false;
+			self.visible = false;
+			return Ok(());
+		}
+
 		self.pending = true;
 		self.progress = None;
 		self.git_push.request(PushTagsRequest {
