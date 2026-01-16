@@ -168,7 +168,7 @@ dependencies = [
  "ssh-key",
  "tempfile",
  "thiserror",
- "unicode-truncate 2.0.0",
+ "unicode-truncate 2.0.1",
  "url",
 ]
 
@@ -1173,7 +1173,7 @@ dependencies = [
  "tui-textarea",
  "two-face",
  "unicode-segmentation",
- "unicode-truncate 2.0.0",
+ "unicode-truncate 2.0.1",
  "unicode-width 0.2.0",
  "which",
 ]
@@ -3817,11 +3817,11 @@ dependencies = [
 
 [[package]]
 name = "unicode-truncate"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fbf03860ff438702f3910ca5f28f8dac63c1c11e7efb5012b8b175493606330"
+checksum = "16b380a1238663e5f8a691f9039c73e1cdae598a30e9855f541d29b08b53e9a5"
 dependencies = [
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "unicode-segmentation",
  "unicode-width 0.2.0",
 ]
