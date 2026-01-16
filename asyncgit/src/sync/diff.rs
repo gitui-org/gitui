@@ -19,7 +19,7 @@ use git2::{
 use gix::{
 	bstr::ByteSlice,
 	diff::blob::{
-		unified_diff::{ConsumeHunk, ContextSize, NewlineSeparator},
+		unified_diff::{ConsumeHunk, ContextSize, DiffLineKind},
 		UnifiedDiff,
 	},
 	ObjectId,
@@ -56,6 +56,16 @@ impl From<git2::DiffLineType> for DiffLineType {
 			git2::DiffLineType::AddEOFNL
 			| git2::DiffLineType::Addition => Self::Add,
 			_ => Self::None,
+		}
+	}
+}
+
+impl From<DiffLineKind> for DiffLineType {
+	fn from(value: DiffLineKind) -> Self {
+		match value {
+			DiffLineKind::Context => Self::None,
+			DiffLineKind::Add => Self::Add,
+			DiffLineKind::Remove => Self::Delete,
 		}
 	}
 }
@@ -218,76 +228,9 @@ impl ConsumeHunk for FileDiff {
 
 	fn consume_hunk(
 		&mut self,
-		before_hunk_start: u32,
-		before_hunk_len: u32,
-		after_hunk_start: u32,
-		after_hunk_len: u32,
-		header: &str,
-		hunk: &[u8],
+		header: gix::diff::blob::unified_diff::HunkHeader,
+		hunk_lines: &[(DiffLineKind, &[u8])],
 	) -> std::io::Result<()> {
-		let non_header_lines = hunk.lines().scan(
-			(before_hunk_start, after_hunk_start),
-			|(old_lineno, new_lineno), line| {
-				let (line_type, content, old_lineno, new_lineno) =
-					match line {
-						[b'+', rest @ ..] => {
-							let result = (
-								DiffLineType::Add,
-								rest,
-								None,
-								Some(*new_lineno),
-							);
-							*new_lineno += 1;
-							result
-						}
-						[b'-', rest @ ..] => {
-							let result = (
-								DiffLineType::Delete,
-								rest,
-								Some(*old_lineno),
-								None,
-							);
-							*old_lineno += 1;
-							result
-						}
-						[b' ', rest @ ..] => {
-							let result = (
-								DiffLineType::None,
-								rest,
-								Some(*old_lineno),
-								Some(*new_lineno),
-							);
-							*old_lineno += 1;
-							*new_lineno += 1;
-							result
-						}
-						_ => {
-							// Empty lines or unknown prefixes are treated as context.
-							let result = (
-								DiffLineType::None,
-								line,
-								Some(*old_lineno),
-								Some(*new_lineno),
-							);
-							*old_lineno += 1;
-							*new_lineno += 1;
-							result
-						}
-					};
-
-				Some(DiffLine {
-					position: DiffLinePosition {
-						old_lineno,
-						new_lineno,
-					},
-					content: String::from_utf8_lossy(content)
-						.trim_matches(is_newline)
-						.into(),
-					line_type,
-				})
-			},
-		);
-
 		let mut lines = vec![DiffLine {
 			content: header.to_string().into(),
 			line_type: DiffLineType::Header,
@@ -296,21 +239,41 @@ impl ConsumeHunk for FileDiff {
 				new_lineno: None,
 			},
 		}];
-		lines.extend(non_header_lines);
+		lines.extend(hunk_lines.iter().enumerate().map(
+			|(i, (kind, line))| {
+				DiffLine {
+					content: line
+						.to_str_lossy()
+						.trim_matches(is_newline)
+						.into(),
+					line_type: (*kind).into(),
+					position: DiffLinePosition {
+						old_lineno: Some(
+							header.before_hunk_start
+								+ u32::try_from(i).unwrap(),
+						),
+						new_lineno: Some(
+							header.after_hunk_start
+								+ u32::try_from(i).unwrap(),
+						),
+					},
+				}
+			},
+		));
 
 		let hunk_header = HunkHeader {
-			old_start: before_hunk_start,
-			old_lines: before_hunk_len,
-			new_start: after_hunk_start,
-			new_lines: after_hunk_len,
+			old_start: header.before_hunk_start,
+			old_lines: header.before_hunk_len,
+			new_start: header.after_hunk_start,
+			new_lines: header.after_hunk_len,
 		};
+
+		self.lines += lines.len();
 
 		self.hunks.push(Hunk {
 			header_hash: hash(&hunk_header),
 			lines,
 		});
-
-		self.lines += hunk.lines().count();
 
 		Ok(())
 	}
@@ -468,7 +431,6 @@ pub fn get_diff(
 	let unified_diff = UnifiedDiff::new(
 		&input,
 		FileDiff::default(),
-		NewlineSeparator::AfterHeaderAndLine("\n"),
 		ContextSize::symmetrical(context_size),
 	);
 
