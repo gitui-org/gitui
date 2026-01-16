@@ -5,7 +5,7 @@ use crate::{
 	error::Result,
 	sync::{get_commits_info, gix_repo},
 };
-use gix::blame::Options;
+use gix::repository::blame_file::Options;
 use scopetime::scope_time;
 use std::collections::{HashMap, HashSet};
 
@@ -58,16 +58,8 @@ pub fn blame_file(
 		_ => repo.head()?.peel_to_commit()?.id,
 	};
 
-	let diff_algorithm = repo.diff_algorithm()?;
-
-	let options: Options = Options {
-		diff_algorithm,
-		..Options::default()
-	};
-
-	// TODO: `blame_file` does not take `diff_algorithm` into account. Instead, it relies on
-	// `#[default]` which, as of 2025-10-30, is `Histogram`.
-	let outcome = repo.blame_file(&file_path, tip, options)?;
+	let outcome =
+		repo.blame_file(&file_path, tip, Options::default())?;
 
 	let commit_id = if let Some(commit_id) = commit_id {
 		commit_id

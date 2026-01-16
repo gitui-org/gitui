@@ -20,8 +20,9 @@ use asyncgit::{
 			checkout_remote_branch, BranchDetails, LocalBranch,
 			RemoteBranch,
 		},
-		checkout_branch, get_branches_info, BranchInfo, BranchType,
-		CommitId, RepoPathRef, RepoState,
+		checkout_branch, get_branches_info,
+		status::StatusType,
+		BranchInfo, BranchType, CommitId, RepoPathRef, RepoState,
 	},
 	AsyncGitNotification,
 };
@@ -582,22 +583,35 @@ impl BranchListPopup {
 			anyhow::bail!("no valid branch selected");
 		}
 
-		if self.local {
-			checkout_branch(
-				&self.repo.borrow(),
-				&self.branches[self.selection as usize].name,
-			)?;
-			self.hide();
-		} else {
-			checkout_remote_branch(
-				&self.repo.borrow(),
-				&self.branches[self.selection as usize],
-			)?;
-			self.local = true;
-			self.update_branches()?;
-		}
+		let status = sync::status::get_status(
+			&self.repo.borrow(),
+			StatusType::WorkingDir,
+			None,
+		)
+		.expect("Could not get status");
 
-		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		let selected_branch = &self.branches[self.selection as usize];
+		if status.is_empty() {
+			if self.local {
+				checkout_branch(
+					&self.repo.borrow(),
+					&selected_branch.name,
+				)?;
+				self.hide();
+			} else {
+				checkout_remote_branch(
+					&self.repo.borrow(),
+					selected_branch,
+				)?;
+				self.local = true;
+				self.update_branches()?;
+			}
+			self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		} else {
+			self.queue.push(InternalEvent::CheckoutOption(
+				selected_branch.clone(),
+			));
+		}
 
 		Ok(())
 	}

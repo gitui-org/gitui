@@ -1,6 +1,6 @@
 [package]
 name = "gitui"
-version = "0.27.0"
+version = "0.28.0"
 authors = ["extrawurst <mail@rusticorn.com>"]
 description = "blazing fast terminal-ui for git"
 edition = "2021"
@@ -35,13 +35,13 @@ vendor-openssl = ["asyncgit/vendor-openssl"]
 
 [dependencies]
 anyhow = "1.0"
-asyncgit = { path = "./asyncgit", version = "0.27.0", default-features = false }
+asyncgit = { path = "./asyncgit", version = "0.28.0", default-features = false }
 backtrace = "0.3"
 base64 = "0.22"
 bitflags = "2.10"
 bugreport = "0.5.1"
 bwrap = { version = "1.3", features = ["use_std"] }
-bytesize = { version = "2.1", default-features = false }
+bytesize = { version = "2.3", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.5", features = ["env", "cargo"] }
 crossbeam-channel = "0.5"
@@ -63,7 +63,7 @@ ratatui = { version = "0.29", default-features = false, features = [
     'serde',
 ] }
 rayon-core = "1.13"
-ron = "0.11"
+ron = "0.12"
 scopeguard = "1.2"
 scopetime = { path = "./scopetime", version = "0.1" }
 serde = "1.0"

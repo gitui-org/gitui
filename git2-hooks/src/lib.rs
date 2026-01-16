@@ -44,6 +44,7 @@ pub const HOOK_POST_COMMIT: &str = "post-commit";
 pub const HOOK_PRE_COMMIT: &str = "pre-commit";
 pub const HOOK_COMMIT_MSG: &str = "commit-msg";
 pub const HOOK_PREPARE_COMMIT_MSG: &str = "prepare-commit-msg";
+pub const HOOK_PRE_PUSH: &str = "pre-push";
 
 const HOOK_COMMIT_MSG_TEMP_FILE: &str = "COMMIT_EDITMSG";
 
@@ -162,6 +163,20 @@ pub fn hooks_post_commit(
 	other_paths: Option<&[&str]>,
 ) -> Result<HookResult> {
 	let hook = HookPaths::new(repo, other_paths, HOOK_POST_COMMIT)?;
+
+	if !hook.found() {
+		return Ok(HookResult::NoHookFound);
+	}
+
+	hook.run_hook(&[])
+}
+
+/// this hook is documented here <https://git-scm.com/docs/githooks#_pre_push>
+pub fn hooks_pre_push(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+) -> Result<HookResult> {
+	let hook = HookPaths::new(repo, other_paths, HOOK_PRE_PUSH)?;
 
 	if !hook.found() {
 		return Ok(HookResult::NoHookFound);
@@ -657,5 +672,38 @@ exit 2
 				"commit,0000000000000000000000000000000000000000\n"
 			)
 		);
+	}
+
+	#[test]
+	fn test_pre_push_sh() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let res = hooks_pre_push(&repo, None).unwrap();
+
+		assert!(matches!(res, HookResult::Ok { .. }));
+	}
+
+	#[test]
+	fn test_pre_push_fail_sh() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+echo 'failed'
+exit 3
+	";
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+		let res = hooks_pre_push(&repo, None).unwrap();
+		let HookResult::RunNotSuccessful { code, stdout, .. } = res
+		else {
+			unreachable!()
+		};
+		assert_eq!(code.unwrap(), 3);
+		assert_eq!(&stdout, "failed\n");
 	}
 }
