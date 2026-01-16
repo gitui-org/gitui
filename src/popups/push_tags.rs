@@ -86,7 +86,6 @@ impl PushTagsPopup {
 	) -> Result<()> {
 		let remote = get_default_remote(&self.repo.borrow())?;
 
-		// get remote URL for pre-push hook
 		let remote_url = asyncgit::sync::get_remote_url(
 			&self.repo.borrow(),
 			&remote,

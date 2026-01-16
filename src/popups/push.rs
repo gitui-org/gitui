@@ -144,7 +144,6 @@ impl PushPopup {
 			remote
 		};
 
-		// get remote URL for pre-push hook
 		let remote_url = asyncgit::sync::get_remote_url(
 			&self.repo.borrow(),
 			&remote,
