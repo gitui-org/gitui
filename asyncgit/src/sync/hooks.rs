@@ -161,8 +161,7 @@ pub fn hooks_prepare_commit_msg(
 /// see `git2_hooks::hooks_pre_push`
 pub fn hooks_pre_push(
 	repo_path: &RepoPath,
-	remote: Option<&str>,
-	url: &str,
+	remote: &str,
 	push: &PrePushTarget<'_>,
 	basic_credential: Option<crate::sync::cred::BasicAuthCredential>,
 ) -> Result<HookResult> {
@@ -177,10 +176,21 @@ pub fn hooks_pre_push(
 		return Ok(HookResult::Ok);
 	}
 
+	let git_remote = repo.find_remote(remote)?;
+	let url = git_remote
+		.pushurl()
+		.or_else(|| git_remote.url())
+		.ok_or_else(|| {
+			crate::error::Error::Generic(format!(
+				"remote '{remote}' has no URL configured"
+			))
+		})?
+		.to_string();
+
 	let advertised = advertised_remote_refs(
 		repo_path,
-		remote,
-		url,
+		Some(remote),
+		&url,
 		basic_credential,
 	)?;
 	let updates = match push {
@@ -196,14 +206,16 @@ pub fn hooks_pre_push(
 			)?]
 		}
 		PrePushTarget::Tags => {
-			// If remote is None, use url per git spec
-			let remote = remote.unwrap_or(url);
 			pre_push_tag_updates(repo_path, remote, &advertised)?
 		}
 	};
 
 	Ok(git2_hooks::hooks_pre_push(
-		&repo, None, remote, url, &updates,
+		&repo,
+		None,
+		Some(remote),
+		&url,
+		&updates,
 	)?
 	.into())
 }

@@ -144,28 +144,11 @@ impl PushPopup {
 			remote
 		};
 
-		let remote_url = asyncgit::sync::get_remote_url(
-			&self.repo.borrow(),
-			&remote,
-		)?;
-
-		// If remote doesn't have a URL configured, we can't push
-		let Some(remote_url) = remote_url else {
-			log::error!("remote '{remote}' has no URL configured");
-			self.queue.push(InternalEvent::ShowErrorMsg(format!(
-				"Remote '{remote}' has no URL configured"
-			)));
-			self.pending = false;
-			self.visible = false;
-			return Ok(());
-		};
-
 		// run pre push hook - can reject push
 		let repo = self.repo.borrow();
 		if let HookResult::NotOk(e) = hooks_pre_push(
 			&repo,
-			Some(&remote),
-			&remote_url,
+			&remote,
 			&asyncgit::sync::PrePushTarget::Branch {
 				branch: &self.branch,
 				delete: self.modifier.delete(),
