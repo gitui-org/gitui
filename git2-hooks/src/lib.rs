@@ -120,17 +120,9 @@ pub enum HookResult {
 }
 
 impl HookResult {
-	/// helper to check if result is ok (hook succeeded with exit code 0 or no hook found)
-	pub const fn is_ok(&self) -> bool {
-		match self {
-			Self::Run(response) => response.code == 0,
-			Self::NoHookFound => true,
-		}
-	}
-
-	/// helper to check if a hook was found and ran (regardless of success/failure)
-	pub const fn did_run_hook(&self) -> bool {
-		matches!(self, Self::Run(_))
+	/// helper to check if hook ran successfully (found and exit code 0)
+	pub const fn is_successful(&self) -> bool {
+		matches!(self, Self::Run(response) if response.is_successful())
 	}
 }
 
@@ -401,8 +393,7 @@ exit 0
 
 		let res = hooks_post_commit(&repo, None).unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -418,8 +409,7 @@ exit 0
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 
 		assert_eq!(msg, String::from("test"));
 	}
@@ -439,8 +429,7 @@ exit 0
 		let mut msg = String::from("test_sth");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 
 		assert_eq!(msg, String::from("test_shell_command"));
 	}
@@ -455,8 +444,7 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -515,8 +503,7 @@ exit 0
 		let res =
 			hooks_pre_commit(&repo, Some(&["../.myhooks"])).unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -549,8 +536,7 @@ exit 1
 		let res =
 			hooks_pre_commit(&repo, Some(&["../.myhooks"])).unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -564,7 +550,7 @@ exit 1
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(!res.is_ok());
+		assert!(!res.is_successful());
 	}
 
 	#[test]
@@ -636,7 +622,7 @@ exit 1
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(!res.is_ok());
+		assert!(!res.is_successful());
 	}
 
 	#[test]
@@ -657,8 +643,7 @@ sys.exit(0)
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.did_run_hook());
-		assert!(res.is_ok(), "{res:?}");
+		assert!(res.is_successful(), "{res:?}");
 	}
 
 	#[test]
@@ -679,7 +664,7 @@ sys.exit(1)
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(!res.is_ok());
+		assert!(!res.is_successful());
 	}
 
 	#[test]
@@ -721,8 +706,7 @@ exit 0
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 		assert_eq!(msg, String::from("msg\n"));
 	}
 
@@ -768,8 +752,7 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 		assert_eq!(msg, String::from("msg:message\n"));
 	}
 
@@ -837,8 +820,7 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -900,8 +882,7 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(res.did_run_hook());
-		assert!(res.is_ok(), "Expected Ok result, got: {res:?}");
+		assert!(res.is_successful(), "Expected Ok result, got: {res:?}");
 	}
 
 	#[test]
