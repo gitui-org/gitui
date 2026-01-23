@@ -1114,7 +1114,7 @@ version = "0.6.0"
 dependencies = [
  "git2",
  "git2-testing",
- "gix-path 0.10.22",
+ "gix-path",
  "log",
  "pretty_assertions",
  "shellexpand",
@@ -1210,7 +1210,7 @@ dependencies = [
  "gix-object",
  "gix-odb",
  "gix-pack",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-pathspec",
  "gix-protocol",
  "gix-ref",
@@ -1226,7 +1226,7 @@ dependencies = [
  "gix-traverse",
  "gix-url",
  "gix-utils",
- "gix-validate 0.11.0",
+ "gix-validate",
  "gix-worktree",
  "smallvec",
  "thiserror",
@@ -1254,7 +1254,7 @@ checksum = "f868f013fee0ebb5c85fae848c34a0b9ef7438acfbaec0c82a3cdbd5eac730a0"
 dependencies = [
  "bstr",
  "gix-glob",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-quote",
  "gix-trace",
  "kstring",
@@ -1288,7 +1288,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "745bc165b7da500acc26d24888379ae0dfd1ecabe3a47420cdcb92feefb0561d"
 dependencies = [
  "bstr",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-quote",
  "gix-trace",
  "shell-words",
@@ -1317,7 +1317,7 @@ dependencies = [
  "gix-config-value",
  "gix-features",
  "gix-glob",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-ref",
  "gix-sec",
  "memchr",
@@ -1335,7 +1335,7 @@ checksum = "563361198101cedc975fe5760c91ac2e4126eec22216e81b659b45289feaf1ea"
 dependencies = [
  "bitflags 2.10.0",
  "bstr",
- "gix-path 0.11.0",
+ "gix-path",
  "libc",
  "thiserror",
 ]
@@ -1367,7 +1367,7 @@ dependencies = [
  "gix-hash",
  "gix-index",
  "gix-object",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-pathspec",
  "gix-tempfile",
  "gix-trace",
@@ -1389,7 +1389,7 @@ dependencies = [
  "gix-ignore",
  "gix-index",
  "gix-object",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-pathspec",
  "gix-trace",
  "gix-utils",
@@ -1406,7 +1406,7 @@ dependencies = [
  "bstr",
  "dunce",
  "gix-fs",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-ref",
  "gix-sec",
  "thiserror",
@@ -1429,7 +1429,7 @@ checksum = "6a407957e21dc5e6c87086e50e5114a2f9240f9cb11699588a6d900d53cb6c70"
 dependencies = [
  "crc32fast",
  "crossbeam-channel",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-trace",
  "gix-utils",
  "libc",
@@ -1454,7 +1454,7 @@ dependencies = [
  "gix-hash",
  "gix-object",
  "gix-packetline",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-quote",
  "gix-trace",
  "gix-utils",
@@ -1471,7 +1471,7 @@ dependencies = [
  "bstr",
  "fastrand",
  "gix-features",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-utils",
  "thiserror",
 ]
@@ -1485,7 +1485,7 @@ dependencies = [
  "bitflags 2.10.0",
  "bstr",
  "gix-features",
- "gix-path 0.11.0",
+ "gix-path",
 ]
 
 [[package]]
@@ -1519,7 +1519,7 @@ checksum = "8953d87c13267e296d547f0fc7eaa8aa8fa5b2a9a34ab1cd5857f25240c7d299"
 dependencies = [
  "bstr",
  "gix-glob",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-trace",
  "unicode-bom",
 ]
@@ -1542,7 +1542,7 @@ dependencies = [
  "gix-object",
  "gix-traverse",
  "gix-utils",
- "gix-validate 0.11.0",
+ "gix-validate",
  "hashbrown 0.16.1",
  "itoa",
  "libc",
@@ -1587,9 +1587,9 @@ dependencies = [
  "gix-features",
  "gix-hash",
  "gix-hashtable",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-utils",
- "gix-validate 0.11.0",
+ "gix-validate",
  "itoa",
  "smallvec",
  "thiserror",
@@ -1609,7 +1609,7 @@ dependencies = [
  "gix-hashtable",
  "gix-object",
  "gix-pack",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-quote",
  "parking_lot",
  "tempfile",
@@ -1629,7 +1629,7 @@ dependencies = [
  "gix-hash",
  "gix-hashtable",
  "gix-object",
- "gix-path 0.11.0",
+ "gix-path",
  "memmap2",
  "smallvec",
  "thiserror",
@@ -1650,25 +1650,13 @@ dependencies = [
 
 [[package]]
 name = "gix-path"
-version = "0.10.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cb06c3e4f8eed6e24fd915fa93145e28a511f4ea0e768bae16673e05ed3f366"
-dependencies = [
- "bstr",
- "gix-trace",
- "gix-validate 0.10.1",
- "thiserror",
-]
-
-[[package]]
-name = "gix-path"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7c3cd795cad18c7acbc6bafe34bfb34ac7273ee81133793f9d1516dd9faf922"
 dependencies = [
  "bstr",
  "gix-trace",
- "gix-validate 0.11.0",
+ "gix-validate",
  "thiserror",
 ]
 
@@ -1683,7 +1671,7 @@ dependencies = [
  "gix-attributes",
  "gix-config-value",
  "gix-glob",
- "gix-path 0.11.0",
+ "gix-path",
  "thiserror",
 ]
 
@@ -1729,10 +1717,10 @@ dependencies = [
  "gix-hash",
  "gix-lock",
  "gix-object",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-tempfile",
  "gix-utils",
- "gix-validate 0.11.0",
+ "gix-validate",
  "memmap2",
  "thiserror",
  "winnow",
@@ -1749,7 +1737,7 @@ dependencies = [
  "gix-glob",
  "gix-hash",
  "gix-revision",
- "gix-validate 0.11.0",
+ "gix-validate",
  "smallvec",
  "thiserror",
 ]
@@ -1795,7 +1783,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "beeb3bc63696cf7acb5747a361693ebdbcaf25b5d27d2308f38e9782983e7bce"
 dependencies = [
  "bitflags 2.10.0",
- "gix-path 0.11.0",
+ "gix-path",
  "libc",
  "windows-sys 0.61.2",
 ]
@@ -1828,7 +1816,7 @@ dependencies = [
  "gix-hash",
  "gix-index",
  "gix-object",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-pathspec",
  "gix-worktree",
  "portable-atomic",
@@ -1843,7 +1831,7 @@ checksum = "db1840fe723c6264ee596e5a179e1b9a2df59351f09bae9cea570a472a790bc0"
 dependencies = [
  "bstr",
  "gix-config",
- "gix-path 0.11.0",
+ "gix-path",
  "gix-pathspec",
  "gix-refspec",
  "gix-url",
@@ -1909,7 +1897,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ca2e50308a8373069e71970939f43ea4a1b5f422cf807d048ebcf07dcc02b2c"
 dependencies = [
  "bstr",
- "gix-path 0.11.0",
+ "gix-path",
  "percent-encoding",
  "thiserror",
 ]
@@ -1923,16 +1911,6 @@ dependencies = [
  "bstr",
  "fastrand",
  "unicode-normalization",
-]
-
-[[package]]
-name = "gix-validate"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b1e63a5b516e970a594f870ed4571a8fdcb8a344e7bd407a20db8bd61dbfde4"
-dependencies = [
- "bstr",
- "thiserror",
 ]
 
 [[package]]
@@ -1958,8 +1936,8 @@ dependencies = [
  "gix-ignore",
  "gix-index",
  "gix-object",
- "gix-path 0.11.0",
- "gix-validate 0.11.0",
+ "gix-path",
+ "gix-validate",
 ]
 
 [[package]]
