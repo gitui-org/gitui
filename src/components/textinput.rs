@@ -11,16 +11,18 @@ use crate::{
 	ui::{self, style::SharedTheme},
 };
 use anyhow::Result;
-use crossterm::event::Event;
-use ratatui::widgets::{Block, Borders};
+use crossterm::event::{
+	Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+};
 use ratatui::{
+	buffer::Buffer,
 	layout::{Alignment, Rect},
+	style::Style,
+	widgets::{Block, Borders, Widget, WidgetRef},
 	widgets::{Clear, Paragraph},
 	Frame,
 };
-use std::cell::Cell;
-use std::cell::OnceCell;
-use tui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
+use std::cell::{Cell, OnceCell};
 
 ///
 #[derive(PartialEq, Eq)]
@@ -37,7 +39,229 @@ enum SelectionState {
 	SelectionEndPending,
 }
 
-type TextAreaComponent = TextArea<'static>;
+enum CursorMove {
+	Top,
+	Bottom,
+	Up,
+	Down,
+	Back,
+	Forward,
+	Head,
+	End,
+	WordForward,
+	WordBack,
+	ParagraphForward,
+	ParagraphBack,
+}
+
+enum Scrolling {
+	PageUp,
+	PageDown,
+}
+
+#[derive(Default, PartialEq)]
+enum Key {
+	#[default]
+	Null,
+	Up,
+	Down,
+	Left,
+	Right,
+	Home,
+	End,
+	PageUp,
+	PageDown,
+	Backspace,
+	Delete,
+	Tab,
+	Char(char),
+}
+
+#[derive(Default)]
+struct Input {
+	key: Key,
+	ctrl: bool,
+	alt: bool,
+	shift: bool,
+}
+
+impl From<Event> for Input {
+	/// Convert [`crossterm::event::Event`] into [`Input`].
+	fn from(event: Event) -> Self {
+		match event {
+			Event::Key(key) => Self::from(key),
+			_ => Self::default(),
+		}
+	}
+}
+
+impl From<KeyCode> for Key {
+	/// Convert [`crossterm::event::KeyCode`] into [`Key`].
+	fn from(code: KeyCode) -> Self {
+		match code {
+			KeyCode::Char(c) => Self::Char(c),
+			KeyCode::Backspace => Self::Backspace,
+			KeyCode::Left => Self::Left,
+			KeyCode::Right => Self::Right,
+			KeyCode::Up => Self::Up,
+			KeyCode::Down => Self::Down,
+			KeyCode::Tab => Self::Tab,
+			KeyCode::Delete => Self::Delete,
+			KeyCode::Home => Self::Home,
+			KeyCode::End => Self::End,
+			KeyCode::PageUp => Self::PageUp,
+			KeyCode::PageDown => Self::PageDown,
+			_ => Self::Null,
+		}
+	}
+}
+
+impl From<KeyEvent> for Input {
+	/// Convert [`crossterm::event::KeyEvent`] into [`Input`].
+	fn from(key: KeyEvent) -> Self {
+		if key.kind == KeyEventKind::Release {
+			// On Windows or when `crossterm::event::PushKeyboardEnhancementFlags` is set,
+			// key release event can be reported. Ignore it. (rhysd/tui-textarea#14)
+			return Self::default();
+		}
+
+		let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+		let alt = key.modifiers.contains(KeyModifiers::ALT);
+		let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+		let key = Key::from(key.code);
+
+		Self {
+			key,
+			ctrl,
+			alt,
+			shift,
+		}
+	}
+}
+
+struct TextArea;
+
+impl TextArea {
+	fn new(_lines: Vec<String>) -> Self {
+		todo!();
+	}
+
+	fn scroll(&mut self, _scrolling: Scrolling) {
+		todo!();
+	}
+
+	fn paste(&mut self) {
+		todo!();
+	}
+
+	fn redo(&mut self) {
+		todo!();
+	}
+
+	fn undo(&mut self) {
+		todo!();
+	}
+
+	#[cfg(test)]
+	fn cursor(&mut self) -> (usize, usize) {
+		todo!();
+	}
+
+	fn move_cursor(&mut self, _cursor_move: CursorMove) {
+		todo!();
+	}
+
+	fn delete_next_word(&mut self) {
+		todo!();
+	}
+
+	fn delete_word(&mut self) {
+		todo!();
+	}
+
+	fn delete_line_by_head(&mut self) {
+		todo!();
+	}
+
+	fn delete_line_by_end(&mut self) {
+		todo!();
+	}
+
+	fn delete_next_char(&mut self) {
+		todo!();
+	}
+
+	fn delete_char(&mut self) {
+		todo!();
+	}
+
+	fn insert_tab(&mut self) {
+		todo!();
+	}
+
+	fn insert_char(&mut self, _char: char) {
+		todo!();
+	}
+
+	fn set_block(&mut self, _block: Block<'_>) {
+		todo!();
+	}
+
+	fn set_style(&mut self, _style: Style) {
+		todo!();
+	}
+
+	fn set_placeholder_text(&mut self, _placeholder: String) {
+		todo!();
+	}
+
+	fn set_placeholder_style(&mut self, _style: Style) {
+		todo!();
+	}
+
+	fn set_cursor_line_style(&mut self, _style: Style) {
+		todo!();
+	}
+
+	fn set_mask_char(&mut self, _char: char) {
+		todo!();
+	}
+}
+
+type TextAreaComponent = TextArea;
+
+impl<'a> TextAreaComponent {
+	fn start_selection(&mut self) {
+		todo!();
+	}
+
+	fn cancel_selection(&mut self) {
+		todo!();
+	}
+
+	fn insert_newline(&mut self) {
+		todo!();
+	}
+
+	fn lines(&self) -> &'a [String] {
+		todo!();
+	}
+}
+
+impl Widget for TextAreaComponent {
+	fn render(self, _area: Rect, _buf: &mut Buffer)
+	where
+		Self: Sized,
+	{
+		todo!()
+	}
+}
+
+impl WidgetRef for TextAreaComponent {
+	fn render_ref(&self, _area: Rect, _buf: &mut Buffer) {
+		todo!()
+	}
+}
 
 ///
 pub struct TextInputComponent {
@@ -260,7 +484,7 @@ impl TextInputComponent {
 	}
 
 	#[allow(clippy::too_many_lines, clippy::unnested_or_patterns)]
-	fn process_inputs(ta: &mut TextArea<'_>, input: &Input) -> bool {
+	fn process_inputs(ta: &mut TextArea, input: &Input) -> bool {
 		match input {
 			Input {
 				key: Key::Char(c),
