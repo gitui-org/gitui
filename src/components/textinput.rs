@@ -144,18 +144,6 @@ impl<'a> TextArea<'a> {
 		todo!();
 	}
 
-	fn paste(&mut self) {
-		todo!();
-	}
-
-	fn redo(&mut self) {
-		todo!();
-	}
-
-	fn undo(&mut self) {
-		todo!();
-	}
-
 	#[cfg(test)]
 	fn cursor(&mut self) -> (usize, usize) {
 		self.cursor
@@ -702,33 +690,6 @@ impl TextInputComponent {
 				true
 			}
 
-			Input {
-				key: Key::Char('u'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.undo();
-				true
-			}
-			Input {
-				key: Key::Char('r'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.redo();
-				true
-			}
-			Input {
-				key: Key::Char('y'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.paste();
-				true
-			}
 			Input {
 				key: Key::Char('v'),
 				ctrl: true,
