@@ -32,13 +32,7 @@ pub enum InputType {
 	Password,
 }
 
-#[derive(PartialEq, Eq)]
-enum SelectionState {
-	Selecting,
-	NotSelecting,
-	SelectionEndPending,
-}
-
+#[derive(Clone, Copy)]
 enum CursorMove {
 	Top,
 	Bottom,
@@ -46,12 +40,8 @@ enum CursorMove {
 	Down,
 	Back,
 	Forward,
-	Head,
+	Home,
 	End,
-	WordForward,
-	WordBack,
-	ParagraphForward,
-	ParagraphBack,
 }
 
 enum Scrolling {
@@ -82,7 +72,6 @@ struct Input {
 	key: Key,
 	ctrl: bool,
 	alt: bool,
-	shift: bool,
 }
 
 impl From<Event> for Input {
@@ -127,23 +116,28 @@ impl From<KeyEvent> for Input {
 
 		let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 		let alt = key.modifiers.contains(KeyModifiers::ALT);
-		let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 		let key = Key::from(key.code);
 
-		Self {
-			key,
-			ctrl,
-			alt,
-			shift,
-		}
+		Self { key, ctrl, alt }
 	}
 }
 
-struct TextArea;
+struct TextArea<'a> {
+	lines: Vec<String>,
+	block: Option<Block<'a>>,
+	/// 0-based (row, column)
+	cursor: (usize, usize),
+	placeholder: String,
+}
 
-impl TextArea {
-	fn new(_lines: Vec<String>) -> Self {
-		todo!();
+impl<'a> TextArea<'a> {
+	const fn new(lines: Vec<String>) -> Self {
+		Self {
+			lines,
+			block: None,
+			cursor: (0, 0),
+			placeholder: String::new(),
+		}
 	}
 
 	fn scroll(&mut self, _scrolling: Scrolling) {
@@ -164,11 +158,44 @@ impl TextArea {
 
 	#[cfg(test)]
 	fn cursor(&mut self) -> (usize, usize) {
-		todo!();
+		self.cursor
 	}
 
-	fn move_cursor(&mut self, _cursor_move: CursorMove) {
-		todo!();
+	fn move_cursor(&mut self, cursor_move: CursorMove) {
+		let (current_row, current_column) = self.cursor;
+
+		match cursor_move {
+			CursorMove::Top => self.cursor = (0, current_column),
+			CursorMove::Bottom => {
+				self.cursor = (self.lines.len(), current_column);
+			}
+			CursorMove::Up => {
+				self.cursor =
+					(current_row.saturating_sub(1), current_column);
+			}
+			CursorMove::Down => {
+				self.cursor = (
+					(current_row + 1).min(self.lines.len()),
+					current_column,
+				);
+			}
+			CursorMove::Back => {
+				self.cursor =
+					(current_row, current_column.saturating_sub(1));
+			}
+			CursorMove::Forward => {
+				self.cursor = (
+					current_row,
+					(current_column + 1)
+						.min(self.lines[current_row].len()),
+				);
+			}
+			CursorMove::Home => self.cursor = (current_row, 0),
+			CursorMove::End => {
+				self.cursor =
+					(current_row, self.lines[current_row].len());
+			}
+		}
 	}
 
 	fn delete_next_word(&mut self) {
@@ -203,24 +230,24 @@ impl TextArea {
 		todo!();
 	}
 
-	fn set_block(&mut self, _block: Block<'_>) {
-		todo!();
+	fn set_block(&mut self, block: Block<'a>) {
+		self.block = Some(block);
 	}
 
 	fn set_style(&mut self, _style: Style) {
-		todo!();
+		// Do nothing, implement or remove.
 	}
 
-	fn set_placeholder_text(&mut self, _placeholder: String) {
-		todo!();
+	fn set_placeholder_text(&mut self, placeholder: String) {
+		self.placeholder = placeholder;
 	}
 
 	fn set_placeholder_style(&mut self, _style: Style) {
-		todo!();
+		// Do nothing, implement or remove.
 	}
 
 	fn set_cursor_line_style(&mut self, _style: Style) {
-		todo!();
+		// Do nothing, implement or remove.
 	}
 
 	fn set_mask_char(&mut self, _char: char) {
@@ -228,23 +255,24 @@ impl TextArea {
 	}
 }
 
-type TextAreaComponent = TextArea;
+type TextAreaComponent = TextArea<'static>;
 
+// TODO:
+// `TextArea` and `TextAreaComponent` likely can be merged.
 impl<'a> TextAreaComponent {
-	fn start_selection(&mut self) {
-		todo!();
-	}
-
-	fn cancel_selection(&mut self) {
-		todo!();
-	}
-
 	fn insert_newline(&mut self) {
-		todo!();
+		let (current_row, current_column) = self.cursor;
+
+		let (_, new_line) =
+			self.lines[current_row].split_at(current_column);
+
+		self.lines.insert(current_row + 1, new_line.into());
+		self.lines[current_row].truncate(current_column);
+		self.cursor = (current_row + 1, 0);
 	}
 
-	fn lines(&self) -> &'a [String] {
-		todo!();
+	fn lines(&'a self) -> &'a [String] {
+		&self.lines
 	}
 }
 
@@ -276,7 +304,6 @@ pub struct TextInputComponent {
 	current_area: Cell<Rect>,
 	embed: bool,
 	textarea: Option<TextAreaComponent>,
-	select_state: SelectionState,
 }
 
 impl TextInputComponent {
@@ -299,7 +326,6 @@ impl TextInputComponent {
 			current_area: Cell::new(Rect::default()),
 			embed: false,
 			textarea: None,
-			select_state: SelectionState::NotSelecting,
 		}
 	}
 
@@ -445,41 +471,6 @@ impl TextInputComponent {
 				.saturating_sub(rect.height.saturating_sub(1));
 
 			f.render_widget(w, rect);
-		}
-	}
-
-	fn should_select(&mut self, input: &Input) {
-		if input.key == Key::Null {
-			return;
-		}
-		// Should we start selecting text, stop the current selection, or do nothing?
-		// the end is handled after the ending keystroke
-
-		match (&self.select_state, input.shift) {
-			(SelectionState::Selecting, true)
-			| (SelectionState::NotSelecting, false) => {
-				// continue selecting or not selecting
-			}
-			(SelectionState::Selecting, false) => {
-				// end select
-				self.select_state =
-					SelectionState::SelectionEndPending;
-			}
-			(SelectionState::NotSelecting, true) => {
-				// start select
-				// this should always work since we are only called
-				// if we have a textarea to get input
-				if let Some(ta) = &mut self.textarea {
-					ta.start_selection();
-					self.select_state = SelectionState::Selecting;
-				}
-			}
-			(SelectionState::SelectionEndPending, _) => {
-				// this really should not happen because the end pending state
-				// should have been picked up in the same pass as it was set
-				// so lets clear it
-				self.select_state = SelectionState::NotSelecting;
-			}
 		}
 	}
 
@@ -661,7 +652,7 @@ impl TextInputComponent {
 				alt: true,
 				..
 			} => {
-				ta.move_cursor(CursorMove::Head);
+				ta.move_cursor(CursorMove::Home);
 				true
 			}
 			Input {
@@ -710,79 +701,7 @@ impl TextInputComponent {
 				ta.move_cursor(CursorMove::Bottom);
 				true
 			}
-			Input {
-				key: Key::Char('f'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Right,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::WordForward);
-				true
-			}
-			Input {
-				key: Key::Char('b'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Left,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::WordBack);
-				true
-			}
 
-			Input {
-				key: Key::Char(']'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Char('n'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Down,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::ParagraphForward);
-				true
-			}
-			Input {
-				key: Key::Char('['),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Char('p'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Up,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::ParagraphBack);
-				true
-			}
 			Input {
 				key: Key::Char('u'),
 				ctrl: true,
@@ -899,7 +818,7 @@ impl Component for TextInputComponent {
 
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		let input = Input::from(ev.clone());
-		self.should_select(&input);
+
 		if let Some(ta) = &mut self.textarea {
 			let modified = if let Event::Key(e) = ev {
 				if key_match(e, self.key_config.keys.exit_popup) {
@@ -918,13 +837,6 @@ impl Component for TextInputComponent {
 			} else {
 				false
 			};
-
-			if self.select_state
-				== SelectionState::SelectionEndPending
-			{
-				ta.cancel_selection();
-				self.select_state = SelectionState::NotSelecting;
-			}
 
 			if modified {
 				self.msg.take();
@@ -965,6 +877,7 @@ mod tests {
 		comp.show_inner_textarea();
 		comp.set_text(String::from("a\nb"));
 		assert!(comp.is_visible());
+
 		if let Some(ta) = &mut comp.textarea {
 			assert_eq!(ta.cursor(), (0, 0));
 
@@ -983,6 +896,7 @@ mod tests {
 		comp.show_inner_textarea();
 		comp.set_text(String::from("a"));
 		assert!(comp.is_visible());
+
 		if let Some(ta) = &mut comp.textarea {
 			let txt = ta.lines();
 			assert_eq!(txt[0].len(), 1);
@@ -997,6 +911,7 @@ mod tests {
 		comp.show_inner_textarea();
 		comp.set_text(String::from("a\nb\nc"));
 		assert!(comp.is_visible());
+
 		if let Some(ta) = &mut comp.textarea {
 			let txt = ta.lines();
 			assert_eq!(txt[0], "a");
@@ -1006,109 +921,94 @@ mod tests {
 	}
 
 	#[test]
-	fn test_next_word_position() {
+	fn test_move_cursor_horizontally() {
 		let env = Environment::test_env();
 		let mut comp = TextInputComponent::new(&env, "", "", false);
 		comp.show_inner_textarea();
 		comp.set_text(String::from("aa b;c"));
 		assert!(comp.is_visible());
-		if let Some(ta) = &mut comp.textarea {
-			// from word start
-			ta.move_cursor(CursorMove::Head);
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 3));
-			// from inside start
-			ta.move_cursor(CursorMove::Forward);
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 5));
-			// to string end
-			ta.move_cursor(CursorMove::Forward);
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 6));
-
-			// from string end
-			ta.move_cursor(CursorMove::Forward);
-			let save_cursor = ta.cursor();
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), save_cursor);
-		}
-	}
-
-	#[test]
-	fn test_previous_word_position() {
-		let env = Environment::test_env();
-		let mut comp = TextInputComponent::new(&env, "", "", false);
-		comp.show_inner_textarea();
-		comp.set_text(String::from(" a bb;c"));
-		assert!(comp.is_visible());
 
 		if let Some(ta) = &mut comp.textarea {
-			// from string end
-			ta.move_cursor(CursorMove::End);
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), (0, 6));
-			// from inside word
-			ta.move_cursor(CursorMove::Back);
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), (0, 3));
-			// from word start
-			ta.move_cursor(CursorMove::WordBack);
+			ta.move_cursor(CursorMove::Home);
+			assert_eq!(ta.cursor(), (0, 0));
+
+			ta.move_cursor(CursorMove::Forward);
 			assert_eq!(ta.cursor(), (0, 1));
-			// to string start
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), (0, 0));
-			// from string start
-			let save_cursor = ta.cursor();
-			ta.move_cursor(CursorMove::WordBack);
 
-			assert_eq!(ta.cursor(), save_cursor);
+			ta.move_cursor(CursorMove::Forward);
+			assert_eq!(ta.cursor(), (0, 2));
+
+			ta.move_cursor(CursorMove::End);
+			assert_eq!(ta.cursor(), (0, 6));
+
+			ta.move_cursor(CursorMove::Back);
+			assert_eq!(ta.cursor(), (0, 5));
+
+			ta.move_cursor(CursorMove::Back);
+			assert_eq!(ta.cursor(), (0, 4));
 		}
 	}
 
 	#[test]
-	fn test_next_word_multibyte() {
+	fn test_move_cursor_vertically() {
 		let env = Environment::test_env();
 		let mut comp = TextInputComponent::new(&env, "", "", false);
-		// should emojis be word boundaries or not?
-		// various editors (vs code, vim) do not agree with the
-		// behavhior of the original textinput here.
-		//
-		// tui-textarea agrees with them.
-		// So these tests are changed to match that behavior
-		// FYI: this line is "a à ❤ab🤯 a"
-
-		//              "01245       89A        EFG"
-		let text = dbg!("a à \u{2764}ab\u{1F92F} a");
 		comp.show_inner_textarea();
-		comp.set_text(String::from(text));
+		comp.set_text(String::from("aa b;c\ndef sa\ngitui"));
 		assert!(comp.is_visible());
 
 		if let Some(ta) = &mut comp.textarea {
-			ta.move_cursor(CursorMove::Head);
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 2));
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 4));
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 9));
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), (0, 10));
-			let save_cursor = ta.cursor();
-			ta.move_cursor(CursorMove::WordForward);
-			assert_eq!(ta.cursor(), save_cursor);
+			ta.move_cursor(CursorMove::Bottom);
+			assert_eq!(ta.cursor(), (3, 0));
 
-			ta.move_cursor(CursorMove::End);
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), (0, 9));
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), (0, 4));
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), (0, 2));
-			ta.move_cursor(CursorMove::WordBack);
+			ta.move_cursor(CursorMove::Up);
+			assert_eq!(ta.cursor(), (2, 0));
+
+			ta.move_cursor(CursorMove::Up);
+			assert_eq!(ta.cursor(), (1, 0));
+
+			ta.move_cursor(CursorMove::Bottom);
+			assert_eq!(ta.cursor(), (3, 0));
+
+			ta.move_cursor(CursorMove::Top);
 			assert_eq!(ta.cursor(), (0, 0));
-			let save_cursor = ta.cursor();
-			ta.move_cursor(CursorMove::WordBack);
-			assert_eq!(ta.cursor(), save_cursor);
+
+			ta.move_cursor(CursorMove::Down);
+			assert_eq!(ta.cursor(), (1, 0));
+
+			ta.move_cursor(CursorMove::Down);
+			assert_eq!(ta.cursor(), (2, 0));
+		}
+	}
+
+	#[test]
+	fn test_insert_newline() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from("aa b;c asdf asdf"));
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			assert_eq!(ta.cursor(), (0, 3));
+
+			ta.insert_newline();
+
+			assert_eq!(ta.lines(), &["aa ", "b;c asdf asdf"]);
+			assert_eq!(ta.cursor(), (1, 0));
+
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			assert_eq!(ta.cursor(), (1, 3));
+
+			ta.insert_newline();
+
+			assert_eq!(ta.lines(), &["aa ", "b;c", " asdf asdf"]);
+			assert_eq!(ta.cursor(), (2, 0));
 		}
 	}
 }
