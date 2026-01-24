@@ -156,16 +156,24 @@ impl<'a> TextArea<'a> {
 		match cursor_move {
 			CursorMove::Top => self.cursor = (0, current_column),
 			CursorMove::Bottom => {
-				self.cursor = (self.lines.len(), current_column);
+				let last_row = self.lines.len() - 1;
+
+				self.cursor = (
+					last_row,
+					current_column.min(self.lines[last_row].len()),
+				);
 			}
 			CursorMove::Up => {
 				self.cursor =
 					(current_row.saturating_sub(1), current_column);
 			}
 			CursorMove::Down => {
+				let new_row =
+					(current_row + 1).min(self.lines.len() - 1);
+
 				self.cursor = (
-					(current_row + 1).min(self.lines.len()),
-					current_column,
+					new_row,
+					current_column.min(self.lines[new_row].len()),
 				);
 			}
 			CursorMove::Back => {
@@ -851,7 +859,7 @@ mod tests {
 		let env = Environment::test_env();
 		let mut comp = TextInputComponent::new(&env, "", "", false);
 		comp.show_inner_textarea();
-		comp.set_text(String::from("a\nb"));
+		comp.set_text(String::from("ab\nb"));
 		assert!(comp.is_visible());
 
 		if let Some(ta) = &mut comp.textarea {
@@ -935,22 +943,25 @@ mod tests {
 
 		if let Some(ta) = &mut comp.textarea {
 			ta.move_cursor(CursorMove::Bottom);
-			assert_eq!(ta.cursor(), (3, 0));
-
-			ta.move_cursor(CursorMove::Up);
 			assert_eq!(ta.cursor(), (2, 0));
 
 			ta.move_cursor(CursorMove::Up);
 			assert_eq!(ta.cursor(), (1, 0));
 
+			ta.move_cursor(CursorMove::Up);
+			assert_eq!(ta.cursor(), (0, 0));
+
 			ta.move_cursor(CursorMove::Bottom);
-			assert_eq!(ta.cursor(), (3, 0));
+			assert_eq!(ta.cursor(), (2, 0));
 
 			ta.move_cursor(CursorMove::Top);
 			assert_eq!(ta.cursor(), (0, 0));
 
 			ta.move_cursor(CursorMove::Down);
 			assert_eq!(ta.cursor(), (1, 0));
+
+			ta.move_cursor(CursorMove::Down);
+			assert_eq!(ta.cursor(), (2, 0));
 
 			ta.move_cursor(CursorMove::Down);
 			assert_eq!(ta.cursor(), (2, 0));
