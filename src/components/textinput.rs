@@ -216,7 +216,21 @@ impl<'a> TextArea<'a> {
 	}
 
 	fn delete_char(&mut self) {
-		todo!();
+		let (current_row, current_column) = self.cursor;
+
+		if current_column > 0 {
+			self.lines[current_row]
+				.remove(current_column.saturating_sub(1));
+			self.cursor = (current_row, current_column - 1);
+		} else if current_row > 0 {
+			let current_line = self.lines[current_row].clone();
+			self.lines[current_row - 1].push_str(&current_line);
+			self.lines.remove(current_row);
+			self.cursor =
+				(current_row - 1, self.lines[current_row - 1].len());
+		} else {
+			// We're at (0, 0), there's no characters to be deleted. Do nothing.
+		}
 	}
 
 	fn insert_tab(&mut self) {
@@ -996,6 +1010,57 @@ mod tests {
 
 			assert_eq!(ta.lines(), &["aa ", "b;c", " asdf asdf"]);
 			assert_eq!(ta.cursor(), (2, 0));
+		}
+	}
+
+	#[test]
+	fn test_delete_char() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from("aa b;c\ndef sa\ngitui"));
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::Bottom);
+			ta.move_cursor(CursorMove::End);
+			assert_eq!(ta.cursor(), (2, 5));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def sa", "gitu"]);
+			assert_eq!(ta.cursor(), (2, 4));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def sa", "git"]);
+			assert_eq!(ta.cursor(), (2, 3));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def sa", "gi"]);
+			assert_eq!(ta.cursor(), (2, 2));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def sa", "g"]);
+			assert_eq!(ta.cursor(), (2, 1));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def sa", ""]);
+			assert_eq!(ta.cursor(), (2, 0));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def sa"]);
+			assert_eq!(ta.cursor(), (1, 6));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def s"]);
+			assert_eq!(ta.cursor(), (1, 5));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aa b;c", "def "]);
+			assert_eq!(ta.cursor(), (1, 4));
+
+			ta.insert_char('g');
+			assert_eq!(ta.lines(), &["aa b;c", "def g"]);
+			assert_eq!(ta.cursor(), (1, 5));
 		}
 	}
 }
