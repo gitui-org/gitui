@@ -404,16 +404,16 @@ impl<'a> TextAreaComponent {
 
 impl DrawableComponent for TextAreaComponent {
 	fn draw(&self, f: &mut Frame, rect: Rect) -> Result<()> {
-		let rect = self.block.as_ref().map_or(rect, |block| {
+		let inner_rect = self.block.as_ref().map_or(rect, |block| {
 			block.render_ref(rect, f.buffer_mut());
 
 			block.inner(rect)
 		});
 
 		if self.is_empty() && !self.placeholder.is_empty() {
-			self.draw_placeholder(f, rect);
+			self.draw_placeholder(f, inner_rect);
 		} else {
-			self.draw_lines(f, rect);
+			self.draw_lines(f, inner_rect);
 		}
 
 		self.scroll.draw(f, rect, &self.theme);
