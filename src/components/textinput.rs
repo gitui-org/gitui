@@ -15,11 +15,12 @@ use anyhow::Result;
 use crossterm::event::{
 	Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
 };
+use ratatui::text::{Line, Text};
+use ratatui::widgets::WidgetRef;
 use ratatui::{
-	buffer::Buffer,
 	layout::{Alignment, Rect},
 	style::Style,
-	widgets::{Block, Borders, Widget, WidgetRef},
+	widgets::{Block, Borders},
 	widgets::{Clear, Paragraph},
 	Frame,
 };
@@ -124,16 +125,18 @@ struct TextArea<'a> {
 	/// 0-based (row, column)
 	cursor: (usize, usize),
 	placeholder: String,
+	theme: SharedTheme,
 	scroll: VerticalScroll,
 }
 
 impl<'a> TextArea<'a> {
-	const fn new(lines: Vec<String>) -> Self {
+	const fn new(lines: Vec<String>, theme: SharedTheme) -> Self {
 		Self {
 			lines,
 			block: None,
 			cursor: (0, 0),
 			placeholder: String::new(),
+			theme,
 			scroll: VerticalScroll::new(),
 		}
 	}
@@ -212,8 +215,11 @@ impl<'a> TextArea<'a> {
 		todo!();
 	}
 
-	fn insert_char(&mut self, _char: char) {
-		todo!();
+	fn insert_char(&mut self, char: char) {
+		let (current_row, current_column) = self.cursor;
+
+		self.lines[current_row].insert(current_column, char);
+		self.cursor = (current_row, current_column + 1);
 	}
 
 	fn set_block(&mut self, block: Block<'a>) {
@@ -262,18 +268,28 @@ impl<'a> TextAreaComponent {
 	}
 }
 
-impl Widget for TextAreaComponent {
-	fn render(self, _area: Rect, _buf: &mut Buffer)
-	where
-		Self: Sized,
-	{
-		todo!()
-	}
-}
+impl DrawableComponent for TextAreaComponent {
+	fn draw(&self, f: &mut Frame, rect: Rect) -> Result<()> {
+		let lines: Vec<_> = self
+			.lines
+			.iter()
+			.skip(self.scroll.get_top())
+			.map(|line| Line::from(line.clone()))
+			.collect();
+		let paragraph = Paragraph::new(Text::from(lines));
 
-impl WidgetRef for TextAreaComponent {
-	fn render_ref(&self, _area: Rect, _buf: &mut Buffer) {
-		todo!()
+		if let Some(block) = &self.block {
+			block.render_ref(rect, f.buffer_mut());
+
+			let rect = block.inner(rect);
+			f.render_widget(paragraph, rect);
+		} else {
+			f.render_widget(paragraph, rect);
+		};
+
+		self.scroll.draw(f, rect, &self.theme);
+
+		Ok(())
 	}
 }
 
@@ -384,7 +400,8 @@ impl TextInputComponent {
 			.collect();
 
 		self.textarea = Some({
-			let mut text_area = TextArea::new(lines);
+			let mut text_area =
+				TextArea::new(lines, self.theme.clone());
 			if self.input_type == InputType::Password {
 				text_area.set_mask_char('*');
 			}
@@ -743,7 +760,7 @@ impl DrawableComponent for TextInputComponent {
 
 			f.render_widget(Clear, area);
 
-			f.render_widget(ta, area);
+			ta.draw(f, area)?;
 
 			if self.show_char_count {
 				self.draw_char_count(f, area);
