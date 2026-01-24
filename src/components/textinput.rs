@@ -198,14 +198,19 @@ impl<'a> TextArea<'a> {
 			CursorMove::Forward => {
 				self.cursor = (
 					current_row,
-					(current_column + 1)
-						.min(self.lines[current_row].len()),
+					(current_column + 1).min(
+						self.lines[current_row]
+							.char_indices()
+							.count(),
+					),
 				);
 			}
 			CursorMove::Home => self.cursor = (current_row, 0),
 			CursorMove::End => {
-				self.cursor =
-					(current_row, self.lines[current_row].len());
+				self.cursor = (
+					current_row,
+					self.lines[current_row].char_indices().count(),
+				);
 			}
 		}
 	}
@@ -227,22 +232,43 @@ impl<'a> TextArea<'a> {
 	}
 
 	fn delete_next_char(&mut self) {
-		todo!();
+		let (current_row, current_column) = self.cursor;
+		let current_line = &mut self.lines[current_row];
+
+		if current_column < current_line.len() {
+			if let Some((offset, _)) =
+				current_line.char_indices().nth(current_column)
+			{
+				current_line.remove(offset);
+			}
+		} else if current_row < self.lines.len().saturating_sub(1) {
+			let next_line = self.lines[current_row + 1].clone();
+			self.lines[current_row].push_str(&next_line);
+			self.lines.remove(current_row + 1);
+		} else {
+			// We're at the end of the input. Do nothing.
+		}
 	}
 
 	fn delete_char(&mut self) {
 		let (current_row, current_column) = self.cursor;
+		let current_line = &mut self.lines[current_row];
 
 		if current_column > 0 {
-			self.lines[current_row]
-				.remove(current_column.saturating_sub(1));
-			self.cursor = (current_row, current_column - 1);
+			if let Some((offset, _)) =
+				current_line.char_indices().nth(current_column - 1)
+			{
+				current_line.remove(offset);
+				self.cursor = (current_row, current_column - 1);
+			}
 		} else if current_row > 0 {
 			let current_line = self.lines[current_row].clone();
 			self.lines[current_row - 1].push_str(&current_line);
 			self.lines.remove(current_row);
-			self.cursor =
-				(current_row - 1, self.lines[current_row - 1].len());
+			self.cursor = (
+				current_row - 1,
+				self.lines[current_row - 1].char_indices().count(),
+			);
 		} else {
 			// We're at (0, 0), there's no characters to be deleted. Do nothing.
 		}
@@ -254,8 +280,14 @@ impl<'a> TextArea<'a> {
 
 	fn insert_char(&mut self, char: char) {
 		let (current_row, current_column) = self.cursor;
+		let current_line = &mut self.lines[current_row];
 
-		self.lines[current_row].insert(current_column, char);
+		let offset = current_line
+			.char_indices()
+			.nth(current_column)
+			.map_or_else(|| current_line.len(), |(i, _)| i);
+
+		current_line.insert(offset, char);
 		self.cursor = (current_row, current_column + 1);
 	}
 
@@ -321,26 +353,43 @@ impl<'a> TextAreaComponent {
 			.skip(self.scroll.get_top())
 			.map(|(row, line)| {
 				if row == current_row {
-					if current_column == line.len() {
-						Line::from(vec![
+					if current_column == line.char_indices().count() {
+						return Line::from(vec![
 							Span::from(line.clone()),
 							Span::styled(" ", self.cursor_style),
-						])
-					} else {
-						let (before_cursor, cursor) =
-							line.split_at(current_column);
-						let (cursor, after_cursor) =
-							cursor.split_at(1);
+						]);
+					}
 
-						Line::from(vec![
+					if let Some((offset, _)) =
+						line.char_indices().nth(current_column)
+					{
+						let (before_cursor, cursor) =
+							line.split_at(offset);
+
+						if let Some((next_offset, _)) =
+							cursor.char_indices().nth(1)
+						{
+							let (cursor, after_cursor) =
+								cursor.split_at(next_offset);
+
+							return Line::from(vec![
+								Span::from(before_cursor),
+								Span::styled(
+									cursor,
+									self.cursor_style,
+								),
+								Span::from(after_cursor),
+							]);
+						}
+
+						return Line::from(vec![
 							Span::from(before_cursor),
 							Span::styled(cursor, self.cursor_style),
-							Span::from(after_cursor),
-						])
+						]);
 					}
-				} else {
-					Line::from(line.clone())
 				}
+
+				Line::from(line.clone())
 			})
 			.collect();
 		let paragraph = Paragraph::new(Text::from(lines));
@@ -1132,6 +1181,91 @@ mod tests {
 			ta.insert_char('g');
 			assert_eq!(ta.lines(), &["aa b;c", "def g"]);
 			assert_eq!(ta.cursor(), (1, 5));
+		}
+	}
+
+	#[test]
+	fn test_delete_char_unicode() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from("äÜö"));
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::End);
+			assert_eq!(ta.cursor(), (0, 3));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["äÜ"]);
+			assert_eq!(ta.cursor(), (0, 2));
+		}
+	}
+
+	#[test]
+	fn test_delete_next_char() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from("aa\ndef sa\ngitui"));
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			assert_eq!(ta.cursor(), (0, 0));
+
+			ta.delete_next_char();
+			assert_eq!(ta.lines(), &["a", "def sa", "gitui"]);
+			assert_eq!(ta.cursor(), (0, 0));
+
+			ta.delete_next_char();
+			assert_eq!(ta.lines(), &["", "def sa", "gitui"]);
+			assert_eq!(ta.cursor(), (0, 0));
+
+			ta.delete_next_char();
+			assert_eq!(ta.lines(), &["def sa", "gitui"]);
+			assert_eq!(ta.cursor(), (0, 0));
+
+			ta.move_cursor(CursorMove::Down);
+			assert_eq!(ta.cursor(), (1, 0));
+
+			ta.delete_next_char();
+			assert_eq!(ta.lines(), &["def sa", "itui"]);
+			assert_eq!(ta.cursor(), (1, 0));
+		}
+	}
+
+	#[test]
+	fn test_delete_next_char_empty() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text("".into());
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			assert_eq!(ta.cursor(), (0, 0));
+
+			ta.delete_next_char();
+			assert_eq!(ta.lines(), &[""]);
+			assert_eq!(ta.cursor(), (0, 0));
+		}
+	}
+
+	#[test]
+	fn test_delete_next_char_unicode() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text("üäu".into());
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::Forward);
+			assert_eq!(ta.cursor(), (0, 1));
+
+			ta.delete_next_char();
+			assert_eq!(ta.lines(), &["üu"]);
+			assert_eq!(ta.cursor(), (0, 1));
 		}
 	}
 }
