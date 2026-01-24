@@ -15,13 +15,12 @@ use anyhow::Result;
 use crossterm::event::{
 	Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
 };
-use ratatui::text::{Line, Text};
-use ratatui::widgets::WidgetRef;
+use ratatui::text::Span;
 use ratatui::{
 	layout::{Alignment, Rect},
-	style::Style,
-	widgets::{Block, Borders},
-	widgets::{Clear, Paragraph},
+	style::{Modifier, Style},
+	text::{Line, Text},
+	widgets::{Block, Borders, Clear, Paragraph, WidgetRef},
 	Frame,
 };
 use std::cell::{Cell, OnceCell};
@@ -124,6 +123,7 @@ struct TextArea<'a> {
 	block: Option<Block<'a>>,
 	/// 0-based (row, column)
 	cursor: (usize, usize),
+	cursor_style: Style,
 	placeholder: String,
 	theme: SharedTheme,
 	scroll: VerticalScroll,
@@ -141,6 +141,8 @@ impl<'a> TextArea<'a> {
 			lines,
 			block: None,
 			cursor: (0, 0),
+			cursor_style: Style::default()
+				.add_modifier(Modifier::REVERSED),
 			placeholder: String::new(),
 			theme,
 			scroll: VerticalScroll::new(),
@@ -304,11 +306,35 @@ impl<'a> TextAreaComponent {
 	}
 
 	fn draw_lines(&self, f: &mut Frame, rect: Rect) {
+		let (current_row, current_column) = self.cursor;
 		let lines: Vec<_> = self
 			.lines
 			.iter()
+			.enumerate()
 			.skip(self.scroll.get_top())
-			.map(|line| Line::from(line.clone()))
+			.map(|(row, line)| {
+				if row == current_row {
+					if current_column == line.len() {
+						Line::from(vec![
+							Span::from(line.clone()),
+							Span::styled(" ", self.cursor_style),
+						])
+					} else {
+						let (before_cursor, cursor) =
+							line.split_at(current_column);
+						let (cursor, after_cursor) =
+							cursor.split_at(1);
+
+						Line::from(vec![
+							Span::from(before_cursor),
+							Span::styled(cursor, self.cursor_style),
+							Span::from(after_cursor),
+						])
+					}
+				} else {
+					Line::from(line.clone())
+				}
+			})
 			.collect();
 		let paragraph = Paragraph::new(Text::from(lines));
 
