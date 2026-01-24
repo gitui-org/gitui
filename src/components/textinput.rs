@@ -1,4 +1,5 @@
 use crate::app::Environment;
+use crate::components::{ScrollType, VerticalScroll};
 use crate::keys::key_match;
 use crate::ui::Size;
 use crate::{
@@ -42,11 +43,6 @@ enum CursorMove {
 	Forward,
 	Home,
 	End,
-}
-
-enum Scrolling {
-	PageUp,
-	PageDown,
 }
 
 #[derive(Default, PartialEq)]
@@ -128,6 +124,7 @@ struct TextArea<'a> {
 	/// 0-based (row, column)
 	cursor: (usize, usize),
 	placeholder: String,
+	scroll: VerticalScroll,
 }
 
 impl<'a> TextArea<'a> {
@@ -137,11 +134,12 @@ impl<'a> TextArea<'a> {
 			block: None,
 			cursor: (0, 0),
 			placeholder: String::new(),
+			scroll: VerticalScroll::new(),
 		}
 	}
 
-	fn scroll(&mut self, _scrolling: Scrolling) {
-		todo!();
+	fn scroll(&self, scroll_type: ScrollType) -> bool {
+		self.scroll.move_top(scroll_type)
 	}
 
 	#[cfg(test)]
@@ -699,7 +697,7 @@ impl TextInputComponent {
 			| Input {
 				key: Key::PageDown, ..
 			} => {
-				ta.scroll(Scrolling::PageDown);
+				ta.scroll(ScrollType::PageDown);
 				true
 			}
 			Input {
@@ -711,7 +709,7 @@ impl TextInputComponent {
 			| Input {
 				key: Key::PageUp, ..
 			} => {
-				ta.scroll(Scrolling::PageUp);
+				ta.scroll(ScrollType::PageUp);
 				true
 			}
 			_ => false,
