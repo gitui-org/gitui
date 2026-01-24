@@ -130,7 +130,13 @@ struct TextArea<'a> {
 }
 
 impl<'a> TextArea<'a> {
-	const fn new(lines: Vec<String>, theme: SharedTheme) -> Self {
+	fn new(lines: Vec<String>, theme: SharedTheme) -> Self {
+		let lines = if lines.is_empty() {
+			vec![String::new()]
+		} else {
+			lines
+		};
+
 		Self {
 			lines,
 			block: None,
@@ -288,10 +294,16 @@ impl<'a> TextAreaComponent {
 	fn lines(&'a self) -> &'a [String] {
 		&self.lines
 	}
-}
 
-impl DrawableComponent for TextAreaComponent {
-	fn draw(&self, f: &mut Frame, rect: Rect) -> Result<()> {
+	fn draw_placeholder(&self, f: &mut Frame, rect: Rect) {
+		let paragraph = Paragraph::new(Text::from(Line::from(
+			self.placeholder.clone(),
+		)));
+
+		f.render_widget(paragraph, rect);
+	}
+
+	fn draw_lines(&self, f: &mut Frame, rect: Rect) {
 		let lines: Vec<_> = self
 			.lines
 			.iter()
@@ -300,14 +312,27 @@ impl DrawableComponent for TextAreaComponent {
 			.collect();
 		let paragraph = Paragraph::new(Text::from(lines));
 
-		if let Some(block) = &self.block {
+		f.render_widget(paragraph, rect);
+	}
+
+	fn is_empty(&self) -> bool {
+		self.lines == [""]
+	}
+}
+
+impl DrawableComponent for TextAreaComponent {
+	fn draw(&self, f: &mut Frame, rect: Rect) -> Result<()> {
+		let rect = self.block.as_ref().map_or(rect, |block| {
 			block.render_ref(rect, f.buffer_mut());
 
-			let rect = block.inner(rect);
-			f.render_widget(paragraph, rect);
+			block.inner(rect)
+		});
+
+		if self.is_empty() && !self.placeholder.is_empty() {
+			self.draw_placeholder(f, rect);
 		} else {
-			f.render_widget(paragraph, rect);
-		};
+			self.draw_lines(f, rect);
+		}
 
 		self.scroll.draw(f, rect, &self.theme);
 
