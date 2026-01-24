@@ -346,11 +346,18 @@ impl<'a> TextAreaComponent {
 
 	fn draw_lines(&self, f: &mut Frame, rect: Rect) {
 		let (current_row, current_column) = self.cursor;
+
+		let top = self.scroll.update(
+			current_row,
+			self.lines.len(),
+			rect.height.into(),
+		);
+
 		let lines: Vec<_> = self
 			.lines
 			.iter()
 			.enumerate()
-			.skip(self.scroll.get_top())
+			.skip(top)
 			.map(|(row, line)| {
 				if row == current_row {
 					if current_column == line.char_indices().count() {
