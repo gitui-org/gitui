@@ -1,5 +1,5 @@
 use crate::app::Environment;
-use crate::components::{ScrollType, VerticalScroll};
+use crate::components::VerticalScroll;
 use crate::keys::key_match;
 use crate::ui::Size;
 use crate::{
@@ -43,6 +43,8 @@ enum CursorMove {
 	Forward,
 	Home,
 	End,
+	PageUp,
+	PageDown,
 }
 
 #[derive(Default, PartialEq)]
@@ -149,10 +151,6 @@ impl<'a> TextArea<'a> {
 		}
 	}
 
-	fn scroll(&self, scroll_type: ScrollType) -> bool {
-		self.scroll.move_top(scroll_type)
-	}
-
 	#[cfg(test)]
 	fn cursor(&mut self) -> (usize, usize) {
 		self.cursor
@@ -210,6 +208,25 @@ impl<'a> TextArea<'a> {
 				self.cursor = (
 					current_row,
 					self.lines[current_row].char_indices().count(),
+				);
+			}
+			CursorMove::PageUp => {
+				let new_row = current_row
+					.saturating_sub(self.scroll.get_visual_height());
+
+				self.cursor = (
+					new_row,
+					current_column.min(self.lines[new_row].len()),
+				);
+			}
+			CursorMove::PageDown => {
+				let new_row = (current_row
+					+ self.scroll.get_visual_height())
+				.min(self.lines.len().saturating_sub(1));
+
+				self.cursor = (
+					new_row,
+					current_column.min(self.lines[new_row].len()),
 				);
 			}
 		}
@@ -855,7 +872,7 @@ impl TextInputComponent {
 			| Input {
 				key: Key::PageDown, ..
 			} => {
-				ta.scroll(ScrollType::PageDown);
+				ta.move_cursor(CursorMove::PageDown);
 				true
 			}
 			Input {
@@ -867,7 +884,7 @@ impl TextInputComponent {
 			| Input {
 				key: Key::PageUp, ..
 			} => {
-				ta.scroll(ScrollType::PageUp);
+				ta.move_cursor(CursorMove::PageUp);
 				true
 			}
 			_ => false,
@@ -1111,6 +1128,37 @@ mod tests {
 
 			ta.move_cursor(CursorMove::Top);
 			assert_eq!(ta.cursor(), (0, 3));
+		}
+	}
+
+	#[test]
+	fn test_move_cursor_vertically_page_up_down() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from(
+			"aa \nd\ngitui\nasdf\ndf\ndfsdf\nsdfsdfsdfsdf",
+		));
+		assert!(comp.is_visible());
+
+		let test_backend =
+			ratatui::backend::TestBackend::new(100, 100);
+		let mut terminal = ratatui::Terminal::new(test_backend)
+			.expect("Unable to set up terminal");
+		let mut frame = terminal.get_frame();
+		let rect = Rect::new(0, 0, 10, 5);
+
+		// we call draw once before running the actual test as the component only learns its dimensions
+		// in a `draw` call. It needs to learn its dimensions because `PageUp` and `PageDown` rely on
+		// them for calculating how far to move the cursor.
+		comp.draw(&mut frame, rect).expect("draw not to fail");
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::PageDown);
+			assert_eq!(ta.cursor(), (6, 0));
+
+			ta.move_cursor(CursorMove::PageUp);
+			assert_eq!(ta.cursor(), (0, 0));
 		}
 	}
 
