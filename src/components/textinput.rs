@@ -242,9 +242,8 @@ impl<'a> TextArea<'a> {
 				current_line.remove(offset);
 			}
 		} else if current_row < self.lines.len().saturating_sub(1) {
-			let next_line = self.lines[current_row + 1].clone();
+			let next_line = self.lines.remove(current_row + 1);
 			self.lines[current_row].push_str(&next_line);
-			self.lines.remove(current_row + 1);
 		} else {
 			// We're at the end of the input. Do nothing.
 		}
@@ -262,13 +261,14 @@ impl<'a> TextArea<'a> {
 				self.cursor = (current_row, current_column - 1);
 			}
 		} else if current_row > 0 {
-			let current_line = self.lines[current_row].clone();
-			self.lines[current_row - 1].push_str(&current_line);
-			self.lines.remove(current_row);
-			self.cursor = (
-				current_row - 1,
-				self.lines[current_row - 1].char_indices().count(),
-			);
+			let current_line = self.lines.remove(current_row);
+
+			let previous_line = &mut self.lines[current_row - 1];
+			let previous_line_length =
+				previous_line.char_indices().count();
+
+			previous_line.push_str(&current_line);
+			self.cursor = (current_row - 1, previous_line_length);
 		} else {
 			// We're at (0, 0), there's no characters to be deleted. Do nothing.
 		}
@@ -1242,6 +1242,24 @@ mod tests {
 			ta.delete_char();
 			assert_eq!(ta.lines(), &["äÜ"]);
 			assert_eq!(ta.cursor(), (0, 2));
+		}
+	}
+
+	#[test]
+	fn test_delete_char_cursor_position() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from("aasd\nfdfsd\nölkj"));
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::Bottom);
+			assert_eq!(ta.cursor(), (2, 0));
+
+			ta.delete_char();
+			assert_eq!(ta.lines(), &["aasd", "fdfsdölkj"]);
+			assert_eq!(ta.cursor(), (1, 5));
 		}
 	}
 
