@@ -233,22 +233,6 @@ impl<'a> TextArea<'a> {
 		}
 	}
 
-	fn delete_next_word(&mut self) {
-		todo!();
-	}
-
-	fn delete_word(&mut self) {
-		todo!();
-	}
-
-	fn delete_line_by_head(&mut self) {
-		todo!();
-	}
-
-	fn delete_line_by_end(&mut self) {
-		todo!();
-	}
-
 	fn delete_next_char(&mut self) {
 		let (current_row, current_column) = self.cursor;
 		let current_line = &mut self.lines[current_row];
@@ -290,10 +274,6 @@ impl<'a> TextArea<'a> {
 		} else {
 			// We're at (0, 0), there's no characters to be deleted. Do nothing.
 		}
-	}
-
-	fn insert_tab(&mut self) {
-		todo!();
 	}
 
 	fn insert_char(&mut self, char: char) {
@@ -650,15 +630,6 @@ impl TextInputComponent {
 				true
 			}
 			Input {
-				key: Key::Tab,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
-				ta.insert_tab();
-				true
-			}
-			Input {
 				key: Key::Char('h'),
 				ctrl: true,
 				alt: false,
@@ -686,60 +657,6 @@ impl TextInputComponent {
 				..
 			} => {
 				ta.delete_next_char();
-				true
-			}
-			Input {
-				key: Key::Char('k'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.delete_line_by_end();
-				true
-			}
-			Input {
-				key: Key::Char('j'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.delete_line_by_head();
-				true
-			}
-			Input {
-				key: Key::Char('w'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Char('h'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Backspace,
-				ctrl: false,
-				alt: true,
-				..
-			} => {
-				ta.delete_word();
-				true
-			}
-			Input {
-				key: Key::Delete,
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Char('d'),
-				ctrl: false,
-				alt: true,
-				..
-			} => {
-				ta.delete_next_word();
 				true
 			}
 			Input {
