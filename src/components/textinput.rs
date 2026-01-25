@@ -22,7 +22,9 @@ use ratatui::{
 	widgets::{Block, Borders, Clear, Paragraph, WidgetRef},
 	Frame,
 };
+use std::borrow::Cow;
 use std::cell::{Cell, OnceCell};
+use std::iter::repeat_n;
 
 ///
 #[derive(PartialEq, Eq)]
@@ -127,6 +129,7 @@ struct TextArea<'a> {
 	cursor_style: Style,
 	placeholder: String,
 	placeholder_style: Style,
+	mask_char: Option<char>,
 	theme: SharedTheme,
 	scroll: VerticalScroll,
 }
@@ -147,6 +150,7 @@ impl<'a> TextArea<'a> {
 				.add_modifier(Modifier::REVERSED),
 			placeholder: String::new(),
 			placeholder_style: Style::default().fg(Color::DarkGray),
+			mask_char: None,
 			theme,
 			scroll: VerticalScroll::new(),
 		}
@@ -309,8 +313,8 @@ impl<'a> TextArea<'a> {
 		// Do nothing, implement or remove.
 	}
 
-	fn set_mask_char(&mut self, _char: char) {
-		todo!();
+	fn set_mask_char(&mut self, mask_char: char) {
+		self.mask_char = Some(mask_char);
 	}
 }
 
@@ -363,6 +367,14 @@ impl<'a> TextAreaComponent {
 			.enumerate()
 			.skip(top)
 			.map(|(row, line)| {
+				let line: Cow<'_, str> = self.mask_char.map_or_else(
+					|| line.into(),
+					|mask_char| {
+						repeat_n(mask_char, line.chars().count())
+							.collect()
+					},
+				);
+
 				if row == current_row {
 					if current_column == line.char_indices().count() {
 						return Line::from(vec![
@@ -384,18 +396,21 @@ impl<'a> TextAreaComponent {
 								cursor.split_at(next_offset);
 
 							return Line::from(vec![
-								Span::from(before_cursor),
+								Span::from(before_cursor.to_string()),
 								Span::styled(
-									cursor,
+									cursor.to_string(),
 									self.cursor_style,
 								),
-								Span::from(after_cursor),
+								Span::from(after_cursor.to_string()),
 							]);
 						}
 
 						return Line::from(vec![
-							Span::from(before_cursor),
-							Span::styled(cursor, self.cursor_style),
+							Span::from(before_cursor.to_string()),
+							Span::styled(
+								cursor.to_string(),
+								self.cursor_style,
+							),
 						]);
 					}
 				}
