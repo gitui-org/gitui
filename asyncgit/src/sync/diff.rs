@@ -131,6 +131,7 @@ pub struct FileDiff {
 #[derive(
 	Debug, Hash, Clone, Copy, PartialEq, Eq, Serialize, Deserialize,
 )]
+#[serde(default)]
 pub struct DiffOptions {
 	/// see <https://libgit2.org/libgit2/#HEAD/type/git_diff_options>
 	pub ignore_whitespace: bool,

@@ -1,3 +1,5 @@
+use crate::args::get_app_config_path;
+
 use anyhow::Result;
 use asyncgit::sync::{
 	diff::DiffOptions, repo_dir, RepoPathRef,
@@ -17,6 +19,7 @@ use std::{
 };
 
 #[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(default)]
 struct OptionsData {
 	pub tab: usize,
 	pub diff: DiffOptions,
@@ -25,6 +28,8 @@ struct OptionsData {
 }
 
 const COMMIT_MSG_HISTORY_LENGTH: usize = 20;
+
+const OPTIONS_FILENAME: &str = "gitui.ron";
 
 #[derive(Clone)]
 pub struct Options {
@@ -144,9 +149,18 @@ impl Options {
 	}
 
 	fn read(repo: &RepoPathRef) -> Result<OptionsData> {
-		let dir = Self::options_file(repo)?;
+		let local_file = Self::options_file(repo)?;
 
-		let mut f = File::open(dir)?;
+		// Precedence: local -> global (respects GITUI_CONFIG_DIR)
+		let mut f = match File::open(&local_file) {
+			Ok(file) => file,
+			Err(_) => {
+				let app_home = get_app_config_path()?;
+				let global_file = app_home.join(OPTIONS_FILENAME);
+				File::open(global_file)?
+			}
+		};
+
 		let mut buffer = Vec::new();
 		f.read_to_end(&mut buffer)?;
 		Ok(from_bytes(&buffer)?)
@@ -165,7 +179,49 @@ impl Options {
 
 	fn options_file(repo: &RepoPathRef) -> Result<PathBuf> {
 		let dir = repo_dir(&repo.borrow())?;
-		let dir = dir.join("gitui");
+		let dir = dir.join(OPTIONS_FILENAME);
 		Ok(dir)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::{env, fs};
+
+	#[test]
+	fn read_falls_back_to_global_config() {
+		let global_dir = tempfile::tempdir().unwrap();
+		let global_file =
+			global_dir.path().join(OPTIONS_FILENAME);
+		fs::write(
+			&global_file,
+			"(diff: (ignore_whitespace: true))",
+		)
+		.unwrap();
+
+		env::set_var(
+			"GITUI_CONFIG_DIR",
+			global_dir.path().to_str().unwrap(),
+		);
+
+		// Init a real git repo so repo_dir() works
+		let repo_dir = tempfile::tempdir().unwrap();
+		std::process::Command::new("git")
+			.args(["init"])
+			.current_dir(repo_dir.path())
+			.output()
+			.unwrap();
+		let git_dir = repo_dir.path().join(".git");
+		let repo = RefCell::new(
+			asyncgit::sync::RepoPath::Path(
+				git_dir.to_path_buf(),
+			),
+		);
+
+		let data = Options::read(&repo).unwrap();
+		assert!(data.diff.ignore_whitespace);
+
+		env::remove_var("GITUI_CONFIG_DIR");
 	}
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* support global options file and `GITUI_CONFIG_DIR` / `--config-dir` [[@amaanq](https://github.com/amaanq)] ([#2852](https://github.com/gitui-org/gitui/pull/2852))
+
 ## [0.28.0] - 2025-12-14
 
 **discard changes on checkout**

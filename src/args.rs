@@ -22,6 +22,7 @@ const GIT_DIR_FLAG_ID: &str = "directory";
 const WATCHER_FLAG_ID: &str = "watcher";
 const KEY_BINDINGS_FLAG_ID: &str = "key_bindings";
 const KEY_SYMBOLS_FLAG_ID: &str = "key_symbols";
+const CONFIG_DIR_FLAG_ID: &str = "config_dir";
 const DEFAULT_THEME: &str = "theme.ron";
 const DEFAULT_GIT_DIR: &str = ".";
 
@@ -67,6 +68,13 @@ pub fn process_cmdline() -> Result<CliArgs> {
 	} else {
 		RepoPath::Path(gitdir)
 	};
+
+	// Set GITUI_CONFIG_DIR env var early so get_app_config_path() picks it up
+	if let Some(config_dir) =
+		arg_matches.get_one::<String>(CONFIG_DIR_FLAG_ID)
+	{
+		env::set_var("GITUI_CONFIG_DIR", config_dir);
+	}
 
 	let arg_theme = arg_matches
 		.get_one::<String>(THEME_FLAG_ID)
@@ -132,6 +140,15 @@ fn app() -> ClapApp {
 				.short('s')
 				.long("key-symbols")
 				.value_name("KEY_SYMBOLS_FILENAME")
+				.num_args(1),
+		)
+		.arg(
+			Arg::new(CONFIG_DIR_FLAG_ID)
+				.help("Use a custom config directory")
+				.short('c')
+				.long("config-dir")
+				.env("GITUI_CONFIG_DIR")
+				.value_name("CONFIG_DIR")
 				.num_args(1),
 		)
 		.arg(
@@ -227,6 +244,11 @@ fn get_app_cache_path() -> Result<PathBuf> {
 }
 
 pub fn get_app_config_path() -> Result<PathBuf> {
+	// Check GITUI_CONFIG_DIR first, then fall back to default
+	if let Ok(config_dir) = env::var("GITUI_CONFIG_DIR") {
+		return Ok(PathBuf::from(config_dir));
+	}
+
 	let mut path = if cfg!(target_os = "macos") {
 		dirs::home_dir().map(|h| h.join(".config"))
 	} else {
@@ -238,7 +260,31 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 	Ok(path)
 }
 
-#[test]
-fn verify_app() {
-	app().debug_assert();
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::env;
+
+	#[test]
+	fn verify_app() {
+		app().debug_assert();
+	}
+
+	// env var tests must be serial since they mutate process state
+	#[test]
+	fn config_path_env_var_and_fallback() {
+		// with env var set, should return the custom path
+		let custom = "/tmp/gitui-test-config";
+		env::set_var("GITUI_CONFIG_DIR", custom);
+		let path = get_app_config_path().unwrap();
+		assert_eq!(path, PathBuf::from(custom));
+
+		// without env var, should fall back to default
+		env::remove_var("GITUI_CONFIG_DIR");
+		let path = get_app_config_path().unwrap();
+		assert!(
+			path.ends_with("gitui"),
+			"expected path ending in 'gitui', got: {path:?}"
+		);
+	}
 }
