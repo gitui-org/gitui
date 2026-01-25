@@ -15,11 +15,10 @@ use anyhow::Result;
 use crossterm::event::{
 	Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
 };
-use ratatui::text::Span;
 use ratatui::{
 	layout::{Alignment, Rect},
-	style::{Modifier, Style},
-	text::{Line, Text},
+	style::{Color, Modifier, Style},
+	text::{Line, Span, Text},
 	widgets::{Block, Borders, Clear, Paragraph, WidgetRef},
 	Frame,
 };
@@ -127,6 +126,7 @@ struct TextArea<'a> {
 	cursor: (usize, usize),
 	cursor_style: Style,
 	placeholder: String,
+	placeholder_style: Style,
 	theme: SharedTheme,
 	scroll: VerticalScroll,
 }
@@ -146,6 +146,7 @@ impl<'a> TextArea<'a> {
 			cursor_style: Style::default()
 				.add_modifier(Modifier::REVERSED),
 			placeholder: String::new(),
+			placeholder_style: Style::default().fg(Color::DarkGray),
 			theme,
 			scroll: VerticalScroll::new(),
 		}
@@ -320,8 +321,8 @@ impl<'a> TextArea<'a> {
 		self.placeholder = placeholder;
 	}
 
-	fn set_placeholder_style(&mut self, _style: Style) {
-		// Do nothing, implement or remove.
+	fn set_placeholder_style(&mut self, placeholder_style: Style) {
+		self.placeholder_style = placeholder_style;
 	}
 
 	fn set_cursor_line_style(&mut self, _style: Style) {
@@ -361,7 +362,8 @@ impl<'a> TextAreaComponent {
 	fn draw_placeholder(&self, f: &mut Frame, rect: Rect) {
 		let paragraph = Paragraph::new(Text::from(Line::from(
 			self.placeholder.clone(),
-		)));
+		)))
+		.style(self.placeholder_style);
 
 		f.render_widget(paragraph, rect);
 	}
