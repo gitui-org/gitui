@@ -311,10 +311,6 @@ impl<'a> TextArea<'a> {
 		self.placeholder_style = placeholder_style;
 	}
 
-	fn set_cursor_line_style(&mut self, _style: Style) {
-		// Do nothing, implement or remove.
-	}
-
 	fn set_mask_char(&mut self, mask_char: char) {
 		self.mask_char = Some(mask_char);
 	}
@@ -564,8 +560,6 @@ impl TextInputComponent {
 				text_area.set_mask_char('*');
 			}
 
-			text_area
-				.set_cursor_line_style(self.theme.text(true, false));
 			text_area.set_placeholder_text(self.default_msg.clone());
 			text_area.set_placeholder_style(
 				self.theme
