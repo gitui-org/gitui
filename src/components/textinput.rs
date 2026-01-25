@@ -124,6 +124,7 @@ impl From<KeyEvent> for Input {
 struct TextArea<'a> {
 	lines: Vec<String>,
 	block: Option<Block<'a>>,
+	style: Style,
 	/// 0-based (row, column)
 	cursor: (usize, usize),
 	cursor_style: Style,
@@ -145,6 +146,7 @@ impl<'a> TextArea<'a> {
 		Self {
 			lines,
 			block: None,
+			style: Style::default(),
 			cursor: (0, 0),
 			cursor_style: Style::default()
 				.add_modifier(Modifier::REVERSED),
@@ -297,8 +299,8 @@ impl<'a> TextArea<'a> {
 		self.block = Some(block);
 	}
 
-	fn set_style(&mut self, _style: Style) {
-		// Do nothing, implement or remove.
+	fn set_style(&mut self, style: Style) {
+		self.style = style;
 	}
 
 	fn set_placeholder_text(&mut self, placeholder: String) {
@@ -418,7 +420,8 @@ impl<'a> TextAreaComponent {
 				Line::from(line.clone())
 			})
 			.collect();
-		let paragraph = Paragraph::new(Text::from(lines));
+		let paragraph =
+			Paragraph::new(Text::from(lines)).style(self.style);
 
 		f.render_widget(paragraph, rect);
 	}
