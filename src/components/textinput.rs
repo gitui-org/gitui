@@ -323,12 +323,17 @@ type TextAreaComponent = TextArea<'static>;
 impl<'a> TextAreaComponent {
 	fn insert_newline(&mut self) {
 		let (current_row, current_column) = self.cursor;
+		let current_line = &self.lines[current_row];
 
-		let (_, new_line) =
-			self.lines[current_row].split_at(current_column);
+		let offset = current_line
+			.char_indices()
+			.nth(current_column)
+			.map_or_else(|| current_line.len(), |(i, _)| i);
 
-		self.lines.insert(current_row + 1, new_line.into());
-		self.lines[current_row].truncate(current_column);
+		let new_line = current_line[offset..].to_string();
+
+		self.lines.insert(current_row + 1, new_line);
+		self.lines[current_row].truncate(offset);
 		self.cursor = (current_row + 1, 0);
 	}
 
@@ -1136,6 +1141,37 @@ mod tests {
 			ta.insert_newline();
 
 			assert_eq!(ta.lines(), &["aa ", "b;c", " asdf asdf"]);
+			assert_eq!(ta.cursor(), (2, 0));
+		}
+	}
+
+	#[test]
+	fn test_insert_newline_unicode() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text(String::from("äaä b;ö üü"));
+		assert!(comp.is_visible());
+
+		if let Some(ta) = &mut comp.textarea {
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			assert_eq!(ta.cursor(), (0, 3));
+
+			ta.insert_newline();
+
+			assert_eq!(ta.lines(), &["äaä", " b;ö üü"]);
+			assert_eq!(ta.cursor(), (1, 0));
+
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			ta.move_cursor(CursorMove::Forward);
+			assert_eq!(ta.cursor(), (1, 3));
+
+			ta.insert_newline();
+
+			assert_eq!(ta.lines(), &["äaä", " b;", "ö üü"]);
 			assert_eq!(ta.cursor(), (2, 0));
 		}
 	}
