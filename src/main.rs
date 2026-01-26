@@ -170,9 +170,12 @@ fn main() -> Result<()> {
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
 
-	let key_config = KeyConfig::init()
-		.map_err(|e| log_eprintln!("KeyConfig loading error: {e}"))
-		.unwrap_or_default();
+	let key_config = KeyConfig::init(
+		cliargs.key_bindings_path.as_ref(),
+		cliargs.key_symbols_path.as_ref(),
+	)
+	.map_err(|e| log_eprintln!("KeyConfig loading error: {e}"))
+	.unwrap_or_default();
 	let theme = Theme::init(&cliargs.theme);
 
 	setup_terminal()?;
@@ -212,6 +215,8 @@ fn main() -> Result<()> {
 					select_file: None,
 					theme: args.theme,
 					notify_watcher: args.notify_watcher,
+					key_bindings_path: args.key_bindings_path,
+					key_symbols_path: args.key_symbols_path,
 				}
 			}
 			_ => break,

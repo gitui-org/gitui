@@ -1,6 +1,6 @@
 [package]
 name = "filetreelist"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["extrawurst <mail@rusticorn.com>"]
 edition = "2021"
 description = "filetree abstraction based on a sorted path list, supports key based navigation events, folding, scrolling and more"

@@ -38,7 +38,7 @@ pub use error::HooksError;
 use error::Result;
 use hookspath::HookPaths;
 
-use git2::Repository;
+use git2::{Oid, Repository};
 
 pub const HOOK_POST_COMMIT: &str = "post-commit";
 pub const HOOK_PRE_COMMIT: &str = "pre-commit";
@@ -48,37 +48,98 @@ pub const HOOK_PRE_PUSH: &str = "pre-push";
 
 const HOOK_COMMIT_MSG_TEMP_FILE: &str = "COMMIT_EDITMSG";
 
+/// Check if a given hook is present considering config/paths and optional extra paths.
+pub fn hook_available(
+	repo: &Repository,
+	other_paths: Option<&[&str]>,
+	hook: &str,
+) -> Result<bool> {
+	let hook = HookPaths::new(repo, other_paths, hook)?;
+	Ok(hook.found())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrePushRef {
+	pub local_ref: String,
+	pub local_oid: Option<Oid>,
+	pub remote_ref: String,
+	pub remote_oid: Option<Oid>,
+}
+
+impl PrePushRef {
+	pub fn new(
+		local_ref: impl Into<String>,
+		local_oid: Option<Oid>,
+		remote_ref: impl Into<String>,
+		remote_oid: Option<Oid>,
+	) -> Self {
+		Self {
+			local_ref: local_ref.into(),
+			local_oid,
+			remote_ref: remote_ref.into(),
+			remote_oid,
+		}
+	}
+
+	fn format_oid(oid: Option<Oid>) -> String {
+		// "If the foreign ref does not yet exist the <remote-object-name> will be the all-zeroes object name"
+		// see https://git-scm.com/docs/githooks#_pre_push
+		oid.map_or_else(|| "0".repeat(40), |id| id.to_string())
+	}
+
+	pub fn to_line(&self) -> String {
+		format!(
+			"{} {} {} {}",
+			self.local_ref,
+			Self::format_oid(self.local_oid),
+			self.remote_ref,
+			Self::format_oid(self.remote_oid)
+		)
+	}
+
+	/// Build stdin content from a slice of updates (for pre-push hook)
+	pub fn to_stdin(updates: &[Self]) -> String {
+		let mut stdin = String::new();
+		for update in updates {
+			stdin.push_str(&update.to_line());
+			stdin.push('\n');
+		}
+		stdin
+	}
+}
+
+/// Response from running a hook
+#[derive(Debug, PartialEq, Eq)]
+pub struct HookRunResponse {
+	/// path of the hook that was run
+	pub hook: PathBuf,
+	/// stdout output emitted by hook
+	pub stdout: String,
+	/// stderr output emitted by hook
+	pub stderr: String,
+	/// exit code as reported back from process calling the hook (0 = success)
+	pub code: i32,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum HookResult {
 	/// No hook found
 	NoHookFound,
-	/// Hook executed with non error return code
-	Ok {
-		/// path of the hook that was run
-		hook: PathBuf,
-	},
-	/// Hook executed and returned an error code
-	RunNotSuccessful {
-		/// exit code as reported back from process calling the hook
-		code: Option<i32>,
-		/// stderr output emitted by hook
-		stdout: String,
-		/// stderr output emitted by hook
-		stderr: String,
-		/// path of the hook that was run
-		hook: PathBuf,
-	},
+	/// Hook executed (check `HookRunResponse.code` for success/failure)
+	Run(HookRunResponse),
 }
 
 impl HookResult {
-	/// helper to check if result is ok
-	pub const fn is_ok(&self) -> bool {
-		matches!(self, Self::Ok { .. })
+	/// helper to check if hook ran successfully (found and exit code 0)
+	pub const fn is_successful(&self) -> bool {
+		matches!(self, Self::Run(response) if response.is_successful())
 	}
+}
 
-	/// helper to check if result was run and not rejected
-	pub const fn is_not_successful(&self) -> bool {
-		matches!(self, Self::RunNotSuccessful { .. })
+impl HookRunResponse {
+	/// Check if the hook succeeded (exit code 0)
+	pub const fn is_successful(&self) -> bool {
+		self.code == 0
 	}
 }
 
@@ -172,9 +233,23 @@ pub fn hooks_post_commit(
 }
 
 /// this hook is documented here <https://git-scm.com/docs/githooks#_pre_push>
+///
+/// According to git documentation, pre-push hook receives:
+/// - remote name as first argument (or URL if remote is not named)
+/// - remote URL as second argument
+/// - information about refs being pushed via stdin in format:
+///   `<local-ref> SP <local-object-name> SP <remote-ref> SP <remote-object-name> LF`
+///
+/// If `remote` is `None` or empty, the `url` is used for both arguments as per Git spec.
+///
+/// Note: The hook is called even when `updates` is empty (matching Git's behavior).
+/// This can occur when pushing tags that already exist on the remote.
 pub fn hooks_pre_push(
 	repo: &Repository,
 	other_paths: Option<&[&str]>,
+	remote: Option<&str>,
+	url: &str,
+	updates: &[PrePushRef],
 ) -> Result<HookResult> {
 	let hook = HookPaths::new(repo, other_paths, HOOK_PRE_PUSH)?;
 
@@ -182,7 +257,18 @@ pub fn hooks_pre_push(
 		return Ok(HookResult::NoHookFound);
 	}
 
-	hook.run_hook(&[])
+	// If a remote is not named (None or empty), the URL is passed for both arguments
+	let remote_name = match remote {
+		Some(r) if !r.is_empty() => r,
+		_ => url,
+	};
+
+	let stdin_data = PrePushRef::to_stdin(updates);
+
+	hook.run_hook_os_str_with_stdin(
+		[remote_name, url],
+		Some(stdin_data.as_bytes()),
+	)
 }
 
 pub enum PrepareCommitMsgSource {
@@ -251,6 +337,110 @@ mod tests {
 	use pretty_assertions::assert_eq;
 	use tempfile::TempDir;
 
+	fn branch_update(
+		repo: &Repository,
+		remote: Option<&str>,
+		branch: &str,
+		remote_branch: Option<&str>,
+		delete: bool,
+	) -> PrePushRef {
+		let local_ref = format!("refs/heads/{branch}");
+		let local_oid = (!delete).then(|| {
+			repo.find_branch(branch, git2::BranchType::Local)
+				.unwrap()
+				.get()
+				.peel_to_commit()
+				.unwrap()
+				.id()
+		});
+
+		let remote_branch = remote_branch.unwrap_or(branch);
+		let remote_ref = format!("refs/heads/{remote_branch}");
+		let remote_oid = remote.and_then(|remote_name| {
+			repo.find_reference(&format!(
+				"refs/remotes/{remote_name}/{remote_branch}"
+			))
+			.ok()
+			.and_then(|r| r.peel_to_commit().ok())
+			.map(|c| c.id())
+		});
+
+		PrePushRef::new(local_ref, local_oid, remote_ref, remote_oid)
+	}
+
+	fn head_branch(repo: &Repository) -> String {
+		repo.head().unwrap().shorthand().unwrap().to_string()
+	}
+
+	#[test]
+	fn test_pre_push_ref_format() {
+		let zero_oid = "0".repeat(40);
+		let oid_a = "a".repeat(40);
+		let oid_b = "b".repeat(40);
+
+		// Both oids present
+		let update = PrePushRef::new(
+			"refs/heads/main",
+			Some(git2::Oid::from_str(&oid_a).unwrap()),
+			"refs/heads/main",
+			Some(git2::Oid::from_str(&oid_b).unwrap()),
+		);
+		assert_eq!(
+			update.to_line(),
+			format!(
+				"refs/heads/main {oid_a} refs/heads/main {oid_b}"
+			)
+		);
+
+		// No remote oid (new branch)
+		let update = PrePushRef::new(
+			"refs/heads/feature",
+			Some(git2::Oid::from_str(&oid_a).unwrap()),
+			"refs/heads/feature",
+			None,
+		);
+		assert_eq!(
+			update.to_line(),
+			format!("refs/heads/feature {oid_a} refs/heads/feature {zero_oid}")
+		);
+
+		// No local oid (delete)
+		let update = PrePushRef::new(
+			"refs/heads/old",
+			None,
+			"refs/heads/old",
+			Some(git2::Oid::from_str(&oid_b).unwrap()),
+		);
+		assert_eq!(
+			update.to_line(),
+			format!(
+				"refs/heads/old {zero_oid} refs/heads/old {oid_b}"
+			)
+		);
+
+		// to_stdin adds newlines
+		let updates = [
+			PrePushRef::new(
+				"refs/heads/a",
+				Some(git2::Oid::from_str(&oid_a).unwrap()),
+				"refs/heads/a",
+				None,
+			),
+			PrePushRef::new(
+				"refs/heads/b",
+				Some(git2::Oid::from_str(&oid_b).unwrap()),
+				"refs/heads/b",
+				None,
+			),
+		];
+		assert_eq!(
+			PrePushRef::to_stdin(&updates),
+			format!(
+				"refs/heads/a {oid_a} refs/heads/a {zero_oid}\nrefs/heads/b {oid_b} refs/heads/b {zero_oid}\n"
+			)
+		);
+	}
+
 	#[test]
 	fn test_smoke() {
 		let (_td, repo) = repo_init();
@@ -268,7 +458,7 @@ exit 0
 
 		let res = hooks_post_commit(&repo, None).unwrap();
 
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -284,7 +474,7 @@ exit 0
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 
 		assert_eq!(msg, String::from("test"));
 	}
@@ -304,7 +494,7 @@ exit 0
 		let mut msg = String::from("test_sth");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 
 		assert_eq!(msg, String::from("test_shell_command"));
 	}
@@ -319,7 +509,7 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -339,22 +529,16 @@ exit 0
 
 		let result = hook.run_hook(&[TEXT]).unwrap();
 
-		let HookResult::RunNotSuccessful {
-			code,
-			stdout,
-			stderr,
-			hook: h,
-		} = result
-		else {
-			unreachable!("run_hook should've failed");
+		let HookResult::Run(response) = result else {
+			unreachable!("run_hook should've run");
 		};
 
-		let stdout = stdout.as_str().trim_ascii_end();
+		let stdout = response.stdout.as_str().trim_ascii_end();
 
-		assert_eq!(code, Some(42));
-		assert_eq!(h, hook.hook);
+		assert_eq!(response.code, 42);
+		assert_eq!(response.hook, hook.hook);
 		assert_eq!(stdout, TEXT, "{:?} != {TEXT:?}", stdout);
-		assert!(stderr.is_empty());
+		assert!(response.stderr.is_empty());
 	}
 
 	#[test]
@@ -384,7 +568,7 @@ exit 0
 		let res =
 			hooks_pre_commit(&repo, Some(&["../.myhooks"])).unwrap();
 
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -417,7 +601,7 @@ exit 1
 		let res =
 			hooks_pre_commit(&repo, Some(&["../.myhooks"])).unwrap();
 
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -431,7 +615,7 @@ exit 1
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_not_successful());
+		assert!(!res.is_successful());
 	}
 
 	#[test]
@@ -448,15 +632,17 @@ exit 1
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
 
-		let HookResult::RunNotSuccessful { stdout, .. } = res else {
+		let HookResult::Run(response) = res else {
 			unreachable!()
 		};
 
 		assert!(
-			stdout
+			response
+				.stdout
 				.lines()
 				.any(|line| line.starts_with(PATH_EXPORT)),
-			"Could not find line starting with {PATH_EXPORT:?} in: {stdout:?}"
+			"Could not find line starting with {PATH_EXPORT:?} in: {:?}",
+			response.stdout
 		);
 	}
 
@@ -482,13 +668,12 @@ exit 1
 
 		let res = hooks_pre_commit(&repo, None).unwrap();
 
-		let HookResult::RunNotSuccessful { code, stdout, .. } = res
-		else {
+		let HookResult::Run(response) = res else {
 			unreachable!()
 		};
 
-		assert_eq!(code.unwrap(), 1);
-		assert_eq!(&stdout, "rejected\n");
+		assert_eq!(response.code, 1);
+		assert_eq!(&response.stdout, "rejected\n");
 	}
 
 	#[test]
@@ -502,7 +687,7 @@ exit 1
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_not_successful());
+		assert!(!res.is_successful());
 	}
 
 	#[test]
@@ -523,7 +708,7 @@ sys.exit(0)
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_ok(), "{res:?}");
+		assert!(res.is_successful(), "{res:?}");
 	}
 
 	#[test]
@@ -544,7 +729,7 @@ sys.exit(1)
 
 		create_hook(&repo, HOOK_PRE_COMMIT, hook);
 		let res = hooks_pre_commit(&repo, None).unwrap();
-		assert!(res.is_not_successful());
+		assert!(!res.is_successful());
 	}
 
 	#[test]
@@ -562,13 +747,12 @@ sys.exit(1)
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		let HookResult::RunNotSuccessful { code, stdout, .. } = res
-		else {
+		let HookResult::Run(response) = res else {
 			unreachable!()
 		};
 
-		assert_eq!(code.unwrap(), 1);
-		assert_eq!(&stdout, "rejected\n");
+		assert_eq!(response.code, 1);
+		assert_eq!(&response.stdout, "rejected\n");
 
 		assert_eq!(msg, String::from("msg\n"));
 	}
@@ -587,7 +771,7 @@ exit 0
 		let mut msg = String::from("test");
 		let res = hooks_commit_msg(&repo, None, &mut msg).unwrap();
 
-		assert!(res.is_ok());
+		assert!(res.is_successful());
 		assert_eq!(msg, String::from("msg\n"));
 	}
 
@@ -633,7 +817,7 @@ exit 0
 		)
 		.unwrap();
 
-		assert!(matches!(res, HookResult::Ok { .. }));
+		assert!(res.is_successful());
 		assert_eq!(msg, String::from("msg:message\n"));
 	}
 
@@ -658,13 +842,12 @@ exit 2
 		)
 		.unwrap();
 
-		let HookResult::RunNotSuccessful { code, stdout, .. } = res
-		else {
+		let HookResult::Run(response) = res else {
 			unreachable!()
 		};
 
-		assert_eq!(code.unwrap(), 2);
-		assert_eq!(&stdout, "rejected\n");
+		assert_eq!(response.code, 2);
+		assert_eq!(&response.stdout, "rejected\n");
 
 		assert_eq!(
 			msg,
@@ -684,9 +867,25 @@ exit 0
 
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
 
-		let res = hooks_pre_push(&repo, None).unwrap();
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
 
-		assert!(matches!(res, HookResult::Ok { .. }));
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		assert!(res.is_successful());
 	}
 
 	#[test]
@@ -698,12 +897,331 @@ echo 'failed'
 exit 3
 	";
 		create_hook(&repo, HOOK_PRE_PUSH, hook);
-		let res = hooks_pre_push(&repo, None).unwrap();
-		let HookResult::RunNotSuccessful { code, stdout, .. } = res
-		else {
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+		let HookResult::Run(response) = res else {
 			unreachable!()
 		};
-		assert_eq!(code.unwrap(), 3);
-		assert_eq!(&stdout, "failed\n");
+		assert_eq!(response.code, 3);
+		assert_eq!(&response.stdout, "failed\n");
+	}
+
+	#[test]
+	fn test_pre_push_no_remote_name() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+# Verify that when remote is None, URL is passed for both arguments
+echo \"arg1=$1 arg2=$2\"
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates =
+			[branch_update(&repo, None, &branch, None, false)];
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			None,
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			panic!("Expected Run result, got: {res:?}");
+		};
+
+		assert!(response.is_successful());
+		// When remote is None, URL should be passed for both arguments
+		assert_eq!(
+			response.stdout,
+			"arg1=https://example.com/repo.git arg2=https://example.com/repo.git\n"
+		);
+	}
+
+	#[test]
+	fn test_pre_push_with_arguments() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+echo \"remote_name=$1\"
+echo \"remote_url=$2\"
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			unreachable!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(response.is_successful());
+		assert_eq!(
+			response.stdout,
+			"remote_name=origin\nremote_url=https://example.com/repo.git\n"
+		);
+	}
+
+	#[test]
+	fn test_pre_push_multiple_updates() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+cat
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let branch_update = branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		);
+
+		// create a tag to add a second refspec
+		let head_commit =
+			repo.head().unwrap().peel_to_commit().unwrap();
+		repo.tag_lightweight("v1", head_commit.as_object(), false)
+			.unwrap();
+		let tag_ref = repo.find_reference("refs/tags/v1").unwrap();
+		let tag_oid = tag_ref.target().unwrap();
+		let tag_update = PrePushRef::new(
+			"refs/tags/v1",
+			Some(tag_oid),
+			"refs/tags/v1",
+			None,
+		);
+
+		let updates = [branch_update, tag_update];
+		let expected_stdin = PrePushRef::to_stdin(&updates);
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			unreachable!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(
+			response.is_successful(),
+			"Hook should succeed: stdout {} stderr {}",
+			response.stdout,
+			response.stderr
+		);
+		assert_eq!(
+			response.stdout, expected_stdin,
+			"stdin should include all refspec lines"
+		);
+	}
+
+	#[test]
+	fn test_pre_push_delete_ref_uses_zero_oid() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+cat
+exit 0
+	";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			true,
+		)];
+		let expected_stdin = PrePushRef::to_stdin(&updates);
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://example.com/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			unreachable!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
+	}
+
+	#[test]
+	fn test_pre_push_stdin() {
+		let (_td, repo) = repo_init();
+
+		let hook = b"#!/bin/sh
+cat
+exit 0
+		";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("origin"),
+			&branch,
+			None,
+			false,
+		)];
+		let expected_stdin = PrePushRef::to_stdin(&updates);
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("origin"),
+			"https://github.com/user/repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			unreachable!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
+	}
+
+	#[test]
+	fn test_pre_push_uses_push_target_remote_not_upstream() {
+		let (_td, repo) = repo_init();
+
+		// repo_init() already creates an initial commit on master
+		let head = repo.head().unwrap();
+		let local_commit = head.target().unwrap();
+
+		// Set up scenario:
+		// - Local master is at local_commit (latest)
+		// - origin/master exists at local_commit (fully synced - upstream)
+		// - backup/master exists at old_commit (behind/different)
+		// - Branch tracks origin/master as upstream
+		// - We push to "backup" remote
+		// - Expected: remote SHA should be old_commit (not origin/master)
+
+		// Create origin/master tracking branch (at same commit as local)
+		repo.reference(
+			"refs/remotes/origin/master",
+			local_commit,
+			true,
+			"create origin/master",
+		)
+		.unwrap();
+
+		// Create backup/master at a different commit
+		let sig = repo.signature().unwrap();
+		let tree_id = {
+			let mut index = repo.index().unwrap();
+			index.write_tree().unwrap()
+		};
+		let tree = repo.find_tree(tree_id).unwrap();
+		let old_commit = repo
+			.commit(None, &sig, &sig, "old backup commit", &tree, &[])
+			.unwrap();
+
+		repo.reference(
+			"refs/remotes/backup/master",
+			old_commit,
+			true,
+			"create backup/master at old commit",
+		)
+		.unwrap();
+
+		// Configure upstream to origin
+		{
+			let mut config = repo.config().unwrap();
+			config.set_str("branch.master.remote", "origin").unwrap();
+			config
+				.set_str("branch.master.merge", "refs/heads/master")
+				.unwrap();
+		}
+
+		let hook = b"#!/bin/sh
+cat
+exit 0
+";
+
+		create_hook(&repo, HOOK_PRE_PUSH, hook);
+
+		let branch = head_branch(&repo);
+		let updates = [branch_update(
+			&repo,
+			Some("backup"),
+			&branch,
+			None,
+			false,
+		)];
+		let expected_stdin = PrePushRef::to_stdin(&updates);
+
+		let res = hooks_pre_push(
+			&repo,
+			None,
+			Some("backup"),
+			"https://github.com/user/backup-repo.git",
+			&updates,
+		)
+		.unwrap();
+
+		let HookResult::Run(response) = res else {
+			panic!("Expected Run result, got: {res:?}")
+		};
+
+		assert!(response.is_successful());
+		assert_eq!(response.stdout, expected_stdin);
 	}
 }

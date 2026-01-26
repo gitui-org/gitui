@@ -382,7 +382,7 @@ impl Status {
 
 	///
 	pub fn update(&mut self) -> Result<()> {
-		self.git_branch_name.lookup().map(Some).unwrap_or(None);
+		let _ = self.git_branch_name.lookup().ok();
 
 		if self.is_visible() {
 			let config =

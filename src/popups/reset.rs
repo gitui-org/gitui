@@ -120,7 +120,7 @@ impl ResetPopup {
 	///
 	#[allow(clippy::unnecessary_wraps)]
 	pub fn update(&mut self) -> Result<()> {
-		self.git_branch_name.lookup().map(Some).unwrap_or(None);
+		self.git_branch_name.lookup().ok();
 
 		Ok(())
 	}
