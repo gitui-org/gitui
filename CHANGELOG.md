@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+* change recommended `vim`-style key-binding for "reset file changes" to avoid conflict with "undo last commit" [[@callpraths](https://github.com/callpraths)] [[2853](https://github.com/gitui-org/gitui/pull/2853)]
+
 ## [0.28.0] - 2025-12-14
 
 **discard changes on checkout**
