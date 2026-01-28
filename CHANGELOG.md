@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **go to line in blame**
 ![blame-goto-line](assets/blame-goto-line.png)
 
+### Breaking Changes
+
 ### Added
 * support choosing checkout branch method when status is not empty [[@fatpandac](https://github.com/fatpandac)] ([#2404](https://github.com/extrawurst/gitui/issues/2404))
 * support pre-push hook [[@xlai89](https://github.com/xlai89)] ([#1933](https://github.com/extrawurst/gitui/issues/1933))
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * disable blame and history popup keybinds for untracked files [[@kpbaks](https://github.com/kpbaks)] ([#2489](https://github.com/gitui-org/gitui/pull/2489))
 * overwrites committer on amend of unsigned commits [[@cruessler](https://github.com/cruessler)] ([#2784](https://github.com/gitui-org/gitui/issues/2784))
 * Updated project links to point to `gitui-org` instead of `extrawurst`  [[@vasleymus](https://github.com/vasleymus)] ([#2538](https://github.com/gitui-org/gitui/pull/2538))
+* check if selected range is [topologically continuous](https://git-scm.com/docs/git-log#Documentation/git-log.txt---topo-order) before producing `<oldest>^..<newest>` for yanked commit ranges. [[@Esgariot](https://github.com/Esgariot)] ([#2441](https://github.com/extrawurst/gitui/pull/2441))
 
 ## [0.27.0] - 2025-01-14
 
