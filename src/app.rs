@@ -30,7 +30,10 @@ use crate::{
 	strings::{self, ellipsis_trim_start, order},
 	tabs::{FilesTab, Revlog, StashList, Stashing, Status},
 	try_or_popup,
-	ui::style::{SharedTheme, Theme},
+	ui::{
+		mask,
+		style::{SharedTheme, Theme},
+	},
 	AsyncAppNotification, AsyncNotification,
 };
 use anyhow::{bail, Result};
@@ -294,6 +297,15 @@ impl App {
 				3 => self.stashing_tab.draw(f, chunks_main[1])?,
 				4 => self.stashlist_tab.draw(f, chunks_main[1])?,
 				_ => bail!("unknown tab"),
+			}
+
+			if self.any_popup_visible() {
+				// "Tints" the background whenever a popup is open.
+				// NB: Order is important. We manipulate the entire layout chunk
+				//     assigned to the tab, without the knowledge of where the
+				//     popup is located. Thus, we must tint before drawing the
+				//     popup.
+				mask::draw_mask(f, chunks_main[1]);
 			}
 		}
 
