@@ -74,6 +74,7 @@ pub struct Revlog {
 	key_config: SharedKeyConfig,
 	sender: Sender<AsyncGitNotification>,
 	theme: SharedTheme,
+	commit_list_percentage: u16,
 }
 
 impl Revlog {
@@ -107,6 +108,7 @@ impl Revlog {
 			key_config: env.key_config.clone(),
 			sender: env.sender_git.clone(),
 			theme: env.theme.clone(),
+			commit_list_percentage: 60,
 		}
 	}
 
@@ -424,8 +426,12 @@ impl DrawableComponent for Revlog {
 			.direction(Direction::Horizontal)
 			.constraints(
 				[
-					Constraint::Percentage(60),
-					Constraint::Percentage(40),
+					Constraint::Percentage(
+						self.commit_list_percentage,
+					),
+					Constraint::Percentage(
+						100 - self.commit_list_percentage,
+					),
 				]
 				.as_ref(),
 			)
@@ -460,6 +466,20 @@ impl Component for Revlog {
 				if key_match(k, self.key_config.keys.enter) {
 					self.commit_details.toggle_visible()?;
 					self.update()?;
+					return Ok(EventState::Consumed);
+				} else if key_match(k, self.key_config.keys.alt_left)
+				{
+					if self.commit_list_percentage > 10 {
+						self.commit_list_percentage -= 5;
+						self.update()?;
+					}
+					return Ok(EventState::Consumed);
+				} else if key_match(k, self.key_config.keys.alt_right)
+				{
+					if self.commit_list_percentage < 90 {
+						self.commit_list_percentage += 5;
+						self.update()?;
+					}
 					return Ok(EventState::Consumed);
 				} else if key_match(
 					k,
