@@ -113,16 +113,24 @@ impl SignBuilder {
 		// Variants are described in the git config documentation
 		// https://git-scm.com/docs/git-config#Documentation/git-config.txt-gpgformat
 		match format.as_str() {
-			"openpgp" => {
+			"openpgp" | "x509" => {
 				// Try to retrieve the gpg program from the git configuration,
 				// moving from the least to the most specific config key,
 				// defaulting to "gpg" if nothing is explicitly defined (per git's implementation)
 				// https://git-scm.com/docs/git-config#Documentation/git-config.txt-gpgprogram
-				// https://git-scm.com/docs/git-config#Documentation/git-config.txt-gpgprogram
 				let program = config
-					.get_string("gpg.openpgp.program")
+					.get_string(
+						format!("gpg.{format}.program").as_str(),
+					)
 					.or_else(|_| config.get_string("gpg.program"))
-					.unwrap_or_else(|_| "gpg".to_string());
+					.unwrap_or_else(|_| {
+						(if format == "x509" {
+							"gpgsm"
+						} else {
+							"gpg"
+						})
+						.to_string()
+					});
 
 				// Optional signing key.
 				// If 'user.signingKey' is not set, we'll use 'user.name' and 'user.email'
@@ -152,9 +160,6 @@ impl SignBuilder {
 					signing_key,
 				}))
 			}
-			"x509" => Err(SignBuilderError::MethodNotImplemented(
-				String::from("x509"),
-			)),
 			"ssh" => {
 				let ssh_signer = config
 					.get_string("user.signingKey")
@@ -436,6 +441,60 @@ mod tests {
 
 		assert_eq!("ssh", sign.program());
 		assert_eq!("/tmp/key.pub", sign.signing_key());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_x509_program_defaults() -> Result<()> {
+		let (_tmp_dir, repo) = repo_init_empty()?;
+
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "x509")?;
+		}
+
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+
+		// default x509 program should be gpgsm
+		assert_eq!("gpgsm", sign.program());
+		// default signing key should be "name <email>" when not specified
+		assert_eq!("name <email>", sign.signing_key());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_x509_program_configs() -> Result<()> {
+		let (_tmp_dir, repo) = repo_init_empty()?;
+
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "x509")?;
+			config.set_str("gpg.program", "GPG_PROGRAM_TEST")?;
+		}
+
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+
+		// we get gpg.program, because gpg.x509.program is not set
+		assert_eq!("GPG_PROGRAM_TEST", sign.program());
+
+		{
+			let mut config = repo.config()?;
+			config.set_str(
+				"gpg.x509.program",
+				"GPG_X509_PROGRAM_TEST",
+			)?;
+		}
+
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+
+		// since gpg.x509.program is now set as well, it is more specific than
+		// gpg.program and therefore takes precedence
+		assert_eq!("GPG_X509_PROGRAM_TEST", sign.program());
 
 		Ok(())
 	}
