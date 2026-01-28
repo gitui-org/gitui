@@ -5,6 +5,7 @@ use crate::{
 use ratatui::{layout::Rect, Frame};
 use std::cell::Cell;
 
+#[derive(Debug)]
 pub struct VerticalScroll {
 	top: Cell<usize>,
 	max_top: Cell<usize>,
@@ -22,6 +23,10 @@ impl VerticalScroll {
 
 	pub fn get_top(&self) -> usize {
 		self.top.get()
+	}
+
+	pub fn get_visual_height(&self) -> usize {
+		self.visual_height.get()
 	}
 
 	pub fn reset(&self) {
