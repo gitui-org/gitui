@@ -22,6 +22,7 @@ const GIT_DIR_FLAG_ID: &str = "directory";
 const WATCHER_FLAG_ID: &str = "watcher";
 const KEY_BINDINGS_FLAG_ID: &str = "key_bindings";
 const KEY_SYMBOLS_FLAG_ID: &str = "key_symbols";
+const NO_TERMINAL_TITLE_FLAG_ID: &str = "no-terminal-title";
 const DEFAULT_THEME: &str = "theme.ron";
 const DEFAULT_GIT_DIR: &str = ".";
 
@@ -33,6 +34,7 @@ pub struct CliArgs {
 	pub notify_watcher: bool,
 	pub key_bindings_path: Option<PathBuf>,
 	pub key_symbols_path: Option<PathBuf>,
+	pub no_terminal_title: bool,
 }
 
 pub fn process_cmdline() -> Result<CliArgs> {
@@ -92,6 +94,9 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.get_one::<String>(KEY_SYMBOLS_FLAG_ID)
 		.map(PathBuf::from);
 
+	let no_terminal_title: bool =
+		*arg_matches.get_one(NO_TERMINAL_TITLE_FLAG_ID).unwrap_or(&false);
+
 	Ok(CliArgs {
 		theme,
 		select_file,
@@ -99,6 +104,7 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		notify_watcher,
 		key_bindings_path,
 		key_symbols_path,
+		no_terminal_title,
 	})
 }
 
@@ -189,6 +195,13 @@ fn app() -> ClapApp {
 				.long("workdir")
 				.env("GIT_WORK_TREE")
 				.num_args(1),
+		)
+		.arg(
+			Arg::new(NO_TERMINAL_TITLE_FLAG_ID)
+				.help("Disable setting the terminal title")
+				.short('n')
+				.long("no-terminal-title")
+				.action(clap::ArgAction::SetTrue),
 		)
 }
 
