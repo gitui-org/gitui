@@ -7,6 +7,25 @@ use thiserror::Error;
 ///
 #[derive(Error, Debug)]
 pub enum GixError {
+	#[error("gix::config::diff::algorithm::Error error: {0}")]
+	ConfigDiffAlgorithm(#[from] gix::config::diff::algorithm::Error),
+
+	///
+	#[error(
+		"gix::diff::blob::platform::prepare_diff::Error error: {0}"
+	)]
+	DiffBlobPlatformPrepareDiff(
+		#[from] gix::diff::blob::platform::prepare_diff::Error,
+	),
+
+	///
+	#[error(
+		"gix::diff::blob::platform::set_resource::Error error: {0}"
+	)]
+	DiffBlobPlatformSetResource(
+		#[from] gix::diff::blob::platform::set_resource::Error,
+	),
+
 	///
 	#[error("gix::discover error: {0}")]
 	Discover(#[from] Box<gix::discover::Error>),
@@ -36,6 +55,10 @@ pub enum GixError {
 	),
 
 	///
+	#[error("gix::reference::head_tree::Error error: {0}")]
+	ReferenceHeadTree(#[from] gix::reference::head_tree::Error),
+
+	///
 	#[error("gix::reference::head_tree_id::Error error: {0}")]
 	ReferenceHeadTreeId(#[from] gix::reference::head_tree_id::Error),
 
@@ -46,6 +69,14 @@ pub enum GixError {
 	///
 	#[error("gix::reference::iter::init::Error error: {0}")]
 	ReferenceIterInit(#[from] gix::reference::iter::init::Error),
+
+	///
+	#[error(
+		"gix::repository::diff_resource_cache::Error error: {0}"
+	)]
+	RepositoryDiffResourceCache(
+		#[from] gix::repository::diff_resource_cache::Error,
+	),
 
 	///
 	#[error("gix::revision::walk error: {0}")]
@@ -171,7 +202,7 @@ pub enum Error {
 
 	///
 	#[error("gix error:{0}")]
-	Gix(#[from] GixError),
+	Gix(#[from] Box<GixError>),
 
 	///
 	#[error("amend error: config commit.gpgsign=true detected.\ngpg signing is not supported for amending non-last commits")]
@@ -207,15 +238,31 @@ impl From<gix::discover::Error> for GixError {
 	}
 }
 
+impl From<gix::diff::blob::platform::prepare_diff::Error> for Error {
+	fn from(
+		error: gix::diff::blob::platform::prepare_diff::Error,
+	) -> Self {
+		Self::Gix(Box::new(GixError::from(error)))
+	}
+}
+
+impl From<gix::diff::blob::platform::set_resource::Error> for Error {
+	fn from(
+		error: gix::diff::blob::platform::set_resource::Error,
+	) -> Self {
+		Self::Gix(Box::new(GixError::from(error)))
+	}
+}
+
 impl From<gix::discover::Error> for Error {
 	fn from(error: gix::discover::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::head::peel::to_commit::Error> for Error {
 	fn from(error: gix::head::peel::to_commit::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -225,13 +272,13 @@ impl From<gix::object::find::existing::with_conversion::Error>
 	fn from(
 		error: gix::object::find::existing::with_conversion::Error,
 	) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::objs::decode::Error> for Error {
 	fn from(error: gix::objs::decode::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -243,37 +290,51 @@ impl From<gix::pathspec::init::Error> for GixError {
 
 impl From<gix::pathspec::init::Error> for Error {
 	fn from(error: gix::pathspec::init::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::reference::find::existing::Error> for Error {
 	fn from(error: gix::reference::find::existing::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
+	}
+}
+
+impl From<gix::reference::head_tree::Error> for Error {
+	fn from(error: gix::reference::head_tree::Error) -> Self {
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::reference::head_tree_id::Error> for Error {
 	fn from(error: gix::reference::head_tree_id::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::reference::iter::Error> for Error {
 	fn from(error: gix::reference::iter::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::reference::iter::init::Error> for Error {
 	fn from(error: gix::reference::iter::init::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
+	}
+}
+
+impl From<gix::repository::diff_resource_cache::Error> for Error {
+	fn from(
+		error: gix::repository::diff_resource_cache::Error,
+	) -> Self {
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
 impl From<gix::revision::walk::Error> for Error {
 	fn from(error: gix::revision::walk::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -285,7 +346,7 @@ impl From<gix::status::Error> for GixError {
 
 impl From<gix::status::Error> for Error {
 	fn from(error: gix::status::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -297,7 +358,7 @@ impl From<gix::status::iter::Error> for GixError {
 
 impl From<gix::status::iter::Error> for Error {
 	fn from(error: gix::status::iter::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -309,7 +370,7 @@ impl From<gix::status::into_iter::Error> for GixError {
 
 impl From<gix::status::into_iter::Error> for Error {
 	fn from(error: gix::status::into_iter::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -321,7 +382,7 @@ impl From<gix::status::index_worktree::Error> for GixError {
 
 impl From<gix::status::index_worktree::Error> for Error {
 	fn from(error: gix::status::index_worktree::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -333,7 +394,7 @@ impl From<gix::status::tree_index::Error> for GixError {
 
 impl From<gix::status::tree_index::Error> for Error {
 	fn from(error: gix::status::tree_index::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
 
@@ -345,6 +406,6 @@ impl From<gix::worktree::open_index::Error> for GixError {
 
 impl From<gix::worktree::open_index::Error> for Error {
 	fn from(error: gix::worktree::open_index::Error) -> Self {
-		Self::Gix(GixError::from(error))
+		Self::Gix(Box::new(GixError::from(error)))
 	}
 }
