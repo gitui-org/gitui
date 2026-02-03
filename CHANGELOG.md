@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * disable blame and history popup keybinds for untracked files [[@kpbaks](https://github.com/kpbaks)] ([#2489](https://github.com/gitui-org/gitui/pull/2489))
 * overwrites committer on amend of unsigned commits [[@cruessler](https://github.com/cruessler)] ([#2784](https://github.com/gitui-org/gitui/issues/2784))
 * Updated project links to point to `gitui-org` instead of `extrawurst`  [[@vasleymus](https://github.com/vasleymus)] ([#2538](https://github.com/gitui-org/gitui/pull/2538))
+* when staging the last file in a directory, the first item after the directory is no longer skipped [[@Tillerino](https://github.com/Tillerino)] ([#2748](https://github.com/gitui-org/gitui/issues/2748))
 
 ## [0.27.0] - 2025-01-14
 
