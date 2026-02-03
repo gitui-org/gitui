@@ -248,7 +248,7 @@ mod test {
 		text: &str,
 		text_area_width: u16,
 	) -> (Vec<String>, Vec<u16>) {
-		let style = Default::default();
+		let style = ratatui::style::Style::default();
 		let mut styled = UnicodeSegmentation::graphemes(text, true)
 			.map(|g| StyledGrapheme { symbol: g, style });
 		let mut composer: Box<dyn LineComposer> = match which {
