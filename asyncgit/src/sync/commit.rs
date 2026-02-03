@@ -184,18 +184,26 @@ pub fn tag_commit(
 }
 
 /// Loads the comment prefix from config & uses it to prettify commit messages
+///
+/// Also removes any lines after the scissors line.
 pub fn commit_message_prettify(
 	repo_path: &RepoPath,
-	message: String,
+	message: &str,
 ) -> Result<String> {
 	let comment_char = repo(repo_path)?
 		.config()?
 		.get_string("core.commentChar")
 		.ok()
 		.and_then(|char_string| char_string.chars().next())
-		.unwrap_or('#') as u8;
+		.unwrap_or('#');
+	let scissors_line = format!("{comment_char} ------------------------ >8 ------------------------");
+	let message = message
+		.lines()
+		.take_while(|line| line != &scissors_line)
+		.collect::<Vec<_>>()
+		.join("\n");
 
-	Ok(message_prettify(message, Some(comment_char))?)
+	Ok(message_prettify(message, Some(comment_char as u8))?)
 }
 
 #[cfg(test)]
@@ -519,7 +527,7 @@ mod tests {
 
 		let message = commit_message_prettify(
 			repo_path,
-			"#This is a test message\nTest".to_owned(),
+			"#This is a test message\nTest",
 		)?;
 
 		assert_eq!(message, "Test\n");
@@ -538,7 +546,27 @@ mod tests {
 
 		let message = commit_message_prettify(
 			repo_path,
-			";This is a test message\nTest".to_owned(),
+			";This is a test message\nTest",
+		)?;
+
+		assert_eq!(message, "Test\n");
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_scissors_line() -> Result<()> {
+		let (_td, repo) = repo_init_empty().unwrap();
+
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		repo.config()?.set_str("core.commentChar", ";")?;
+
+		let message = commit_message_prettify(
+			repo_path,
+			";This is a test message\nTest\n; ------------------------ >8 ------------------------\nTest2\nTest3\nTest4",
 		)?;
 
 		assert_eq!(message, "Test\n");
