@@ -47,19 +47,19 @@ release-linux-musl: build-linux-musl-release
 	tar -C ./target/x86_64-unknown-linux-musl/release/ -czvf ./release/gitui-linux-x86_64.tar.gz ./gitui
 
 build-apple-x86-debug:
-	cargo build --target=x86_64-apple-darwin
+	cargo build --features vendor-openssl --target=x86_64-apple-darwin
 
 build-apple-x86-release:
-	cargo build --release --target=x86_64-apple-darwin --locked
+	cargo build --features vendor-openssl --release --target=x86_64-apple-darwin --locked
 
 build-linux-musl-debug:
-	cargo build --target=x86_64-unknown-linux-musl
+	cargo build --features vendor-openssl --target=x86_64-unknown-linux-musl
 
 build-linux-musl-release:
-	cargo build --release --target=x86_64-unknown-linux-musl --locked
+	cargo build --features vendor-openssl --release --target=x86_64-unknown-linux-musl --locked
 
 test-linux-musl:
-	cargo nextest run --workspace --target=x86_64-unknown-linux-musl
+	cargo nextest run --features vendor-openssl --workspace --target=x86_64-unknown-linux-musl
 
 release-linux-arm: build-linux-arm-release
 	mkdir -p release
@@ -73,14 +73,14 @@ release-linux-arm: build-linux-arm-release
 	tar -C ./target/arm-unknown-linux-gnueabihf/release/ -czvf ./release/gitui-linux-arm.tar.gz ./gitui
 
 build-linux-arm-debug:
-	cargo build --target=aarch64-unknown-linux-gnu
-	cargo build --target=armv7-unknown-linux-gnueabihf
-	cargo build --target=arm-unknown-linux-gnueabihf
+	cargo build --features vendor-openssl --target=aarch64-unknown-linux-gnu
+	cargo build --features vendor-openssl --target=armv7-unknown-linux-gnueabihf
+	cargo build --features vendor-openssl --target=arm-unknown-linux-gnueabihf
 
 build-linux-arm-release:
-	cargo build --release --target=aarch64-unknown-linux-gnu --locked
-	cargo build --release --target=armv7-unknown-linux-gnueabihf --locked
-	cargo build --release --target=arm-unknown-linux-gnueabihf --locked
+	cargo build --features vendor-openssl --release --target=aarch64-unknown-linux-gnu --locked
+	cargo build --features vendor-openssl --release --target=armv7-unknown-linux-gnueabihf --locked
+	cargo build --features vendor-openssl --release --target=arm-unknown-linux-gnueabihf --locked
 
 test:
 	cargo nextest run --workspace

@@ -223,9 +223,12 @@ see [NIGHTLIES.md](./NIGHTLIES.md)
 - Minimum supported `rust`/`cargo` version: `1.82`
   - See [Install Rust](https://www.rust-lang.org/tools/install)
 
-- To build openssl dependency (see https://docs.rs/openssl/latest/openssl/)
-  - perl >= 5.12 (strawberry perl works for windows https://strawberryperl.com/)
-  - a c compiler (msvc, gcc or clang, cargo will find it)
+- TLS/SSL support uses platform-native libraries:
+  - **Windows**: Uses WinHTTP/Schannel (built-in, no additional setup needed)
+  - **macOS**: Uses SecureTransport (built-in, no additional setup needed)
+  - **Linux**: Requires system OpenSSL development libraries (e.g., `libssl-dev` on Debian/Ubuntu, `openssl-devel` on Fedora)
+
+- A C compiler is required to build native dependencies (msvc on Windows, gcc or clang on Unix)
 
 - To run the complete test suite python is required (and it must be invocable as `python`)
 

@@ -24,7 +24,7 @@ members = [
 ]
 
 [features]
-default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
+default = ["ghemoji", "regex-fancy", "trace-libgit"]
 ghemoji = ["gh-emoji"]
 # regex-* features are mutually exclusive.
 regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
