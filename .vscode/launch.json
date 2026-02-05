@@ -8,6 +8,16 @@
             "program": "${workspaceRoot}/target/debug/gitui",
             "args": [],
             "cwd": "${workspaceRoot}",
-        }
+        },
+        {
+            "name": "Attach to cargo run of executable 'gitui'",
+            "type": "lldb",
+            "request": "attach",
+            "program": "${workspaceFolder}/target/debug/gitui",
+            "stopOnEntry": false,
+            "sourceLanguages": [
+                "rust"
+            ],
+        },
     ]
 }
