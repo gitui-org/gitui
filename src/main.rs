@@ -186,7 +186,7 @@ fn main() -> Result<()> {
 	set_panic_handler()?;
 
 	let mut terminal =
-		start_terminal(io::stdout(), &cliargs.repo_path)?;
+		start_terminal(io::stdout(), &cliargs.repo_path, cliargs.no_terminal_title)?;
 	let input = Input::new();
 
 	let updater = if cliargs.notify_watcher {
@@ -217,6 +217,7 @@ fn main() -> Result<()> {
 					notify_watcher: args.notify_watcher,
 					key_bindings_path: args.key_bindings_path,
 					key_symbols_path: args.key_symbols_path,
+					no_terminal_title: args.no_terminal_title,
 				}
 			}
 			_ => break,
@@ -417,6 +418,7 @@ fn select_event(
 fn start_terminal(
 	buf: Stdout,
 	repo_path: &RepoPath,
+	no_terminal_title: bool,
 ) -> Result<Terminal> {
 	let mut path = repo_path.gitpath().canonicalize()?;
 	let home = dirs::home_dir().ok_or_else(|| {
@@ -430,10 +432,14 @@ fn start_terminal(
 	}
 
 	let mut backend = CrosstermBackend::new(buf);
-	backend.execute(crossterm::terminal::SetTitle(format!(
-		"gitui ({})",
-		path.display()
-	)))?;
+
+	// Conditionally set terminal title
+	if !no_terminal_title {
+		backend.execute(crossterm::terminal::SetTitle(format!(
+			"gitui ({})",
+			path.display()
+		)))?;
+	}
 
 	let mut terminal = Terminal::new(backend)?;
 	terminal.hide_cursor()?;

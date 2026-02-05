@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* `--no-terminal-title/-n` CLI argument to disable automatic terminal title
+
 ## [0.28.0] - 2025-12-14
 
 **discard changes on checkout**
