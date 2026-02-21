@@ -243,7 +243,7 @@ pub fn get_status(
 
 					res.push(StatusItem { path, status });
 
-					Ok(gix::diff::index::Action::Continue)
+					Ok(gix::diff::index::Action::Continue(()))
 				};
 
 			repo.tree_index_status(

@@ -47,6 +47,8 @@ jobs:
       - name: Rustup Show
         run: rustup show
 
+      - uses: taiki-e/install-action@nextest
+
       - name: Build Debug
         run: |
           cargo build
@@ -120,6 +122,8 @@ jobs:
 
       - name: Rustup Show
         run: rustup show
+
+      - uses: taiki-e/install-action@nextest
 
       - name: Setup MUSL
         run: |
