@@ -610,6 +610,20 @@ impl TextInputComponent {
 				ta.scroll(Scrolling::PageUp);
 				true
 			}
+			Input {
+				key: Key::Char(c),
+				ctrl: true,
+				alt: true,
+				..
+			} => {
+				// On Windows, AltGr is commonly reported as Ctrl+Alt.
+				if cfg!(windows) {
+					ta.insert_char(*c);
+					true
+				} else {
+					false
+				}
+			}
 			_ => false,
 		}
 	}
@@ -779,6 +793,49 @@ mod tests {
 			assert_eq!(txt[1], "b");
 			assert_eq!(txt[2], "c");
 		}
+	}
+
+	#[test]
+	fn altgr_ctrl_alt_char_is_inserted_on_windows_only() {
+		let mut ta = TextArea::new(vec![String::new()]);
+		let input = Input {
+			key: Key::Char('{'),
+			ctrl: true,
+			alt: true,
+			shift: false,
+		};
+
+		let modified =
+			TextInputComponent::process_inputs(&mut ta, &input);
+
+		if cfg!(windows) {
+			assert!(modified);
+			assert_eq!(ta.lines()[0], "{");
+		} else {
+			assert!(!modified);
+			assert_eq!(ta.lines()[0], "");
+		}
+	}
+
+	#[test]
+	fn ctrl_alt_b_shortcut_is_preserved() {
+		let mut ta = TextArea::new(vec![String::from("abc")]);
+		ta.move_cursor(CursorMove::End);
+		assert_eq!(ta.cursor(), (0, 3));
+
+		let input = Input {
+			key: Key::Char('b'),
+			ctrl: true,
+			alt: true,
+			shift: false,
+		};
+
+		let modified =
+			TextInputComponent::process_inputs(&mut ta, &input);
+
+		assert!(modified);
+		assert_eq!(ta.lines()[0], "abc");
+		assert_eq!(ta.cursor(), (0, 0));
 	}
 
 	#[test]
