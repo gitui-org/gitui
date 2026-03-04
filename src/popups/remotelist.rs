@@ -146,12 +146,14 @@ impl Component for RemoteListPopup {
 			} else if key_match(
 				e,
 				self.key_config.keys.update_remote_name,
-			) {
+			) && self.valid_selection()
+			{
 				self.rename_remote();
 			} else if key_match(
 				e,
 				self.key_config.keys.update_remote_url,
-			) {
+			) && self.valid_selection()
+			{
 				self.update_remote_url();
 			}
 		}
