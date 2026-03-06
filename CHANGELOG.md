@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 * rust msrv bumped to `1.88`
 
+### Fixed
+* fix panic when renaming or updating remote URL with no remotes configured [[@xvchris](https://github.com/xvchris)] ([#2868](https://github.com/gitui-org/gitui/issues/2868))
+
 ## [0.28.0] - 2025-12-14
 
 **discard changes on checkout**
