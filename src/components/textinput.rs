@@ -122,7 +122,7 @@ impl TextInputComponent {
 	}
 
 	/// screen area (last time we got drawn)
-	pub fn get_area(&self) -> Rect {
+	pub const fn get_area(&self) -> Rect {
 		self.current_area.get()
 	}
 

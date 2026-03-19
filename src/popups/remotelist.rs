@@ -411,7 +411,7 @@ impl RemoteListPopup {
 		Ok(true)
 	}
 
-	fn valid_selection(&self) -> bool {
+	const fn valid_selection(&self) -> bool {
 		!self.remote_names.is_empty()
 			&& self.remote_names.len() >= self.selection as usize
 	}

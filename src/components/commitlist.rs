@@ -113,7 +113,7 @@ impl CommitList {
 	}
 
 	///
-	pub fn marked_count(&self) -> usize {
+	pub const fn marked_count(&self) -> usize {
 		self.marked.len()
 	}
 
@@ -284,7 +284,7 @@ impl CommitList {
 	}
 
 	/// will return view size or None before the first render
-	fn current_size(&self) -> Option<(u16, u16)> {
+	const fn current_size(&self) -> Option<(u16, u16)> {
 		self.current_size.get()
 	}
 
