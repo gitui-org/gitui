@@ -177,7 +177,7 @@ pub fn get_commit_info(
 
 	let message = gix_get_message(&commit_ref, None);
 
-	let author = commit_ref.author();
+	let author = commit_ref.author()?;
 
 	let author = mailmap.try_resolve(author).map_or_else(
 		|| author.name.into(),
@@ -187,7 +187,7 @@ pub fn get_commit_info(
 	Ok(CommitInfo {
 		message,
 		author: author.to_string(),
-		time: commit_ref.time().seconds,
+		time: commit_ref.time()?.seconds,
 		id: commit.id().detach().into(),
 	})
 }

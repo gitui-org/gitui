@@ -2,7 +2,7 @@ name: Build Nightly Releases
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 env:
@@ -14,112 +14,112 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [
-          ubuntu-latest, macos-latest, windows-latest, ubuntu-22.04
-          ]
+        os: [ubuntu-latest, macos-latest, windows-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        shared-key: ${{ matrix.os }}-${{ env.cache-name }}-stable
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          shared-key: ${{ matrix.os }}-${{ env.cache-name }}-stable
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
-    # ideally we trigger the nightly build/deploy only if the normal nightly CI finished successfully
-    - name: Run tests
-      if: matrix.os != 'ubuntu-22.04'
-      run: make test
-    - name: Run clippy
-      if: matrix.os != 'ubuntu-22.04'
-      run: |
-        cargo clean
-        make clippy
+      - uses: taiki-e/install-action@nextest
 
-    - name: Setup MUSL
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        rustup target add x86_64-unknown-linux-musl
-        sudo apt-get -qq install musl-tools
+      # ideally we trigger the nightly build/deploy only if the normal nightly CI finished successfully
+      - name: Run tests
+        if: matrix.os != 'ubuntu-22.04'
+        run: make test
+      - name: Run clippy
+        if: matrix.os != 'ubuntu-22.04'
+        run: |
+          cargo clean
+          make clippy
 
-    - name: Setup ARM toolchain
-      if: matrix.os == 'ubuntu-22.04'
-      run: |
-        rustup target add aarch64-unknown-linux-gnu
-        rustup target add armv7-unknown-linux-gnueabihf
-        rustup target add arm-unknown-linux-gnueabihf
+      - name: Setup MUSL
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get -qq install musl-tools
 
-        curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
-        curl -o $GITHUB_WORKSPACE/arm.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf.tar.xz
+      - name: Setup ARM toolchain
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+          rustup target add arm-unknown-linux-gnueabihf
 
-        tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
-        tar xf $GITHUB_WORKSPACE/arm.tar.xz
+          curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
+          curl -o $GITHUB_WORKSPACE/arm.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf.tar.xz
 
-        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
-        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
+          tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
+          tar xf $GITHUB_WORKSPACE/arm.tar.xz
 
-    - name: Build Release Mac
-      if: matrix.os == 'macos-latest'
-      run: make release-mac
-    - name: Build Release Mac x86
-      if: matrix.os == 'macos-latest'
-      run: |
-        rustup target add x86_64-apple-darwin
-        make release-mac-x86
-    - name: Build Release Linux
-      if: matrix.os == 'ubuntu-latest'
-      run: make release-linux-musl
-    - name: Build Release Win
-      if: matrix.os == 'windows-latest'
-      run: make release-win
-    - name: Build Release Linux ARM
-      if: matrix.os == 'ubuntu-22.04'
-      run: make release-linux-arm
+          echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
 
-    - name: Ubuntu 22.04 Upload Artifact
-      if: matrix.os == 'ubuntu-22.04'
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      run: |
-        aws s3 cp ./release/gitui-linux-armv7.tar.gz $AWS_BUCKET_NAME
-        aws s3 cp ./release/gitui-linux-arm.tar.gz $AWS_BUCKET_NAME
-        aws s3 cp ./release/gitui-linux-aarch64.tar.gz $AWS_BUCKET_NAME
+      - name: Build Release Mac
+        if: matrix.os == 'macos-latest'
+        run: make release-mac
+      - name: Build Release Mac x86
+        if: matrix.os == 'macos-latest'
+        run: |
+          rustup target add x86_64-apple-darwin
+          make release-mac-x86
+      - name: Build Release Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: make release-linux-musl
+      - name: Build Release Win
+        if: matrix.os == 'windows-latest'
+        run: make release-win
+      - name: Build Release Linux ARM
+        if: matrix.os == 'ubuntu-22.04'
+        run: make release-linux-arm
 
-    - name: Ubuntu Latest Upload Artifact
-      if: matrix.os == 'ubuntu-latest'
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      run: |
-        aws s3 cp ./release/gitui-linux-x86_64.tar.gz $AWS_BUCKET_NAME
+      - name: Ubuntu 22.04 Upload Artifact
+        if: matrix.os == 'ubuntu-22.04'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws s3 cp ./release/gitui-linux-armv7.tar.gz $AWS_BUCKET_NAME
+          aws s3 cp ./release/gitui-linux-arm.tar.gz $AWS_BUCKET_NAME
+          aws s3 cp ./release/gitui-linux-aarch64.tar.gz $AWS_BUCKET_NAME
 
-    - name: MacOS Upload Artifact
-      if: matrix.os == 'macos-latest'
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      run: |
-        aws s3 cp ./release/gitui-mac.tar.gz $AWS_BUCKET_NAME
-        aws s3 cp ./release/gitui-mac-x86.tar.gz $AWS_BUCKET_NAME
+      - name: Ubuntu Latest Upload Artifact
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws s3 cp ./release/gitui-linux-x86_64.tar.gz $AWS_BUCKET_NAME
 
-    - name: Windows Upload Artifact
-      if: matrix.os == 'windows-latest'
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      run: |
-        aws s3 cp ./release/gitui-win.msi $env:AWS_BUCKET_NAME
-        aws s3 cp ./release/gitui-win.tar.gz $env:AWS_BUCKET_NAME
+      - name: MacOS Upload Artifact
+        if: matrix.os == 'macos-latest'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws s3 cp ./release/gitui-mac.tar.gz $AWS_BUCKET_NAME
+          aws s3 cp ./release/gitui-mac-x86.tar.gz $AWS_BUCKET_NAME
+
+      - name: Windows Upload Artifact
+        if: matrix.os == 'windows-latest'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_KEY_SECRET }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws s3 cp ./release/gitui-win.msi $env:AWS_BUCKET_NAME
+          aws s3 cp ./release/gitui-win.tar.gz $env:AWS_BUCKET_NAME

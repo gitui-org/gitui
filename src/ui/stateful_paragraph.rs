@@ -70,7 +70,7 @@ impl ParagraphState {
 		self.scroll
 	}
 
-	pub fn set_scroll(&mut self, scroll: ScrollPos) {
+	pub const fn set_scroll(&mut self, scroll: ScrollPos) {
 		self.scroll = scroll;
 	}
 }

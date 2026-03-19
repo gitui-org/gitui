@@ -307,8 +307,7 @@ impl BranchListPopup {
 		if self.visible {
 			self.has_remotes =
 				get_branches_info(&self.repo.borrow(), false)
-					.map(|branches| !branches.is_empty())
-					.unwrap_or(false);
+					.is_ok_and(|branches| !branches.is_empty());
 		}
 	}
 
@@ -342,7 +341,7 @@ impl BranchListPopup {
 		Ok(())
 	}
 
-	fn valid_selection(&self) -> bool {
+	const fn valid_selection(&self) -> bool {
 		!self.branches.is_empty()
 	}
 

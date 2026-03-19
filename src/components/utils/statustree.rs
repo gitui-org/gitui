@@ -173,7 +173,7 @@ impl StatusTree {
 	}
 
 	///
-	pub fn is_empty(&self) -> bool {
+	pub const fn is_empty(&self) -> bool {
 		self.tree.items().is_empty()
 	}
 
