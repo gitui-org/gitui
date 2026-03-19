@@ -20,7 +20,9 @@ ignore = [
     # Crate paste is unmaintained. The dependency is already removed in
     # ratatui:master. Until a new release is available, ignore this in
     # order to pass CI. (https://github.com/gitui-org/gitui/issues/2554)
-    { id = "RUSTSEC-2024-0436", reason = "The paste dependency is already removed from ratatui." }
+    { id = "RUSTSEC-2024-0436", reason = "The paste dependency is already removed from ratatui." },
+    # See https://github.com/trishume/syntect/issues/606
+    { id = "RUSTSEC-2025-0141", reason = "Only brought in via syntect" },
 ]
 
 [bans]
