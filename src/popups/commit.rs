@@ -448,7 +448,7 @@ impl CommitPopup {
 			msg_source,
 			&mut msg,
 		)? {
-			log::error!("prepare-commit-msg hook rejection: {e}",);
+			log::error!("prepare-commit-msg hook rejection: {e}");
 		}
 		self.input.set_text(msg);
 
