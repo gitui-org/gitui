@@ -21,7 +21,7 @@ impl VerticalScroll {
 		}
 	}
 
-	pub fn get_top(&self) -> usize {
+	pub const fn get_top(&self) -> usize {
 		self.top.get()
 	}
 

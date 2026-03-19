@@ -107,7 +107,7 @@ impl Callbacks {
 		reference: &str,
 		msg: Option<&str>,
 	) {
-		log::debug!("push_update_reference: '{reference}' {msg:?}",);
+		log::debug!("push_update_reference: '{reference}' {msg:?}");
 
 		if let Ok(mut stats) = self.stats.lock() {
 			stats.push_rejected_msg = msg
@@ -162,7 +162,7 @@ impl Callbacks {
 		total: usize,
 		bytes: usize,
 	) {
-		log::debug!("progress: {current}/{total} ({bytes} B)",);
+		log::debug!("progress: {current}/{total} ({bytes} B)");
 		self.sender.clone().map(|sender| {
 			sender.send(ProgressNotification::PushTransfer {
 				current,

@@ -341,7 +341,7 @@ impl BranchListPopup {
 		Ok(())
 	}
 
-	fn valid_selection(&self) -> bool {
+	const fn valid_selection(&self) -> bool {
 		!self.branches.is_empty()
 	}
 

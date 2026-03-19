@@ -202,7 +202,7 @@ impl CreateRemotePopup {
 					Err(e) => {
 						log::error!("create remote: {e}");
 						self.queue.push(InternalEvent::ShowErrorMsg(
-							format!("create remote error:\n{e}",),
+							format!("create remote error:\n{e}"),
 						));
 					}
 				}

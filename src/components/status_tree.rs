@@ -58,7 +58,7 @@ impl StatusTreeComponent {
 		}
 	}
 
-	pub fn set_commit(&mut self, revision: Option<CommitId>) {
+	pub const fn set_commit(&mut self, revision: Option<CommitId>) {
 		self.revision = revision;
 	}
 
@@ -92,12 +92,12 @@ impl StatusTreeComponent {
 	}
 
 	///
-	pub fn show_selection(&mut self, show: bool) {
+	pub const fn show_selection(&mut self, show: bool) {
 		self.show_selection = show;
 	}
 
 	/// returns true if list is empty
-	pub fn is_empty(&self) -> bool {
+	pub const fn is_empty(&self) -> bool {
 		self.tree.is_empty()
 	}
 
@@ -208,7 +208,7 @@ impl StatusTreeComponent {
 						w = width as usize
 					)
 				} else {
-					format!("  {indent_str}{collapse_char}{string}",)
+					format!("  {indent_str}{collapse_char}{string}")
 				};
 
 				Some(Span::styled(
