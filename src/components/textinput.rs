@@ -127,12 +127,12 @@ impl TextInputComponent {
 	}
 
 	/// embed into parent draw area
-	pub fn embed(&mut self) {
+	pub const fn embed(&mut self) {
 		self.embed = true;
 	}
 
 	///
-	pub fn enabled(&mut self, enable: bool) {
+	pub const fn enabled(&mut self, enable: bool) {
 		self.selected = Some(enable);
 	}
 

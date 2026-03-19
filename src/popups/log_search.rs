@@ -315,7 +315,7 @@ impl LogSearchPopupPopup {
 		}
 	}
 
-	fn move_selection(&mut self, arg: bool) {
+	const fn move_selection(&mut self, arg: bool) {
 		if arg {
 			//up
 			self.selection = match self.selection {

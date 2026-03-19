@@ -58,7 +58,7 @@ impl StatusTreeComponent {
 		}
 	}
 
-	pub fn set_commit(&mut self, revision: Option<CommitId>) {
+	pub const fn set_commit(&mut self, revision: Option<CommitId>) {
 		self.revision = revision;
 	}
 
@@ -92,7 +92,7 @@ impl StatusTreeComponent {
 	}
 
 	///
-	pub fn show_selection(&mut self, show: bool) {
+	pub const fn show_selection(&mut self, show: bool) {
 		self.show_selection = show;
 	}
 

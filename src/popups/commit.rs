@@ -336,6 +336,7 @@ impl CommitPopup {
 
 		Ok(())
 	}
+
 	fn signoff_commit(&mut self) {
 		let msg = self.input.get_text();
 		let signed_msg = self.add_sign_off(msg);
@@ -343,7 +344,8 @@ impl CommitPopup {
 			self.input.set_text(signed_msg);
 		}
 	}
-	fn toggle_verify(&mut self) {
+
+	const fn toggle_verify(&mut self) {
 		self.verify = !self.verify;
 	}
 
