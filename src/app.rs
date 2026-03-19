@@ -1097,7 +1097,7 @@ impl App {
 			Err(e) => {
 				log::error!("delete remote: {e:?}");
 				self.queue.push(InternalEvent::ShowErrorMsg(
-					format!("delete remote error:\n{e}",),
+					format!("delete remote error:\n{e}"),
 				));
 			}
 		}

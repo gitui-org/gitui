@@ -137,7 +137,7 @@ impl ResetPopup {
 		self.hide();
 	}
 
-	fn change_kind(&mut self, incr: bool) {
+	const fn change_kind(&mut self, incr: bool) {
 		self.kind = if incr {
 			match self.kind {
 				ResetType::Soft => ResetType::Mixed,
