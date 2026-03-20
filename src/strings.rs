@@ -834,6 +834,18 @@ pub mod commands {
 			CMD_GROUP_DIFF,
 		)
 	}
+	pub fn diff_toggle_mode(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Toggle Diff Mode [{}]",
+				key_config.get_hint(key_config.keys.diff_mode_toggle),
+			),
+			"toggle between unified and side-by-side diff",
+			CMD_GROUP_DIFF,
+		)
+	}
 	pub fn close_fuzzy_finder(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {

@@ -23,13 +23,26 @@ use asyncgit::{
 use bytesize::ByteSize;
 use crossterm::event::Event;
 use ratatui::{
-	layout::Rect,
+	layout::{
+		Constraint, Direction as RatatuiDirection, Layout, Rect,
+	},
 	symbols,
 	text::{Line, Span},
 	widgets::{Block, Borders, Paragraph},
 	Frame,
 };
+use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, cell::Cell, cmp, path::Path};
+
+/// Diff display mode
+#[derive(
+	Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize,
+)]
+pub enum DiffMode {
+	#[default]
+	Unified,
+	SideBySide,
+}
 
 #[derive(Default)]
 struct Current {
@@ -101,6 +114,24 @@ impl Selection {
 	}
 }
 
+/// A single line in side-by-side diff view
+struct SideBySideLine {
+	left_content: String,
+	left_line_num: Option<u32>,
+	right_content: String,
+	right_line_num: Option<u32>,
+	left_type: DiffLineType,
+	right_type: DiffLineType,
+	/// Global line index for selection tracking
+	global_line_idx: usize,
+	/// Index of the hunk this line belongs to
+	hunk_idx: usize,
+	/// Whether this is the first line of a hunk
+	is_hunk_start: bool,
+	/// Whether this is the last line of a hunk
+	is_hunk_end: bool,
+}
+
 ///
 pub struct DiffComponent {
 	repo: RepoPathRef,
@@ -119,6 +150,7 @@ pub struct DiffComponent {
 	key_config: SharedKeyConfig,
 	is_immutable: bool,
 	options: SharedOptions,
+	diff_mode: DiffMode,
 }
 
 impl DiffComponent {
@@ -141,6 +173,7 @@ impl DiffComponent {
 			is_immutable,
 			repo: env.repo.clone(),
 			options: env.options.clone(),
+			diff_mode: env.options.borrow().diff_mode(),
 		}
 	}
 	///
@@ -223,11 +256,19 @@ impl DiffComponent {
 
 	fn move_selection(&mut self, move_type: ScrollType) {
 		if let Some(diff) = &self.diff {
-			let max = diff.lines.saturating_sub(1);
+			// In side-by-side mode, display lines differ from diff.lines
+			// because Delete+Add pairs are shown as one line
+			let max = if self.diff_mode == DiffMode::SideBySide {
+				self.side_by_side_lines_count().saturating_sub(1)
+			} else {
+				diff.lines.saturating_sub(1)
+			};
 
 			let new_start = match move_type {
 				ScrollType::Down => {
-					self.selection.get_bottom().saturating_add(1)
+					let next =
+						self.selection.get_bottom().saturating_add(1);
+					cmp::min(next, max)
 				}
 				ScrollType::Up => {
 					self.selection.get_top().saturating_sub(1)
@@ -235,10 +276,14 @@ impl DiffComponent {
 				ScrollType::Home => 0,
 				ScrollType::End => max,
 				ScrollType::PageDown => {
-					self.selection.get_bottom().saturating_add(
-						self.current_size.get().1.saturating_sub(1)
-							as usize,
-					)
+					let next =
+						self.selection.get_bottom().saturating_add(
+							self.current_size
+								.get()
+								.1
+								.saturating_sub(1) as usize,
+						);
+					cmp::min(next, max)
 				}
 				ScrollType::PageUp => {
 					self.selection.get_top().saturating_sub(
@@ -254,11 +299,20 @@ impl DiffComponent {
 
 	fn update_selection(&mut self, new_start: usize) {
 		if let Some(diff) = &self.diff {
-			let max = diff.lines.saturating_sub(1);
+			// In side-by-side mode, display lines differ from diff.lines
+			let max = if self.diff_mode == DiffMode::SideBySide {
+				self.side_by_side_lines_count().saturating_sub(1)
+			} else {
+				diff.lines.saturating_sub(1)
+			};
 			let new_start = cmp::min(max, new_start);
 			self.selection = Selection::Single(new_start);
 			self.selected_hunk =
-				Self::find_selected_hunk(diff, new_start);
+				Self::find_selected_hunk_for_display_line(
+					diff,
+					new_start,
+					self.diff_mode,
+				);
 		}
 	}
 
@@ -266,9 +320,52 @@ impl DiffComponent {
 		self.diff.as_ref().map_or(0, |diff| diff.lines)
 	}
 
+	/// Get the actual display line count for side-by-side mode
+	/// In side-by-side mode, Delete+Add pairs are shown as one line
+	fn side_by_side_lines_count(&self) -> usize {
+		let Some(diff) = &self.diff else {
+			return 0;
+		};
+
+		if diff.hunks.is_empty() {
+			return 0;
+		}
+
+		let mut count = 0_usize;
+		for hunk in &diff.hunks {
+			let mut i = 0;
+			while i < hunk.lines.len() {
+				let line = &hunk.lines[i];
+				if line.line_type == DiffLineType::Delete {
+					// Check if next line is Add (they will be paired)
+					if let Some(next) = hunk.lines.get(i + 1) {
+						if next.line_type == DiffLineType::Add {
+							i += 1; // Skip the Add line in counting
+						}
+					}
+				}
+				count += 1;
+				i += 1;
+			}
+		}
+
+		count
+	}
+
 	fn max_scroll_right(&self) -> usize {
-		self.longest_line
-			.saturating_sub(self.current_size.get().0.into())
+		let available_width: usize = if self.diff_mode
+			== DiffMode::SideBySide
+		{
+			// In side-by-side mode, each panel's content width:
+			// chunks[0].width ≈ r.width / 2
+			// content width = chunks[0].width - 7 (border + marker + line_num + space)
+			// current_width = r.width - 2
+			// So: r.width / 2 - 7 ≈ current_width / 2 - 6
+			(self.current_size.get().0 / 2).saturating_sub(6).into()
+		} else {
+			self.current_size.get().0.into()
+		};
+		self.longest_line.saturating_sub(available_width)
 	}
 
 	fn modify_selection(&mut self, direction: Direction) {
@@ -323,6 +420,50 @@ impl DiffComponent {
 			}
 
 			line_cursor += hunk_len;
+		}
+
+		None
+	}
+
+	/// Find the hunk index for a display line (accounting for side-by-side pairing)
+	fn find_selected_hunk_for_display_line(
+		diff: &FileDiff,
+		display_line_selected: usize,
+		diff_mode: DiffMode,
+	) -> Option<usize> {
+		if diff_mode == DiffMode::Unified {
+			return Self::find_selected_hunk(
+				diff,
+				display_line_selected,
+			);
+		}
+
+		// For side-by-side mode, count display lines (where Delete+Add pairs count as 1)
+		let mut display_cursor = 0_usize;
+		for (i, hunk) in diff.hunks.iter().enumerate() {
+			let mut j = 0;
+			let hunk_start = display_cursor;
+			while j < hunk.lines.len() {
+				let line = &hunk.lines[j];
+				if display_cursor == display_line_selected {
+					return Some(i);
+				}
+				if line.line_type == DiffLineType::Delete {
+					if let Some(next) = hunk.lines.get(j + 1) {
+						if next.line_type == DiffLineType::Add {
+							j += 1;
+						}
+					}
+				}
+				display_cursor += 1;
+				j += 1;
+			}
+			// Check if this is the last line of the hunk
+			if display_line_selected >= hunk_start
+				&& display_line_selected < display_cursor
+			{
+				return Some(i);
+			}
 		}
 
 		None
@@ -677,6 +818,459 @@ impl DiffComponent {
 		}
 	}
 
+	/// Toggle between unified and side-by-side diff mode
+	pub fn toggle_diff_mode(&mut self) {
+		self.diff_mode = match self.diff_mode {
+			DiffMode::Unified => DiffMode::SideBySide,
+			DiffMode::SideBySide => DiffMode::Unified,
+		};
+		self.options.borrow_mut().set_diff_mode(self.diff_mode);
+	}
+
+	fn get_side_by_side_lines(
+		&self,
+		height: u16,
+	) -> Vec<SideBySideLine> {
+		let Some(diff) = &self.diff else {
+			return Vec::new();
+		};
+
+		if diff.hunks.is_empty() {
+			return Vec::new();
+		}
+
+		let min = self.vertical_scroll.get_top();
+		let max = min + height as usize;
+
+		let mut result = Vec::new();
+		// Use display_cursor to track display line index (where Delete+Add pairs count as 1)
+		let mut display_cursor = 0_usize;
+
+		for (hunk_idx, hunk) in diff.hunks.iter().enumerate() {
+			// Calculate display line range for this hunk
+			let hunk_display_start = display_cursor;
+			let mut hunk_display_len = 0_usize;
+			{
+				let mut j = 0;
+				while j < hunk.lines.len() {
+					let line = &hunk.lines[j];
+					if line.line_type == DiffLineType::Delete {
+						if let Some(next) = hunk.lines.get(j + 1) {
+							if next.line_type == DiffLineType::Add {
+								j += 1;
+							}
+						}
+					}
+					hunk_display_len += 1;
+					j += 1;
+				}
+			}
+			let hunk_display_end =
+				hunk_display_start + hunk_display_len;
+
+			if Self::hunk_visible(
+				hunk_display_start,
+				hunk_display_end,
+				min,
+				max,
+			) {
+				let mut i = 0;
+				while i < hunk.lines.len() {
+					let line = &hunk.lines[i];
+					let global_display_idx = display_cursor;
+					let is_hunk_start = i == 0;
+					// Calculate if this is the last display line of the hunk
+					let is_hunk_end = {
+						let mut remaining = hunk.lines.len() - i;
+						let next = hunk.lines.get(i + 1);
+						if line.line_type == DiffLineType::Delete
+							&& next.is_some_and(|n| {
+								n.line_type == DiffLineType::Add
+							}) {
+							remaining -= 1;
+						}
+						remaining == 1
+					};
+
+					if global_display_idx >= min
+						&& global_display_idx <= max
+					{
+						match line.line_type {
+							DiffLineType::Delete => {
+								// Look ahead for a matching add line
+								let next_line = hunk.lines.get(i + 1);
+								let (
+									right_content,
+									right_num,
+									right_type,
+								) = if let Some(next) = next_line {
+									if next.line_type
+										== DiffLineType::Add
+									{
+										i += 1;
+										(
+											tabs_to_spaces(
+												next.content
+													.as_ref()
+													.to_string(),
+											),
+											next.position.new_lineno,
+											DiffLineType::Add,
+										)
+									} else {
+										(
+											String::new(),
+											None,
+											DiffLineType::None,
+										)
+									}
+								} else {
+									(
+										String::new(),
+										None,
+										DiffLineType::None,
+									)
+								};
+
+								result.push(SideBySideLine {
+									left_content: tabs_to_spaces(
+										line.content
+											.as_ref()
+											.to_string(),
+									),
+									left_line_num: line
+										.position
+										.old_lineno,
+									right_content,
+									right_line_num: right_num,
+									left_type: DiffLineType::Delete,
+									right_type,
+									global_line_idx:
+										global_display_idx,
+									hunk_idx,
+									is_hunk_start,
+									is_hunk_end,
+								});
+							}
+							DiffLineType::Add => {
+								// Add line not paired with a delete
+								result.push(SideBySideLine {
+									left_content: String::new(),
+									left_line_num: None,
+									right_content: tabs_to_spaces(
+										line.content
+											.as_ref()
+											.to_string(),
+									),
+									right_line_num: line
+										.position
+										.new_lineno,
+									left_type: DiffLineType::None,
+									right_type: DiffLineType::Add,
+									global_line_idx:
+										global_display_idx,
+									hunk_idx,
+									is_hunk_start,
+									is_hunk_end,
+								});
+							}
+							DiffLineType::Header => {
+								// Add leading space to align with text content below
+								let header_content = format!(
+									" {}",
+									tabs_to_spaces(
+										line.content
+											.as_ref()
+											.to_string()
+									)
+								);
+								result.push(SideBySideLine {
+									left_content: header_content,
+									left_line_num: None,
+									right_content: String::new(),
+									right_line_num: None,
+									left_type: DiffLineType::Header,
+									right_type: DiffLineType::Header,
+									global_line_idx:
+										global_display_idx,
+									hunk_idx,
+									is_hunk_start,
+									is_hunk_end,
+								});
+							}
+							DiffLineType::None => {
+								// Context line - appears in both columns
+								result.push(SideBySideLine {
+									left_content: tabs_to_spaces(
+										line.content
+											.as_ref()
+											.to_string(),
+									),
+									left_line_num: line
+										.position
+										.old_lineno,
+									right_content: tabs_to_spaces(
+										line.content
+											.as_ref()
+											.to_string(),
+									),
+									right_line_num: line
+										.position
+										.new_lineno,
+									left_type: DiffLineType::None,
+									right_type: DiffLineType::None,
+									global_line_idx:
+										global_display_idx,
+									hunk_idx,
+									is_hunk_start,
+									is_hunk_end,
+								});
+							}
+						}
+					}
+
+					// Increment display cursor for each display line
+					display_cursor += 1;
+					i += 1;
+				}
+			} else {
+				// Skip this hunk's display lines
+				display_cursor += hunk_display_len;
+			}
+		}
+
+		result
+	}
+
+	fn draw_side_by_side(
+		&self,
+		f: &mut Frame,
+		r: Rect,
+		title: &str,
+		height: u16,
+	) -> Result<()> {
+		// Split area into left and right columns
+		let chunks = Layout::default()
+			.direction(RatatuiDirection::Horizontal)
+			.constraints(
+				[
+					Constraint::Percentage(50),
+					Constraint::Percentage(50),
+				]
+				.as_ref(),
+			)
+			.split(r);
+
+		// Calculate available width for content (subtract borders, marker, line number, space)
+		// Each panel has: 1 border + 1 marker + 4 line num + 1 space = 7 chars overhead
+		let panel_width = chunks[0].width.saturating_sub(7) as usize;
+
+		let lines = self.get_side_by_side_lines(height);
+		let scrolled_right = self.horizontal_scroll.get_right();
+		let selected_hunk = self.selected_hunk;
+
+		// Get current selection index
+		let current_selection = self.selection.get_end();
+
+		// Build left column text with selection highlighting
+		let left_txt: Vec<Line> = lines
+			.iter()
+			.map(|line| {
+				let selected = self.focused()
+					&& line.global_line_idx == current_selection;
+				let hunk_selected = self.focused()
+					&& selected_hunk
+						.is_some_and(|h| h == line.hunk_idx);
+				let left_content =
+					trim_offset(&line.left_content, scrolled_right);
+				let line_num_str = line
+					.left_line_num
+					.map_or(String::from("   "), |n| {
+						format!("{n:4}")
+					});
+
+				// Get hunk marker style
+				let marker_style =
+					self.theme.diff_hunk_marker(hunk_selected);
+				let marker = if line.is_hunk_end {
+					symbols::line::BOTTOM_LEFT
+				} else if line.is_hunk_start {
+					symbols::line::TOP_LEFT
+				} else {
+					symbols::line::VERTICAL
+				};
+
+				// Pad content to fill width when selected
+				let content = if selected {
+					format!("{:w$}\n", left_content, w = panel_width)
+				} else {
+					format!("{left_content}\n")
+				};
+
+				// For Header lines, content starts with " @" where the leading space
+				// aligns with text below. Split it so the leading space is not highlighted.
+				if line.left_type == DiffLineType::Header
+					&& left_content.starts_with(' ')
+				{
+					Line::from(vec![
+						Span::styled(Cow::from(marker), marker_style),
+						Span::styled(
+							Cow::from(line_num_str),
+							self.theme.text(false, false),
+						),
+						// Gap - never highlighted
+						Span::styled(
+							Cow::from(" "),
+							self.theme.text(false, false),
+						),
+						// Leading space in header content - never highlighted
+						Span::styled(
+							Cow::from(" "),
+							self.theme.text(false, false),
+						),
+						Span::styled(
+							Cow::from(content[1..].to_string()),
+							self.theme
+								.diff_line(line.left_type, selected),
+						),
+					])
+				} else {
+					Line::from(vec![
+						Span::styled(Cow::from(marker), marker_style),
+						Span::styled(
+							Cow::from(line_num_str),
+							self.theme.text(false, false),
+						),
+						// Gap between line number and content - never highlighted
+						Span::styled(
+							Cow::from(" "),
+							self.theme.text(false, false),
+						),
+						Span::styled(
+							Cow::from(content),
+							self.theme
+								.diff_line(line.left_type, selected),
+						),
+					])
+				}
+			})
+			.collect();
+
+		// Build right column text with selection highlighting
+		let right_txt: Vec<Line> = lines
+			.iter()
+			.map(|line| {
+				let selected = self.focused()
+					&& line.global_line_idx == current_selection;
+				let hunk_selected = self.focused()
+					&& selected_hunk
+						.is_some_and(|h| h == line.hunk_idx);
+				let right_content =
+					trim_offset(&line.right_content, scrolled_right);
+				let line_num_str = line
+					.right_line_num
+					.map_or(String::from("   "), |n| {
+						format!("{n:4}")
+					});
+
+				// Get hunk marker style
+				let marker_style =
+					self.theme.diff_hunk_marker(hunk_selected);
+				let marker = if line.is_hunk_end {
+					symbols::line::BOTTOM_LEFT
+				} else if line.is_hunk_start {
+					symbols::line::TOP_LEFT
+				} else {
+					symbols::line::VERTICAL
+				};
+
+				// Pad content to fill width when selected
+				let content = if selected {
+					format!("{:w$}\n", right_content, w = panel_width)
+				} else {
+					format!("{right_content}\n")
+				};
+
+				// For Header lines on right column (empty), don't highlight the filler
+				if line.right_type == DiffLineType::Header {
+					Line::from(vec![
+						Span::styled(Cow::from(marker), marker_style),
+						Span::styled(
+							Cow::from(line_num_str),
+							self.theme.text(false, false),
+						),
+						// Gap - never highlighted
+						Span::styled(
+							Cow::from(" "),
+							self.theme.text(false, false),
+						),
+						// Header right side is empty, don't highlight filler
+						Span::styled(
+							Cow::from(content),
+							self.theme.text(false, false),
+						),
+					])
+				} else {
+					Line::from(vec![
+						Span::styled(Cow::from(marker), marker_style),
+						Span::styled(
+							Cow::from(line_num_str),
+							self.theme.text(false, false),
+						),
+						// Gap between line number and content - never highlighted
+						Span::styled(
+							Cow::from(" "),
+							self.theme.text(false, false),
+						),
+						Span::styled(
+							Cow::from(content),
+							self.theme
+								.diff_line(line.right_type, selected),
+						),
+					])
+				}
+			})
+			.collect();
+
+		// Draw left column
+		f.render_widget(
+			Paragraph::new(left_txt).block(
+				Block::default()
+					.title(Span::styled(
+						format!("{title} [Old]"),
+						self.theme.title(self.focused()),
+					))
+					.borders(Borders::ALL)
+					.border_style(self.theme.block(self.focused())),
+			),
+			chunks[0],
+		);
+
+		// Draw right column
+		f.render_widget(
+			Paragraph::new(right_txt).block(
+				Block::default()
+					.title(Span::styled(
+						"[New]",
+						self.theme.title(self.focused()),
+					))
+					.borders(Borders::ALL)
+					.border_style(self.theme.block(self.focused())),
+			),
+			chunks[1],
+		);
+
+		if self.focused() {
+			self.vertical_scroll.draw(f, r, &self.theme);
+
+			if self.max_scroll_right() > 0 {
+				self.horizontal_scroll.draw(f, r, &self.theme);
+			}
+		}
+
+		Ok(())
+	}
+
 	const fn is_stage(&self) -> bool {
 		self.current.is_stage
 	}
@@ -692,15 +1286,32 @@ impl DrawableComponent for DiffComponent {
 		let current_width = self.current_size.get().0;
 		let current_height = self.current_size.get().1;
 
+		// Use display line count for side-by-side mode
+		let lines_count = if self.diff_mode == DiffMode::SideBySide {
+			self.side_by_side_lines_count()
+		} else {
+			self.lines_count()
+		};
+
 		self.vertical_scroll.update(
 			self.selection.get_end(),
-			self.lines_count(),
+			lines_count,
 			usize::from(current_height),
 		);
 
+		// In side-by-side mode, each panel content width is smaller
+		// chunks[0].width ≈ r.width / 2, content = chunks[0].width - 7
+		// ≈ current_width / 2 - 6
+		let panel_content_width: usize =
+			if self.diff_mode == DiffMode::SideBySide {
+				(current_width / 2).saturating_sub(6).into()
+			} else {
+				current_width.into()
+			};
+
 		self.horizontal_scroll.update_no_selection(
 			self.longest_line,
-			current_width.into(),
+			panel_content_width,
 		);
 
 		let title = format!(
@@ -709,33 +1320,41 @@ impl DrawableComponent for DiffComponent {
 			self.current.path
 		);
 
-		let txt = if self.pending {
-			vec![Line::from(vec![Span::styled(
-				Cow::from(strings::loading_text(&self.key_config)),
-				self.theme.text(false, false),
-			)])]
+		if self.diff_mode == DiffMode::SideBySide && !self.pending {
+			self.draw_side_by_side(f, r, &title, current_height)?;
 		} else {
-			self.get_text(r.width, current_height)
-		};
+			let txt = if self.pending {
+				vec![Line::from(vec![Span::styled(
+					Cow::from(strings::loading_text(
+						&self.key_config,
+					)),
+					self.theme.text(false, false),
+				)])]
+			} else {
+				self.get_text(r.width, current_height)
+			};
 
-		f.render_widget(
-			Paragraph::new(txt).block(
-				Block::default()
-					.title(Span::styled(
-						title.as_str(),
-						self.theme.title(self.focused()),
-					))
-					.borders(Borders::ALL)
-					.border_style(self.theme.block(self.focused())),
-			),
-			r,
-		);
+			f.render_widget(
+				Paragraph::new(txt).block(
+					Block::default()
+						.title(Span::styled(
+							title.as_str(),
+							self.theme.title(self.focused()),
+						))
+						.borders(Borders::ALL)
+						.border_style(
+							self.theme.block(self.focused()),
+						),
+				),
+				r,
+			);
 
-		if self.focused() {
-			self.vertical_scroll.draw(f, r, &self.theme);
+			if self.focused() {
+				self.vertical_scroll.draw(f, r, &self.theme);
 
-			if self.max_scroll_right() > 0 {
-				self.horizontal_scroll.draw(f, r, &self.theme);
+				if self.max_scroll_right() > 0 {
+					self.horizontal_scroll.draw(f, r, &self.theme);
+				}
 			}
 		}
 
@@ -820,6 +1439,11 @@ impl Component for DiffComponent {
 
 		out.push(CommandInfo::new(
 			strings::commands::copy(&self.key_config),
+			true,
+			self.focused(),
+		));
+		out.push(CommandInfo::new(
+			strings::commands::diff_toggle_mode(&self.key_config),
 			true,
 			self.focused(),
 		));
@@ -942,6 +1566,12 @@ impl Component for DiffComponent {
 					Ok(EventState::Consumed)
 				} else if key_match(e, self.key_config.keys.copy) {
 					self.copy_selection();
+					Ok(EventState::Consumed)
+				} else if key_match(
+					e,
+					self.key_config.keys.diff_mode_toggle,
+				) {
+					self.toggle_diff_mode();
 					Ok(EventState::Consumed)
 				} else {
 					Ok(EventState::NotConsumed)

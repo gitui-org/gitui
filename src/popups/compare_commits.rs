@@ -100,6 +100,12 @@ impl Component for CompareCommitsPopup {
 				true,
 				self.diff.focused() || force_all,
 			));
+
+			out.push(CommandInfo::new(
+				strings::commands::diff_toggle_mode(&self.key_config),
+				true,
+				true,
+			));
 		}
 
 		visibility_blocking(self)
@@ -134,6 +140,11 @@ impl Component for CompareCommitsPopup {
 				} else if key_match(e, self.key_config.keys.move_left)
 				{
 					self.hide_stacked(false);
+				} else if key_match(
+					e,
+					self.key_config.keys.diff_mode_toggle,
+				) {
+					self.diff.toggle_diff_mode();
 				}
 
 				return Ok(EventState::Consumed);

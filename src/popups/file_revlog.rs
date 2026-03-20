@@ -569,6 +569,11 @@ impl Component for FileRevlogPopup {
 					self.key_config.keys.page_down,
 				) {
 					self.move_selection(ScrollType::PageDown)?;
+				} else if key_match(
+					key,
+					self.key_config.keys.diff_mode_toggle,
+				) {
+					self.diff.toggle_diff_mode();
 				}
 			}
 
@@ -620,6 +625,11 @@ impl Component for FileRevlogPopup {
 				strings::commands::diff_focus_left(&self.key_config),
 				true,
 				self.diff.focused(),
+			));
+			out.push(CommandInfo::new(
+				strings::commands::diff_toggle_mode(&self.key_config),
+				true,
+				true,
 			));
 		}
 
