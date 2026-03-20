@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Fixes
+### Changed
+* improve `gitui --version` message [[@hlsxx](https://github.com/hlsxx)] ([#2838](https://github.com/gitui-org/gitui/issues/2838))
+* rust msrv bumped to `1.88`
+
+### Fixed
 * fix extremely slow status loading in large repositories by replacing time-based cache invalidation with generation counter [[@DannyStoll1](https://github.com/DannyStoll1)] ([#2823](https://github.com/gitui-org/gitui/issues/2823))
 * fix panic when renaming or updating remote URL with no remotes configured [[@xvchris](https://github.com/xvchris)] ([#2868](https://github.com/gitui-org/gitui/issues/2868))
-
-### Changed
-* rust msrv bumped to `1.88`
 
 ## [0.28.0] - 2025-12-14
 
