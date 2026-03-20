@@ -616,7 +616,8 @@ impl TextInputComponent {
 				alt: true,
 				..
 			} => {
-				// On Windows, AltGr is commonly reported as Ctrl+Alt.
+				// On Windows, AltGr (Right Alt) can surface to applications as the Ctrl+Alt chord,
+				// so AltGr-generated characters may arrive with both `ctrl` and `alt` set.
 				if cfg!(windows) {
 					ta.insert_char(*c);
 					true
