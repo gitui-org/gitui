@@ -1,3 +1,11 @@
+use super::utils::graphrow::{
+	lane_color, SYM_BRANCH_DOWN, SYM_BRANCH_UP, SYM_BRANCH_UP_RIGHT,
+	SYM_COMMIT, SYM_COMMIT_BRANCH, SYM_COMMIT_MERGE,
+	SYM_COMMIT_STASH, SYM_COMMIT_UNCOMMITTED, SYM_HORIZONTAL,
+	SYM_MERGE_BRIDGE_END, SYM_MERGE_BRIDGE_MID,
+	SYM_MERGE_BRIDGE_START, SYM_SPACE, SYM_VERTICAL,
+	SYM_VERTICAL_DOTTED,
+};
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
 	app::Environment,
@@ -13,9 +21,12 @@ use crate::{
 	ui::{calc_scroll_top, draw_scrollbar, Orientation},
 };
 use anyhow::Result;
-use asyncgit::sync::{
-	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
-	RepoPathRef, Tags,
+use asyncgit::{
+	graph::{ConnType, GraphRow},
+	sync::{
+		self, checkout_commit, BranchDetails, BranchInfo, CommitId,
+		RepoPathRef, Tags,
+	},
 };
 use chrono::{DateTime, Local};
 use crossterm::event::Event;
@@ -23,14 +34,14 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use ratatui::{
 	layout::{Alignment, Rect},
-	style::Style,
+	style::{Color, Style},
 	text::{Line, Span},
 	widgets::{Block, Borders, Paragraph},
 	Frame,
 };
+use std::borrow::Cow;
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
-	time::Instant,
+	cell::Cell, cmp, collections::BTreeMap, rc::Rc, time::Instant,
 };
 
 const ELEMENTS_PER_LINE: usize = 9;
@@ -58,6 +69,8 @@ pub struct CommitList {
 	theme: SharedTheme,
 	queue: Queue,
 	key_config: SharedKeyConfig,
+	show_graph: bool,
+	graph_col_width: Cell<usize>,
 }
 
 impl CommitList {
@@ -81,7 +94,21 @@ impl CommitList {
 			queue: env.queue.clone(),
 			key_config: env.key_config.clone(),
 			title: title.into(),
+			show_graph: true,
+			graph_col_width: Cell::new(0),
 		}
+	}
+
+	///
+	pub fn get_loaded_slice(&self) -> (Vec<CommitId>, usize) {
+		let offset = self.items.index_offset();
+		let ids = self.items.iter().map(|e| e.id).collect();
+		(ids, offset)
+	}
+
+	///
+	pub fn set_graph_rows(&mut self, rows: Vec<GraphRow>) {
+		self.items.set_graph_rows(rows);
 	}
 
 	///
@@ -173,6 +200,20 @@ impl CommitList {
 				checkout_commit(&self.repo.borrow(), commit_hash)
 			);
 		}
+	}
+
+	///
+	pub fn local_branches(
+		&self,
+	) -> &std::collections::BTreeMap<CommitId, Vec<BranchInfo>> {
+		&self.local_branches
+	}
+
+	///
+	pub fn remote_branches(
+		&self,
+	) -> &std::collections::BTreeMap<CommitId, Vec<BranchInfo>> {
+		&self.remote_branches
 	}
 
 	///
@@ -439,6 +480,103 @@ impl CommitList {
 		}
 	}
 
+	fn build_graph_spans<'a>(
+		&self,
+		row: &'a GraphRow,
+		graph_col_width: usize,
+		empty_lanes: &std::collections::HashSet<usize>,
+	) -> Vec<Span<'a>> {
+		let mut spans = Vec::new();
+
+		for (lane_index, conn) in row.lanes.iter().enumerate() {
+			if empty_lanes.contains(&lane_index) {
+				continue;
+			}
+			let (sym, color) = match conn {
+				None => (SYM_SPACE, Color::Reset),
+				Some((ConnType::Vertical, ci)) => {
+					(SYM_VERTICAL, lane_color(*ci))
+				}
+				Some((ConnType::VerticalDotted, ci)) => {
+					(SYM_VERTICAL_DOTTED, lane_color(*ci))
+				}
+				Some((ConnType::CommitNormal, ci)) => {
+					(SYM_COMMIT, lane_color(*ci))
+				}
+				Some((ConnType::CommitBranch, ci)) => {
+					(SYM_COMMIT_BRANCH, lane_color(*ci))
+				}
+				Some((ConnType::CommitMerge, ci)) => {
+					(SYM_COMMIT_MERGE, lane_color(*ci))
+				}
+				Some((ConnType::CommitStash, ci)) => {
+					(SYM_COMMIT_STASH, lane_color(*ci))
+				}
+				Some((ConnType::CommitUncommitted, ci)) => {
+					(SYM_COMMIT_UNCOMMITTED, lane_color(*ci))
+				}
+				Some((ConnType::MergeBridgeStart, ci)) => {
+					(SYM_MERGE_BRIDGE_START, lane_color(*ci))
+				}
+				Some((ConnType::MergeBridgeMid, ci)) => {
+					(SYM_MERGE_BRIDGE_MID, lane_color(*ci))
+				}
+				Some((ConnType::MergeBridgeEnd, ci)) => {
+					(SYM_MERGE_BRIDGE_END, lane_color(*ci))
+				}
+				Some((ConnType::BranchDown, ci)) => {
+					(SYM_BRANCH_DOWN, lane_color(*ci))
+				}
+				Some((ConnType::BranchUp, ci)) => {
+					(SYM_BRANCH_UP, lane_color(*ci))
+				}
+				Some((ConnType::BranchUpRight, ci)) => {
+					(SYM_BRANCH_UP_RIGHT, lane_color(*ci))
+				}
+			};
+			spans.push(Span::styled(sym, Style::default().fg(color)));
+
+			// Spacer
+			let mut bridge_color = row.commit_lane % 16;
+			let mut is_bridge_lane = false;
+
+			if let Some((from, to)) = row.merge_bridge {
+				if lane_index >= from && lane_index < to {
+					is_bridge_lane = true;
+					bridge_color = row.commit_lane % 16;
+				}
+			}
+
+			for &(from, to) in &row.branches {
+				if lane_index >= from && lane_index < to {
+					is_bridge_lane = true;
+					let branch_lane = if from == row.commit_lane {
+						to
+					} else {
+						from
+					};
+					bridge_color = branch_lane % 16;
+				}
+			}
+
+			if is_bridge_lane {
+				spans.push(Span::styled(
+					SYM_HORIZONTAL,
+					Style::default().fg(lane_color(bridge_color)),
+				));
+				continue;
+			}
+			spans.push(Span::raw(SYM_SPACE));
+		}
+
+		let current_width = spans.len();
+		for _ in current_width..graph_col_width {
+			spans.push(Span::raw(SYM_SPACE));
+		}
+
+		spans
+	}
+
 	#[allow(clippy::too_many_arguments)]
 	fn get_entry_to_add<'a>(
 		&self,
@@ -451,10 +589,26 @@ impl CommitList {
 		width: usize,
 		now: DateTime<Local>,
 		marked: Option<bool>,
+		empty_lanes: &std::collections::HashSet<usize>,
 	) -> Line<'a> {
 		let mut txt: Vec<Span> = Vec::with_capacity(
 			ELEMENTS_PER_LINE + if marked.is_some() { 2 } else { 0 },
 		);
+
+		if self.show_graph {
+			if let Some(ref row) = e.graph {
+				txt.extend(self.build_graph_spans(
+					row,
+					self.graph_col_width.get(),
+					empty_lanes,
+				));
+			} else {
+				txt.push(Span::raw(
+					" ".repeat(self.graph_col_width.get()),
+				));
+			}
+			txt.push(Span::raw(" "));
+		}
 
 		let normal = !self.items.highlighting()
 			|| (self.items.highlighting() && e.highlighted);
@@ -570,9 +724,57 @@ impl CommitList {
 
 		let mut txt: Vec<Line> = Vec::with_capacity(height);
 
-		let now = Local::now();
+		let mut empty_lanes = std::collections::HashSet::new();
 
-		let any_marked = !self.marked.is_empty();
+		if self.show_graph {
+			let mut max_lane_in_view = 0;
+			for e in self
+				.items
+				.iter()
+				.skip(self.scroll_top.get())
+				.take(height)
+			{
+				if let Some(row) = &e.graph {
+					max_lane_in_view =
+						max_lane_in_view.max(row.lanes.len());
+				}
+			}
+
+			// Assume all lanes up to max_lane_in_view are empty
+			empty_lanes.extend(0..max_lane_in_view);
+
+			// Remove lanes that have content
+			for e in self
+				.items
+				.iter()
+				.skip(self.scroll_top.get())
+				.take(height)
+			{
+				if let Some(row) = &e.graph {
+					for (lane_idx, conn) in
+						row.lanes.iter().enumerate()
+					{
+						if !matches!(
+							conn,
+							None | Some((
+								ConnType::MergeBridgeMid,
+								_
+							))
+						) {
+							empty_lanes.remove(&lane_idx);
+						}
+					}
+				}
+			}
+
+			let width = ((max_lane_in_view
+				.saturating_sub(empty_lanes.len()))
+				* 2)
+			.max(2);
+			self.graph_col_width.set(width);
+		} else {
+			self.graph_col_width.set(0);
+		}
 
 		for (idx, e) in self
 			.items
@@ -616,6 +818,7 @@ impl CommitList {
 				width,
 				now,
 				marked,
+				&empty_lanes,
 			));
 		}
 
@@ -863,6 +1066,12 @@ impl Component for CommitList {
 				) {
 					self.checkout();
 					true
+				} else if key_match(
+					k,
+					self.key_config.keys.log_toggle_graph,
+				) {
+					self.show_graph = !self.show_graph;
+					true
 				} else {
 					false
 				};
@@ -887,6 +1096,11 @@ impl Component for CommitList {
 				&self.key_config,
 				self.selected_entry_marked(),
 			),
+			true,
+			true,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::log_toggle_graph(&self.key_config),
 			true,
 			true,
 		));
