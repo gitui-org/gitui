@@ -1601,6 +1601,19 @@ pub mod commands {
 		)
 	}
 
+	pub fn log_toggle_graph(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Toggle Graph [{}]",
+				key_config.get_hint(key_config.keys.log_toggle_graph),
+			),
+			"toggle commit graph",
+			CMD_GROUP_LOG,
+		)
+	}
+
 	pub fn reset_commit(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(
