@@ -30,38 +30,38 @@ impl GraphWalker {
 	}
 
 	pub fn process(&mut self, commit: &CommitInfo) {
-		let alias = Some(self.oids.get_or_insert(&commit.id));
-		let parent_a =
-			commit.parents.get(0).map(|p| self.oids.get_or_insert(p));
+		let alias = self.oids.get_or_insert(&commit.id);
+		let parent_a = commit
+			.parents
+			.first()
+			.map(|p| self.oids.get_or_insert(p));
 		let parent_b =
 			commit.parents.get(1).map(|p| self.oids.get_or_insert(p));
 
 		let chunk = Chunk {
-			alias,
+			alias: Some(alias),
 			parent_a,
 			parent_b,
 			marker: Markers::Commit,
 		};
 
-		if let (Some(a), Some(b)) = (alias, parent_b) {
-			self.mergers_map.insert(a, b);
+		if let Some(b) = parent_b {
+			self.mergers_map.insert(alias, b);
 		}
 
 		if parent_a.is_some() && parent_b.is_some() {
 			let already_tracked =
 				self.buffer.current.iter().any(|c| {
-					if let Some(c) = c {
+					c.as_ref().is_some_and(|c| {
 						c.parent_a == parent_b && c.parent_b.is_none()
-					} else {
-						false
-					}
+					})
 				});
 			if !already_tracked {
-				self.buffer.merger(alias.unwrap());
+				self.buffer.merger(alias);
 			}
 		}
 
-		self.buffer.update(chunk);
+		self.buffer.update(&chunk);
 	}
 
 	pub fn snapshot_at(
@@ -125,14 +125,14 @@ impl GraphWalker {
 		let commit_lane = curr
 			.iter()
 			.position(|c| {
-				c.as_ref().map_or(false, |chunk| {
+				c.as_ref().is_some_and(|chunk| {
 					alias.is_some() && chunk.alias == alias
 				})
 			})
 			.unwrap_or(0);
 
 		let parent_b_alias =
-			alias.and_then(|a| self.mergers_map.get(&a).cloned());
+			alias.and_then(|a| self.mergers_map.get(&a).copied());
 
 		let is_merge = parent_b_alias.is_some();
 		let is_branch_tip = branch_tips.contains(commit_id);
@@ -144,7 +144,7 @@ impl GraphWalker {
 			.enumerate()
 			.filter(|(i, pc)| {
 				pc.is_some()
-					&& curr.get(*i).map_or(true, |c| c.is_none())
+					&& curr.get(*i).is_none_or(Option::is_none)
 			})
 			.map(|(i, _)| i)
 			.collect();
@@ -154,7 +154,7 @@ impl GraphWalker {
 		let merge_bridge = is_merge
 			.then(|| {
 				let target_lane = curr.iter().position(|c| {
-					c.as_ref().map_or(false, |chunk| {
+					c.as_ref().is_some_and(|chunk| {
 						parent_b_alias.is_some()
 							&& chunk.parent_a == parent_b_alias
 					})
@@ -169,19 +169,84 @@ impl GraphWalker {
 			})
 			.flatten();
 
+		self.fill_lanes(
+			&mut lanes,
+			curr,
+			alias,
+			head_id,
+			is_stash,
+			is_merge,
+			is_branch_tip,
+			&branching_lanes,
+		);
+
+		if let Some((from, to)) = merge_bridge {
+			Self::draw_bridge(
+				&mut lanes,
+				from,
+				to,
+				commit_lane,
+				ConnType::MergeBridgeMid,
+				ConnType::MergeBridgeStart,
+				ConnType::MergeBridgeEnd,
+			);
+		}
+
+		let mut branches = Vec::new();
+		for &branch_lane in &branching_lanes {
+			let from = std::cmp::min(branch_lane, commit_lane);
+			let to = std::cmp::max(branch_lane, commit_lane);
+			branches.push((from, to));
+
+			if lanes.len() <= to {
+				lanes.resize(to + 1, None);
+			}
+
+			Self::draw_bridge(
+				&mut lanes,
+				from,
+				to,
+				branch_lane,
+				ConnType::MergeBridgeMid,
+				ConnType::BranchUp,
+				ConnType::BranchUpRight,
+			);
+		}
+
+		GraphRow {
+			lane_count: curr.iter().flatten().count(),
+			commit_lane,
+			is_merge,
+			is_branch_tip,
+			is_stash,
+			lanes,
+			merge_bridge,
+			branches,
+		}
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	fn fill_lanes(
+		&self,
+		lanes: &mut [Option<(ConnType, usize)>],
+		curr: &Vector<Option<Chunk>>,
+		alias: Option<u32>,
+		head_id: Option<&CommitId>,
+		is_stash: bool,
+		is_merge: bool,
+		is_branch_tip: bool,
+		branching_lanes: &[usize],
+	) {
 		for (lane_idx, chunk_item) in curr.iter().enumerate() {
-			if chunk_item.is_none() {
+			let Some(chunk) = chunk_item.as_ref() else {
 				if branching_lanes.contains(&lane_idx) {
 					lanes[lane_idx] =
 						Some((ConnType::BranchUp, lane_idx % 16));
 				}
 				continue;
-			}
-
-			let chunk = chunk_item.as_ref().unwrap();
+			};
 
 			if alias.is_some() && chunk.alias == alias {
-				// basically a from impl inline here
 				let conn_type =
 					match (is_stash, is_merge, is_branch_tip) {
 						(true, _, _) => ConnType::CommitStash,
@@ -202,70 +267,38 @@ impl GraphWalker {
 				let is_orphan = chunk.parent_a.is_none()
 					&& chunk.parent_b.is_none();
 
-				let conn = match (is_dotted, is_orphan) {
-					(true, _) => ConnType::VerticalDotted,
-					(_, true) => continue,
-					_ => ConnType::Vertical,
+				if is_orphan {
+					continue;
+				}
+
+				let conn = if is_dotted {
+					ConnType::VerticalDotted
+				} else {
+					ConnType::Vertical
 				};
 
 				lanes[lane_idx] = Some((conn, lane_idx % 16));
 			}
 		}
+	}
 
-		if let Some((from, to)) = merge_bridge {
-			for bridge_lane in (from + 1)..to {
-				lanes[bridge_lane] = Some((
-					ConnType::MergeBridgeMid,
-					commit_lane % 16,
-				));
-			}
-			if to > commit_lane {
-				lanes[to] = Some((
-					ConnType::MergeBridgeStart,
-					commit_lane % 16,
-				));
-			} else if from < commit_lane {
-				lanes[from] = Some((
-					ConnType::MergeBridgeEnd,
-					commit_lane % 16,
-				));
-			}
+	fn draw_bridge(
+		lanes: &mut [Option<(ConnType, usize)>],
+		from: usize,
+		to: usize,
+		color_lane: usize,
+		mid: ConnType,
+		start: ConnType,
+		end: ConnType,
+	) {
+		for lane in lanes.iter_mut().take(to).skip(from + 1) {
+			*lane = Some((mid, color_lane % 16));
 		}
 
-		let mut branches = Vec::new();
-		for &branch_lane in &branching_lanes {
-			let from = std::cmp::min(branch_lane, commit_lane);
-			let to = std::cmp::max(branch_lane, commit_lane);
-			branches.push((from, to));
-
-			if lanes.len() <= to {
-				lanes.resize(to + 1, None);
-			}
-
-			for bridge_lane in (from + 1)..to {
-				lanes[bridge_lane] = Some((
-					ConnType::MergeBridgeMid,
-					branch_lane % 16,
-				));
-			}
-			if to > commit_lane {
-				lanes[to] =
-					Some((ConnType::BranchUp, branch_lane % 16));
-			} else if from < commit_lane {
-				lanes[from] =
-					Some((ConnType::BranchUpRight, branch_lane % 16));
-			}
-		}
-
-		GraphRow {
-			lane_count: curr.iter().filter(|c| c.is_some()).count(),
-			commit_lane,
-			is_merge,
-			is_branch_tip,
-			is_stash,
-			lanes,
-			merge_bridge,
-			branches,
+		if to > color_lane {
+			lanes[to] = Some((start, color_lane % 16));
+		} else if from < color_lane {
+			lanes[from] = Some((end, color_lane % 16));
 		}
 	}
 }
