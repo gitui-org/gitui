@@ -202,14 +202,14 @@ impl CommitList {
 	}
 
 	///
-	pub fn local_branches(
+	pub const fn local_branches(
 		&self,
 	) -> &std::collections::BTreeMap<CommitId, Vec<BranchInfo>> {
 		&self.local_branches
 	}
 
 	///
-	pub fn remote_branches(
+	pub const fn remote_branches(
 		&self,
 	) -> &std::collections::BTreeMap<CommitId, Vec<BranchInfo>> {
 		&self.remote_branches
@@ -590,26 +590,14 @@ impl CommitList {
 		);
 
 		if self.show_graph {
-			if let Some(ref row) = e.graph {
-				txt.extend(self.build_graph_spans(
-					row,
-					self.graph_col_width.get(),
-					empty_lanes,
-				));
-			} else {
-				txt.push(Span::raw(
-					" ".repeat(self.graph_col_width.get()),
-				));
-			}
-			txt.push(Span::raw(" "));
+			self.add_graph_spans(e, &mut txt, empty_lanes);
 		}
 
 		let normal = !self.items.highlighting()
 			|| (self.items.highlighting() && e.highlighted);
 
-		let splitter_txt = Cow::from(symbol::EMPTY_SPACE);
 		let splitter = Span::styled(
-			splitter_txt,
+			Cow::from(symbol::EMPTY_SPACE),
 			if normal {
 				theme.text(true, selected)
 			} else {
@@ -630,40 +618,80 @@ impl CommitList {
 			txt.push(splitter.clone());
 		}
 
-		let style_hash = if normal {
-			theme.commit_hash(selected)
+		Self::add_entry_details(
+			e,
+			&mut txt,
+			selected,
+			normal,
+			theme,
+			width,
+			now,
+			tags,
+			local_branches,
+			remote_branches,
+			&splitter,
+		);
+
+		Line::from(txt)
+	}
+
+	fn add_graph_spans<'a>(
+		&self,
+		e: &'a LogEntry,
+		txt: &mut Vec<Span<'a>>,
+		empty_lanes: &std::collections::HashSet<usize>,
+	) {
+		if let Some(ref row) = e.graph {
+			txt.extend(self.build_graph_spans(
+				row,
+				self.graph_col_width.get(),
+				empty_lanes,
+			));
 		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_time = if normal {
-			theme.commit_time(selected)
+			txt.push(Span::raw(
+				" ".repeat(self.graph_col_width.get()),
+			));
+		}
+		txt.push(Span::raw(" "));
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	fn add_entry_details<'a>(
+		e: &'a LogEntry,
+		txt: &mut Vec<Span<'a>>,
+		selected: bool,
+		normal: bool,
+		theme: &Theme,
+		width: usize,
+		now: DateTime<Local>,
+		tags: Option<String>,
+		local_branches: Option<String>,
+		remote_branches: Option<String>,
+		splitter: &Span<'a>,
+	) {
+		let (
+			style_hash,
+			style_time,
+			style_author,
+			style_tags,
+			style_branches,
+			style_msg,
+		) = if normal {
+			(
+				theme.commit_hash(selected),
+				theme.commit_time(selected),
+				theme.commit_author(selected),
+				theme.tags(selected),
+				theme.branch(selected, true),
+				theme.text(true, selected),
+			)
 		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_author = if normal {
-			theme.commit_author(selected)
-		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_tags = if normal {
-			theme.tags(selected)
-		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_branches = if normal {
-			theme.branch(selected, true)
-		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_msg = if normal {
-			theme.text(true, selected)
-		} else {
-			theme.commit_unhighlighted()
+			let s = theme.commit_unhighlighted();
+			(s, s, s, s, s, s)
 		};
 
 		// commit hash
 		txt.push(Span::styled(Cow::from(&*e.hash_short), style_hash));
-
 		txt.push(splitter.clone());
 
 		// commit timestamp
@@ -671,7 +699,6 @@ impl CommitList {
 			Cow::from(e.time_to_string(now)),
 			style_time,
 		));
-
 		txt.push(splitter.clone());
 
 		let author_width =
@@ -680,7 +707,6 @@ impl CommitList {
 
 		// commit author
 		txt.push(Span::styled(author, style_author));
-
 		txt.push(splitter.clone());
 
 		// commit tags
@@ -698,7 +724,7 @@ impl CommitList {
 			txt.push(Span::styled(remote_branches, style_branches));
 		}
 
-		txt.push(splitter);
+		txt.push(splitter.clone());
 
 		let message_width = width.saturating_sub(
 			txt.iter().map(|span| span.content.len()).sum(),
@@ -709,8 +735,6 @@ impl CommitList {
 			format!("{:message_width$}", &e.msg),
 			style_msg,
 		));
-
-		Line::from(txt)
 	}
 
 	fn get_text(&self, height: usize, width: usize) -> Vec<Line<'_>> {
@@ -1133,6 +1157,8 @@ mod tests {
 					std::path::PathBuf::default(),
 				)),
 				queue: Queue::default(),
+				show_graph: true,
+				graph_col_width: Cell::new(0),
 			}
 		}
 	}
@@ -1167,6 +1193,7 @@ mod tests {
 			time: 0,
 			author: String::default(),
 			id: CommitId::default(),
+			parents: Vec::default().into(),
 		};
 		// This just creates a sequence of fake ordered ids
 		// 0000000000000000000000000000000000000000
