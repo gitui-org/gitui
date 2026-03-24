@@ -1,10 +1,9 @@
 use super::utils::graphrow::{
-	lane_color, SYM_BRANCH_DOWN, SYM_BRANCH_UP, SYM_BRANCH_UP_RIGHT,
-	SYM_COMMIT, SYM_COMMIT_BRANCH, SYM_COMMIT_MERGE,
-	SYM_COMMIT_STASH, SYM_COMMIT_UNCOMMITTED, SYM_HORIZONTAL,
-	SYM_MERGE_BRIDGE_END, SYM_MERGE_BRIDGE_MID,
-	SYM_MERGE_BRIDGE_START, SYM_SPACE, SYM_VERTICAL,
-	SYM_VERTICAL_DOTTED,
+	SYM_BRANCH_DOWN, SYM_BRANCH_UP, SYM_BRANCH_UP_RIGHT, SYM_COMMIT,
+	SYM_COMMIT_BRANCH, SYM_COMMIT_MERGE, SYM_COMMIT_STASH,
+	SYM_COMMIT_UNCOMMITTED, SYM_HORIZONTAL, SYM_MERGE_BRIDGE_END,
+	SYM_MERGE_BRIDGE_MID, SYM_MERGE_BRIDGE_START, SYM_SPACE,
+	SYM_VERTICAL, SYM_VERTICAL_DOTTED,
 };
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
@@ -488,81 +487,76 @@ impl CommitList {
 	) -> Vec<Span<'a>> {
 		let mut spans = Vec::new();
 
+		let graph_color =
+			self.theme.commit_hash(false).fg.unwrap_or(Color::Reset);
+
 		for (lane_index, conn) in row.lanes.iter().enumerate() {
 			if empty_lanes.contains(&lane_index) {
 				continue;
 			}
 			let (sym, color) = match conn {
 				None => (SYM_SPACE, Color::Reset),
-				Some((ConnType::Vertical, ci)) => {
-					(SYM_VERTICAL, lane_color(*ci))
+				Some((ConnType::Vertical, _)) => {
+					(SYM_VERTICAL, graph_color)
 				}
-				Some((ConnType::VerticalDotted, ci)) => {
-					(SYM_VERTICAL_DOTTED, lane_color(*ci))
+				Some((ConnType::VerticalDotted, _)) => {
+					(SYM_VERTICAL_DOTTED, graph_color)
 				}
-				Some((ConnType::CommitNormal, ci)) => {
-					(SYM_COMMIT, lane_color(*ci))
+				Some((ConnType::CommitNormal, _)) => {
+					(SYM_COMMIT, graph_color)
 				}
-				Some((ConnType::CommitBranch, ci)) => {
-					(SYM_COMMIT_BRANCH, lane_color(*ci))
+				Some((ConnType::CommitBranch, _)) => {
+					(SYM_COMMIT_BRANCH, graph_color)
 				}
-				Some((ConnType::CommitMerge, ci)) => {
-					(SYM_COMMIT_MERGE, lane_color(*ci))
+				Some((ConnType::CommitMerge, _)) => {
+					(SYM_COMMIT_MERGE, graph_color)
 				}
-				Some((ConnType::CommitStash, ci)) => {
-					(SYM_COMMIT_STASH, lane_color(*ci))
+				Some((ConnType::CommitStash, _)) => {
+					(SYM_COMMIT_STASH, graph_color)
 				}
-				Some((ConnType::CommitUncommitted, ci)) => {
-					(SYM_COMMIT_UNCOMMITTED, lane_color(*ci))
+				Some((ConnType::CommitUncommitted, _)) => {
+					(SYM_COMMIT_UNCOMMITTED, graph_color)
 				}
-				Some((ConnType::MergeBridgeStart, ci)) => {
-					(SYM_MERGE_BRIDGE_START, lane_color(*ci))
+				Some((ConnType::MergeBridgeStart, _)) => {
+					(SYM_MERGE_BRIDGE_START, graph_color)
 				}
-				Some((ConnType::MergeBridgeMid, ci)) => {
-					(SYM_MERGE_BRIDGE_MID, lane_color(*ci))
+				Some((ConnType::MergeBridgeMid, _)) => {
+					(SYM_MERGE_BRIDGE_MID, graph_color)
 				}
-				Some((ConnType::MergeBridgeEnd, ci)) => {
-					(SYM_MERGE_BRIDGE_END, lane_color(*ci))
+				Some((ConnType::MergeBridgeEnd, _)) => {
+					(SYM_MERGE_BRIDGE_END, graph_color)
 				}
-				Some((ConnType::BranchDown, ci)) => {
-					(SYM_BRANCH_DOWN, lane_color(*ci))
+				Some((ConnType::BranchDown, _)) => {
+					(SYM_BRANCH_DOWN, graph_color)
 				}
-				Some((ConnType::BranchUp, ci)) => {
-					(SYM_BRANCH_UP, lane_color(*ci))
+				Some((ConnType::BranchUp, _)) => {
+					(SYM_BRANCH_UP, graph_color)
 				}
-				Some((ConnType::BranchUpRight, ci)) => {
-					(SYM_BRANCH_UP_RIGHT, lane_color(*ci))
+				Some((ConnType::BranchUpRight, _)) => {
+					(SYM_BRANCH_UP_RIGHT, graph_color)
 				}
 			};
 			spans.push(Span::styled(sym, Style::default().fg(color)));
 
 			// Spacer
-			let mut bridge_color = row.commit_lane % 16;
 			let mut is_bridge_lane = false;
 
 			if let Some((from, to)) = row.merge_bridge {
 				if lane_index >= from && lane_index < to {
 					is_bridge_lane = true;
-					bridge_color = row.commit_lane % 16;
 				}
 			}
 
 			for &(from, to) in &row.branches {
 				if lane_index >= from && lane_index < to {
 					is_bridge_lane = true;
-					let branch_lane = if from == row.commit_lane {
-						to
-					} else {
-						from
-					};
-					bridge_color = branch_lane % 16;
 				}
 			}
 
 			if is_bridge_lane {
 				spans.push(Span::styled(
 					SYM_HORIZONTAL,
-					Style::default().fg(lane_color(bridge_color)),
+					Style::default().fg(graph_color),
 				));
 				continue;
 			}
@@ -775,6 +769,9 @@ impl CommitList {
 		} else {
 			self.graph_col_width.set(0);
 		}
+
+		let any_marked = !self.marked.is_empty();
+		let now = Local::now();
 
 		for (idx, e) in self
 			.items
