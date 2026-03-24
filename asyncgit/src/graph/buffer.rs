@@ -88,16 +88,15 @@ impl Buffer {
 
 			if let Some(mut c) = self.current[index].clone() {
 				let changed = new_chunk.alias.is_some_and(|alias| {
-					let mut changed = false;
-					if c.parent_a == Some(alias) {
+					let a = c.parent_a == Some(alias);
+					let b = c.parent_b == Some(alias);
+					if a {
 						c.parent_a = None;
-						changed = true;
 					}
-					if c.parent_b == Some(alias) {
+					if b {
 						c.parent_b = None;
-						changed = true;
 					}
-					changed
+					a || b
 				});
 
 				if changed {
