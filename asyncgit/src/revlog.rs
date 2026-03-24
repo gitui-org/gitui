@@ -1,14 +1,16 @@
 use crate::{
 	error::Result,
+	graph::{GraphRow, GraphWalker},
 	sync::{
-		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
-		RepoPath, SharedCommitFilterFn,
+		get_commits_info, gix_repo, repo, CommitId, LogWalker,
+		LogWalkerWithoutFilter, RepoPath, SharedCommitFilterFn,
 	},
 	AsyncGitNotification, Error,
 };
 use crossbeam_channel::Sender;
 use scopetime::scope_time;
 use std::{
+	collections::HashSet,
 	sync::{
 		atomic::{AtomicBool, Ordering},
 		Arc, Mutex,
@@ -45,6 +47,7 @@ pub struct AsyncLog {
 	filter: Option<SharedCommitFilterFn>,
 	partial_extract: AtomicBool,
 	repo: RepoPath,
+	graph_walker: Arc<Mutex<GraphWalker>>,
 }
 
 static LIMIT_COUNT: usize = 3000;
@@ -70,7 +73,31 @@ impl AsyncLog {
 			background: Arc::new(AtomicBool::new(false)),
 			filter,
 			partial_extract: AtomicBool::new(false),
+			graph_walker: Arc::new(Mutex::new(GraphWalker::new())),
 		}
+	}
+
+	pub fn get_graph_rows(
+		&self,
+		commit_slice: &[CommitId],
+		global_start: usize,
+		branch_tips: &HashSet<CommitId>,
+		stashes: &HashSet<CommitId>,
+		head_id: Option<&CommitId>,
+	) -> Option<Vec<GraphRow>> {
+		let walker_guard = self.graph_walker.lock().ok()?;
+		let needed_end = global_start + commit_slice.len();
+		if walker_guard.buffer.deltas.len() < needed_end {
+			return None;
+		}
+
+		Some(walker_guard.compute_rows(
+			commit_slice,
+			global_start,
+			branch_tips,
+			stashes,
+			head_id,
+		))
 	}
 
 	///
@@ -165,6 +192,7 @@ impl AsyncLog {
 		let sender = self.sender.clone();
 		let arc_pending = Arc::clone(&self.pending);
 		let arc_background = Arc::clone(&self.background);
+		let arc_graph_walker = Arc::clone(&self.graph_walker);
 		let filter = self.filter.clone();
 		let repo_path = self.repo.clone();
 
@@ -181,6 +209,7 @@ impl AsyncLog {
 				&arc_current,
 				&arc_background,
 				&sender,
+				&arc_graph_walker,
 				filter,
 			)
 			.expect("failed to fetch");
@@ -198,6 +227,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
+		arc_graph_walker: &Arc<Mutex<GraphWalker>>,
 		filter: Option<SharedCommitFilterFn>,
 	) -> Result<()> {
 		filter.map_or_else(
@@ -207,6 +237,7 @@ impl AsyncLog {
 					arc_current,
 					arc_background,
 					sender,
+					arc_graph_walker,
 				)
 			},
 			|filter| {
@@ -215,6 +246,7 @@ impl AsyncLog {
 					arc_current,
 					arc_background,
 					sender,
+					arc_graph_walker,
 					filter,
 				)
 			},
@@ -226,6 +258,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
+		arc_graph_walker: &Arc<Mutex<GraphWalker>>,
 		filter: SharedCommitFilterFn,
 	) -> Result<()> {
 		let start_time = Instant::now();
@@ -240,6 +273,18 @@ impl AsyncLog {
 		loop {
 			entries.clear();
 			let read = walker.read(&mut entries)?;
+
+			{
+				let infos = get_commits_info(
+					repo_path,
+					&entries[0..read],
+					1000,
+				)?;
+				let mut gw = arc_graph_walker.lock()?;
+				for info in &infos {
+					gw.process(info);
+				}
+			}
 
 			let mut current = arc_current.lock()?;
 			current.commits.extend(entries.iter());
@@ -270,6 +315,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
+		arc_graph_walker: &Arc<Mutex<GraphWalker>>,
 	) -> Result<()> {
 		let start_time = Instant::now();
 
@@ -283,6 +329,18 @@ impl AsyncLog {
 		loop {
 			entries.clear();
 			let read = walker.read(&mut entries)?;
+
+			{
+				let infos = get_commits_info(
+					repo_path,
+					&entries[0..read],
+					1000,
+				)?;
+				let mut gw = arc_graph_walker.lock()?;
+				for info in &infos {
+					gw.process(info);
+				}
+			}
 
 			let mut current = arc_current.lock()?;
 			current.commits.extend(entries.iter());
@@ -312,6 +370,7 @@ impl AsyncLog {
 		self.current.lock()?.commits.clear();
 		*self.current_head.lock()? = None;
 		self.partial_extract.store(false, Ordering::Relaxed);
+		*self.graph_walker.lock()? = GraphWalker::new();
 		Ok(())
 	}
 
@@ -332,6 +391,7 @@ mod tests {
 	use serial_test::serial;
 	use tempfile::TempDir;
 
+	use crate::graph::GraphWalker;
 	use crate::sync::tests::{debug_cmd_print, repo_init};
 	use crate::sync::RepoPath;
 	use crate::AsyncLog;
@@ -359,12 +419,14 @@ mod tests {
 			duration: Duration::default(),
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
+		let arc_graph_walker = Arc::new(Mutex::new(GraphWalker::new()));
 
 		let result = AsyncLog::fetch_helper_without_filter(
 			&subdir_path,
 			&arc_current,
 			&arc_background,
 			&tx_git,
+			&arc_graph_walker,
 		);
 
 		assert_eq!(result.unwrap(), ());
@@ -387,6 +449,7 @@ mod tests {
 			duration: Duration::default(),
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
+		let arc_graph_walker = Arc::new(Mutex::new(GraphWalker::new()));
 
 		std::env::set_var("GIT_DIR", git_dir);
 
@@ -396,6 +459,7 @@ mod tests {
 			&arc_current,
 			&arc_background,
 			&tx_git,
+			&arc_graph_walker,
 		);
 
 		std::env::remove_var("GIT_DIR");
