@@ -46,6 +46,16 @@ impl Buffer {
 	pub fn update(&mut self, new_chunk: Chunk) {
 		self.pending_delta.clear();
 
+		let mut empty_lanes: Vec<usize> = self
+			.current
+			.iter()
+			.enumerate()
+			.filter_map(|(i, c)| c.is_none().then_some(i))
+			.collect();
+
+		// sort descending so we can pop the lowest index first
+		empty_lanes.sort_unstable_by(|a, b| b.cmp(a));
+
 		let mut found_idx = None;
 		if new_chunk.alias.is_some() {
 			for (i, c) in self.current.iter().enumerate() {
@@ -60,6 +70,8 @@ impl Buffer {
 
 		if let Some(idx) = found_idx {
 			self.record_replace(idx, Some(new_chunk.clone()));
+		} else if let Some(empty_idx) = empty_lanes.pop() {
+			self.record_replace(empty_idx, Some(new_chunk.clone()));
 		} else {
 			self.record_insert(
 				self.current.len(),
@@ -118,10 +130,18 @@ impl Buffer {
 						parent_b: None,
 						marker: Markers::Commit,
 					};
-					self.record_insert(
-						self.current.len(),
-						Some(new_lane),
-					);
+
+					if let Some(empty_idx) = empty_lanes.pop() {
+						self.record_replace(
+							empty_idx,
+							Some(new_lane),
+						);
+					} else {
+						self.record_insert(
+							self.current.len(),
+							Some(new_lane),
+						);
+					}
 				}
 			}
 		}
