@@ -30,6 +30,7 @@ gix = { version = "0.78.0", default-features = false, features = [
     "mailmap",
     "status",
 ] }
+im = "15"
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
 # git2 = { git="https://github.com/extrawurst/git2-rs.git", rev="fc13dcc", features = ["vendored-openssl"]}
@@ -39,6 +40,7 @@ rayon = "1.11"
 rayon-core = "1.13"
 scopetime = { path = "../scopetime", version = "0.1" }
 serde = { version = "1.0", features = ["derive"] }
+smallvec = "1"
 ssh-key = { version = "0.6.7", features = ["crypto", "encryption"] }
 thiserror = "2.0"
 unicode-truncate = "2.0"
