@@ -201,11 +201,9 @@ pub fn get_commit_info(
 			.parents
 			.iter()
 			.take(2)
-			.map(|p| {
-				CommitId::from_str_unchecked(&p.to_string())
-					.expect("valid oid")
-			})
-			.collect(),
+			.map(|p| CommitId::from_str_unchecked(&p.to_string()))
+			.collect::<std::result::Result<Vec<_>, _>>()?
+			.into(),
 	})
 }
 

@@ -5,7 +5,7 @@ pub struct Oids {
 	/// alias
 	pub ids: Vec<CommitId>,
 
-	/// CommitId to alias
+	/// `CommitId` to alias
 	pub aliases: HashMap<CommitId, u32>,
 }
 
@@ -27,7 +27,8 @@ impl Oids {
 		if let Some(&alias) = self.aliases.get(id) {
 			return alias;
 		}
-		let alias = self.ids.len() as u32;
+		let alias =
+			u32::try_from(self.ids.len()).expect("too many oids");
 		self.ids.push(*id);
 		self.aliases.insert(*id, alias);
 		alias

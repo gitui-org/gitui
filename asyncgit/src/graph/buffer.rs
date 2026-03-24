@@ -43,7 +43,7 @@ impl Buffer {
 		self.mergers.push(alias);
 	}
 
-	pub fn update(&mut self, new_chunk: Chunk) {
+	pub fn update(&mut self, new_chunk: &Chunk) {
 		self.pending_delta.clear();
 
 		let mut empty_lanes: Vec<usize> = self
@@ -56,17 +56,15 @@ impl Buffer {
 		// sort descending so we can pop the lowest index first
 		empty_lanes.sort_unstable_by(|a, b| b.cmp(a));
 
-		let mut found_idx = None;
-		if new_chunk.alias.is_some() {
-			for (i, c) in self.current.iter().enumerate() {
-				if let Some(c) = c {
-					if c.parent_a == new_chunk.alias {
-						found_idx = Some(i);
-						break;
-					}
-				}
-			}
-		}
+		let found_idx = if new_chunk.alias.is_some() {
+			self.current.iter().enumerate().find_map(|(i, c)| {
+				c.as_ref().and_then(|c| {
+					(c.parent_a == new_chunk.alias).then_some(i)
+				})
+			})
+		} else {
+			None
+		};
 
 		if let Some(idx) = found_idx {
 			self.record_replace(idx, Some(new_chunk.clone()));
@@ -89,20 +87,18 @@ impl Buffer {
 			}
 
 			if let Some(mut c) = self.current[index].clone() {
-				let mut changed = false;
-
-				if new_chunk.alias.is_some()
-					&& c.parent_a == new_chunk.alias
-				{
-					c.parent_a = None;
-					changed = true;
-				}
-				if new_chunk.alias.is_some()
-					&& c.parent_b == new_chunk.alias
-				{
-					c.parent_b = None;
-					changed = true;
-				}
+				let changed = new_chunk.alias.is_some_and(|alias| {
+					let mut changed = false;
+					if c.parent_a == Some(alias) {
+						c.parent_a = None;
+						changed = true;
+					}
+					if c.parent_b == Some(alias) {
+						c.parent_b = None;
+						changed = true;
+					}
+					changed
+				});
 
 				if changed {
 					if c.parent_a.is_none() && c.parent_b.is_none() {
@@ -117,7 +113,7 @@ impl Buffer {
 		while let Some(alias) = self.mergers.pop() {
 			if let Some(index) = self.current.iter().position(|c| {
 				c.as_ref()
-					.map_or(false, |chunk| chunk.alias == Some(alias))
+					.is_some_and(|chunk| chunk.alias == Some(alias))
 			}) {
 				if let Some(mut c) = self.current[index].clone() {
 					let parent_b = c.parent_b;
@@ -146,14 +142,8 @@ impl Buffer {
 			}
 		}
 
-		loop {
-			if let Some(last) = self.current.last() {
-				if last.is_none() {
-					self.record_remove(self.current.len() - 1);
-					continue;
-				}
-			}
-			break;
+		while self.current.last().is_some_and(Option::is_none) {
+			self.record_remove(self.current.len() - 1);
 		}
 
 		let delta = Delta(self.pending_delta.clone());
@@ -193,12 +183,11 @@ impl Buffer {
 		start: usize,
 		end: usize,
 	) -> Vec<Vector<Option<Chunk>>> {
-		let (current_index, mut state) = self
-			.checkpoints
-			.range(..=start)
-			.next_back()
-			.map(|(&i, s)| (Some(i), s.clone()))
-			.unwrap_or((None, Vector::new()));
+		let (current_index, mut state) =
+			self.checkpoints.range(..=start).next_back().map_or_else(
+				|| (None, Vector::new()),
+				|(&i, s)| (Some(i), s.clone()),
+			);
 
 		let mut history =
 			Vec::with_capacity(end.saturating_sub(start) + 1);
@@ -209,11 +198,11 @@ impl Buffer {
 			}
 		}
 
-		let loop_start = current_index.map(|i| i + 1).unwrap_or(0);
+		let loop_start = current_index.map_or(0, |i| i + 1);
 
 		for delta_index in loop_start..=end {
 			if let Some(delta) = self.deltas.get(delta_index) {
-				self.apply_delta_to_state(&mut state, delta);
+				Self::apply_delta_to_state(&mut state, delta);
 
 				if delta_index >= start {
 					history.push(state.clone());
@@ -227,14 +216,13 @@ impl Buffer {
 	}
 
 	fn apply_delta_to_state(
-		&self,
 		state: &mut Vector<Option<Chunk>>,
 		delta: &Delta,
 	) {
 		for op in &delta.0 {
 			match op {
 				DeltaOp::Insert { index, item } => {
-					state.insert(*index, item.clone())
+					state.insert(*index, item.clone());
 				}
 				DeltaOp::Remove { index } => {
 					state.remove(*index);

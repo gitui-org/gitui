@@ -5,7 +5,7 @@ pub mod walker;
 
 pub use walker::GraphWalker;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConnType {
 	Vertical,
 	VerticalDotted,
@@ -41,11 +41,11 @@ pub struct GraphRow {
 
 	/// Connections emitted per lane:
 	/// None = empty space
-	/// Some((ConnType, color_index)) = draw this connector in this color
+	/// Some((ConnType, `color_index`)) = draw this connector in this color
 	pub lanes: Vec<Option<(ConnType, usize)>>,
 
 	/// Horizontal merge bridge: if this commit merges rightward,
-	/// (from_lane, to_lane) — the span to draw ─ ╭ ╮ across
+	/// (`from_lane`, `to_lane`) — the span to draw ─ ╭ ╮ across
 	pub merge_bridge: Option<(usize, usize)>,
 
 	/// Horizontal branch bridges: if this commit spawns branches,
