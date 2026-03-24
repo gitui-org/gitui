@@ -142,12 +142,11 @@ impl Revlog {
 
 				for (id, branches) in self.list.local_branches() {
 					branch_tips.insert(*id);
-					let is_head = |b: &_| {
-						b.local_details().is_some_and(|d| d.is_head)
-					};
 					if head_id.is_none()
-						&& branches.iter().any(is_head)
-					{
+						&& branches.iter().any(|b| {
+							b.local_details()
+								.is_some_and(|d| d.is_head)
+						}) {
 						head_id = Some(*id);
 					}
 				}
