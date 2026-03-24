@@ -1296,7 +1296,7 @@ mod tests {
 		};
 		let empty_lanes = std::collections::HashSet::new();
 		let spans = cl.build_graph_spans(&row, 1, &empty_lanes);
-		
+
 		assert_eq!(spans.len(), 1);
 		assert_eq!(spans[0].content, Cow::from(SYM_COMMIT));
 	}
