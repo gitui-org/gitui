@@ -1,4 +1,7 @@
-use asyncgit::sync::{CommitId, CommitInfo};
+use asyncgit::{
+	graph::GraphRow,
+	sync::{CommitId, CommitInfo},
+};
 use chrono::{DateTime, Duration, Local, Utc};
 use indexmap::IndexSet;
 use std::{rc::Rc, slice::Iter};
@@ -20,6 +23,7 @@ pub struct LogEntry {
 	pub hash_short: BoxStr,
 	pub id: CommitId,
 	pub highlighted: bool,
+	pub graph: Option<GraphRow>,
 }
 
 impl From<CommitInfo> for LogEntry {
@@ -54,6 +58,7 @@ impl From<CommitInfo> for LogEntry {
 			hash_short,
 			id: c.id,
 			highlighted: false,
+			graph: None,
 		}
 	}
 }
@@ -84,6 +89,8 @@ pub struct ItemBatch {
 	index_offset: Option<usize>,
 	items: Vec<LogEntry>,
 	highlighting: bool,
+	pub graph_ready: bool,
+	pub max_lane: usize,
 }
 
 impl ItemBatch {
@@ -115,6 +122,8 @@ impl ItemBatch {
 	pub fn clear(&mut self) {
 		self.items.clear();
 		self.index_offset = None;
+		self.graph_ready = false;
+		self.max_lane = 0;
 	}
 
 	/// insert new batch of items
@@ -141,6 +150,17 @@ impl ItemBatch {
 			self.index_offset = Some(start_index);
 			self.highlighting = highlighted.is_some();
 		}
+	}
+
+	///
+	pub fn set_graph_rows(&mut self, rows: Vec<GraphRow>) {
+		let mut max = 0;
+		for (entry, row) in self.items.iter_mut().zip(rows) {
+			max = max.max(row.lane_count);
+			entry.graph = Some(row);
+		}
+		self.max_lane = max;
+		self.graph_ready = true;
 	}
 
 	/// returns `true` if we should fetch updated list of items
