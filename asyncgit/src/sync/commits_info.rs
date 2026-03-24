@@ -10,6 +10,7 @@ use crate::{
 };
 use git2::{Commit, Error, Oid};
 use scopetime::scope_time;
+use smallvec::SmallVec;
 use unicode_truncate::UnicodeTruncateStr;
 
 /// identifies a single commit
@@ -122,6 +123,8 @@ pub struct CommitInfo {
 	pub author: String,
 	///
 	pub id: CommitId,
+	///
+	pub parents: SmallVec<[CommitId; 2]>,
 }
 
 ///
@@ -155,6 +158,11 @@ pub fn get_commits_info(
 				author,
 				time: c.time().seconds(),
 				id: CommitId(c.id()),
+				parents: c
+					.parents()
+					.take(2)
+					.map(|p| CommitId::new(p.id()))
+					.collect(),
 			}
 		})
 		.collect::<Vec<_>>();
@@ -189,6 +197,15 @@ pub fn get_commit_info(
 		author: author.to_string(),
 		time: commit_ref.time()?.seconds,
 		id: commit.id().detach().into(),
+		parents: commit_ref
+			.parents
+			.iter()
+			.take(2)
+			.map(|p| {
+				CommitId::from_str_unchecked(&p.to_string())
+					.expect("valid oid")
+			})
+			.collect(),
 	})
 }
 
