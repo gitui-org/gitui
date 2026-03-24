@@ -419,7 +419,8 @@ mod tests {
 			duration: Duration::default(),
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
-		let arc_graph_walker = Arc::new(Mutex::new(GraphWalker::new()));
+		let arc_graph_walker =
+			Arc::new(Mutex::new(GraphWalker::new()));
 
 		let result = AsyncLog::fetch_helper_without_filter(
 			&subdir_path,
@@ -449,7 +450,8 @@ mod tests {
 			duration: Duration::default(),
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
-		let arc_graph_walker = Arc::new(Mutex::new(GraphWalker::new()));
+		let arc_graph_walker =
+			Arc::new(Mutex::new(GraphWalker::new()));
 
 		std::env::set_var("GIT_DIR", git_dir);
 
