@@ -1280,4 +1280,24 @@ mod tests {
 			)))
 		);
 	}
+
+	#[test]
+	fn test_build_graph_spans() {
+		let cl = CommitList::default();
+		let row = GraphRow {
+			lane_count: 1,
+			commit_lane: 0,
+			is_merge: false,
+			is_branch_tip: false,
+			is_stash: false,
+			lanes: vec![Some((ConnType::CommitNormal, 0))],
+			merge_bridge: None,
+			branches: vec![],
+		};
+		let empty_lanes = std::collections::HashSet::new();
+		let spans = cl.build_graph_spans(&row, 1, &empty_lanes);
+		
+		assert_eq!(spans.len(), 1);
+		assert_eq!(spans[0].content, Cow::from(SYM_COMMIT));
+	}
 }
