@@ -33,6 +33,7 @@ use ratatui::{
 	Frame,
 };
 use std::{
+	collections::HashSet,
 	rc::Rc,
 	sync::{
 		atomic::{AtomicBool, Ordering},
@@ -133,6 +134,38 @@ impl Revlog {
 
 			self.list
 				.refresh_extend_data(self.git_log.extract_items()?);
+
+			let (slice, global_start) = self.list.get_loaded_slice();
+			if !slice.is_empty() {
+				let mut branch_tips = HashSet::new();
+				let mut head_id = None;
+
+				for (id, branches) in self.list.local_branches() {
+					branch_tips.insert(*id);
+					let is_head = |b: &_| {
+						b.local_details().is_some_and(|d| d.is_head)
+					};
+					if head_id.is_none()
+						&& branches.iter().any(is_head)
+					{
+						head_id = Some(*id);
+					}
+				}
+				branch_tips
+					.extend(self.list.remote_branches().keys());
+
+				let stashes = HashSet::new();
+
+				if let Some(rows) = self.git_log.get_graph_rows(
+					&slice,
+					global_start,
+					&branch_tips,
+					&stashes,
+					head_id.as_ref(),
+				) {
+					self.list.set_graph_rows(rows);
+				}
+			}
 
 			self.git_tags.request(Duration::from_secs(3), false)?;
 
