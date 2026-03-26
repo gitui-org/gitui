@@ -1,3 +1,4 @@
+pub mod mask;
 mod reflow;
 mod scrollbar;
 mod scrolllist;
