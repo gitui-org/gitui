@@ -29,7 +29,7 @@ asyncgit = { path = "./asyncgit", version = "0.28.1", default-features = false }
 backtrace = "0.3"
 base64 = "0.22"
 bitflags = "2.10"
-bugreport = "0.5.1"
+bugreport = "0.6.0"
 bwrap = { version = "1.3", features = ["use_std"] }
 bytesize = { version = "2.3", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
