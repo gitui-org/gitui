@@ -35,7 +35,7 @@ bytesize = { version = "2.3", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.5", features = ["cargo", "env"] }
 crossbeam-channel = "0.5"
-crossterm = { version = "0.28", features = ["serde"] }
+crossterm = { version = "0.29", features = ["serde"] }
 dirs = "6.0"
 easy-cast = "0.5"
 filetreelist = { path = "./filetreelist", version = ">=0.6" }
@@ -48,10 +48,11 @@ notify = "8"
 notify-debouncer-mini = "0.7"
 once_cell = "1"
 parking_lot_core = "0.9"
-ratatui = { version = "0.29", default-features = false, features = [
+ratatui = { version = "0.30", default-features = false, features = [
   "crossterm",
   "serde",
 ] }
+ratatui-textarea = "0.8"
 rayon-core = "1.13"
 ron = "0.12"
 scopeguard = "1.2"
@@ -67,7 +68,6 @@ syntect = { version = "5.3", default-features = false, features = [
   "parsing",
   "plist-load",
 ] }
-tui-textarea = "0.7"
 two-face = { version = "0.4.4", default-features = false }
 unicode-segmentation = "1.12"
 unicode-truncate = "2.0"

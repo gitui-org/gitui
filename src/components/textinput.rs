@@ -18,9 +18,9 @@ use ratatui::{
 	widgets::{Clear, Paragraph},
 	Frame,
 };
+use ratatui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 use std::cell::Cell;
 use std::cell::OnceCell;
-use tui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 
 ///
 #[derive(PartialEq, Eq)]
