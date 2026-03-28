@@ -105,7 +105,7 @@ deny:
 	cargo deny check
 
 sort:
-	cargo sort -c -w "."
+	tombi format --check
 
 install:
 	cargo install --path "." --offline --locked

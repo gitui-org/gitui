@@ -253,10 +253,16 @@ jobs:
 
       - run: cargo fmt -- --check
 
-      - name: cargo-sort
+      - name: tombi install
+        uses: tombi-toml/setup-tombi@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: '0.9.0'
+      
+      - name: tombi check
         run: |
-          cargo install cargo-sort --force
-          cargo sort -c -w
+          tombi format --check
 
       - name: cargo-deny install
         run: |

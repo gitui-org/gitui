@@ -9,7 +9,7 @@ repository = "https://github.com/gitui-org/gitui"
 readme = "README.md"
 license = "MIT"
 categories = ["command-line-utilities"]
-keywords = ["gui", "cli", "terminal", "ui", "tui"]
+keywords = ["cli", "gui", "terminal", "tui", "ui"]
 exclude = ["/demo.gif"]
 
 [dependencies]
