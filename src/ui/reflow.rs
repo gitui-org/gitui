@@ -161,7 +161,10 @@ impl<'a, 'b> LineTruncator<'a, 'b> {
 		}
 	}
 
-	pub fn set_horizontal_offset(&mut self, horizontal_offset: u16) {
+	pub const fn set_horizontal_offset(
+		&mut self,
+		horizontal_offset: u16,
+	) {
 		self.horizontal_offset = horizontal_offset;
 	}
 }

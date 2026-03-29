@@ -140,7 +140,7 @@ impl RenameBranchPopup {
 				Err(e) => {
 					log::error!("create branch: {e}");
 					self.queue.push(InternalEvent::ShowErrorMsg(
-						format!("rename branch error:\n{e}",),
+						format!("rename branch error:\n{e}"),
 					));
 				}
 			}

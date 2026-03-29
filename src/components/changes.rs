@@ -67,7 +67,7 @@ impl ChangesComponent {
 	}
 
 	/// returns true if list is empty
-	pub fn is_empty(&self) -> bool {
+	pub const fn is_empty(&self) -> bool {
 		self.files.is_empty()
 	}
 
