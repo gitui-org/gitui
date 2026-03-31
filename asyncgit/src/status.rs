@@ -138,9 +138,10 @@ impl AsyncStatus {
 			arc_generation.fetch_add(1, Ordering::Relaxed);
 			arc_pending.fetch_sub(1, Ordering::Relaxed);
 
-			sender
-				.send(AsyncGitNotification::Status)
-				.expect("error sending status");
+			if let Err(e) = sender.send(AsyncGitNotification::Status)
+			{
+				log::error!("send status error: {e}");
+			}
 		});
 
 		Ok(None)
