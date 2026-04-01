@@ -115,7 +115,7 @@ impl CheckoutOptionPopup {
 		Ok(())
 	}
 
-	fn change_kind(&mut self, incr: bool) {
+	const fn change_kind(&mut self, incr: bool) {
 		self.option = if incr {
 			self.option.next()
 		} else {

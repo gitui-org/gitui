@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.rust == 'nightly' }}
 
@@ -94,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -148,7 +148,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -199,7 +199,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -253,10 +253,16 @@ jobs:
 
       - run: cargo fmt -- --check
 
-      - name: cargo-sort
+      - name: tombi install
+        uses: tombi-toml/setup-tombi@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: '0.9.0'
+      
+      - name: tombi check
         run: |
-          cargo install cargo-sort --force
-          cargo sort -c -w
+          tombi format --check
 
       - name: cargo-deny install
         run: |

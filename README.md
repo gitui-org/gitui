@@ -163,6 +163,12 @@ scoop install gitui
 choco install gitui
 ```
 
+##### [Mise](https://github.com/jdx/mise)
+
+```shell
+mise use -g gitui@latest
+```
+
 ##### [Nix](https://search.nixos.org/packages?channel=unstable&show=gitui&from=0&size=50&sort=relevance&query=gitui) (Nix/NixOS)
 
 Nixpkg
@@ -220,7 +226,7 @@ see [NIGHTLIES.md](./NIGHTLIES.md)
 
 ### Requirements
 
-- Minimum supported `rust`/`cargo` version: `1.82`
+- Minimum supported `rust`/`cargo` version: `1.88`
   - See [Install Rust](https://www.rust-lang.org/tools/install)
 
 - To build openssl dependency (see https://docs.rs/openssl/latest/openssl/)

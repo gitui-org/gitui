@@ -312,8 +312,7 @@ impl TagListPopup {
 
 		self.has_remotes =
 			sync::get_branches_info(&self.repo.borrow(), false)
-				.map(|branches| !branches.is_empty())
-				.unwrap_or(false);
+				.is_ok_and(|branches| !branches.is_empty());
 
 		let basic_credential = if self.has_remotes {
 			if need_username_password(&self.repo.borrow())? {
