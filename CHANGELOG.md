@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+- `page_half_up` and `page_half_down` keybindings [@jyn514](https://github.com/jyn514) ([109](https://github.com/extrawurst/gitui/issues/109))
+
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
 

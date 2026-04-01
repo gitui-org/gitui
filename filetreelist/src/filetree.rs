@@ -14,7 +14,9 @@ pub enum MoveSelection {
 	Top,
 	End,
 	PageDown,
+	PageHalfDown,
 	PageUp,
+	PageHalfUp,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -124,8 +126,12 @@ impl FileTree {
 		&self,
 		current_index: usize,
 		direction: Direction,
+		half_page: bool,
 	) -> Option<usize> {
-		let page_size = self.window_height.get().unwrap_or(0);
+		let mut page_size = self.window_height.get().unwrap_or(0);
+		if half_page {
+			page_size = page_size.div_ceil(2);
+		}
 
 		if direction == Direction::Up {
 			self.get_new_selection(
@@ -156,12 +162,28 @@ impl FileTree {
 				}
 				MoveSelection::Top => Some(0),
 				MoveSelection::End => self.selection_end(),
-				MoveSelection::PageUp => self
-					.selection_page_updown(selection, Direction::Up),
+				MoveSelection::PageUp => self.selection_page_updown(
+					selection,
+					Direction::Up,
+					false,
+				),
+				MoveSelection::PageHalfUp => self
+					.selection_page_updown(
+						selection,
+						Direction::Up,
+						true,
+					),
 				MoveSelection::PageDown => self
 					.selection_page_updown(
 						selection,
 						Direction::Down,
+						false,
+					),
+				MoveSelection::PageHalfDown => self
+					.selection_page_updown(
+						selection,
+						Direction::Down,
+						true,
 					),
 			};
 

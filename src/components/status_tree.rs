@@ -471,6 +471,7 @@ impl Component for StatusTreeComponent {
 		CommandBlocking::PassingOn
 	}
 
+	#[allow(clippy::too_many_lines)]
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.focused {
 			if let Event::Key(e) = ev {
@@ -539,10 +540,24 @@ impl Component for StatusTreeComponent {
 					Ok(self
 						.move_selection(MoveSelection::PageUp)
 						.into())
+				} else if key_match(
+					e,
+					self.key_config.keys.page_half_up,
+				) {
+					Ok(self
+						.move_selection(MoveSelection::PageHalfUp)
+						.into())
 				} else if key_match(e, self.key_config.keys.page_down)
 				{
 					Ok(self
 						.move_selection(MoveSelection::PageDown)
+						.into())
+				} else if key_match(
+					e,
+					self.key_config.keys.page_half_down,
+				) {
+					Ok(self
+						.move_selection(MoveSelection::PageHalfDown)
 						.into())
 				} else if key_match(e, self.key_config.keys.move_left)
 				{

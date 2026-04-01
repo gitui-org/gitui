@@ -38,9 +38,13 @@ impl VerticalScroll {
 			ScrollType::PageDown => old
 				.saturating_sub(1)
 				.saturating_add(self.visual_height.get()),
+			ScrollType::PageHalfDown => old
+				.saturating_add(self.visual_height.get().div_ceil(2)),
 			ScrollType::PageUp => old
 				.saturating_add(1)
 				.saturating_sub(self.visual_height.get()),
+			ScrollType::PageHalfUp => old
+				.saturating_sub(self.visual_height.get().div_ceil(2)),
 			ScrollType::Home => 0,
 			ScrollType::End => max,
 		};
@@ -222,5 +226,23 @@ mod tests {
 
 		assert!(!scroll.move_top(ScrollType::PageUp));
 		assert_eq!(scroll.get_top(), 0);
+
+		assert!(!scroll.move_top(ScrollType::PageHalfUp));
+		assert_eq!(scroll.get_top(), 0);
+
+		assert!(scroll.move_top(ScrollType::PageHalfDown));
+		assert_eq!(scroll.get_top(), 4);
+
+		assert!(scroll.move_top(ScrollType::PageHalfDown));
+		assert_eq!(scroll.get_top(), 8);
+
+		assert!(scroll.move_top(ScrollType::PageHalfDown));
+		assert_eq!(scroll.get_top(), 10);
+
+		assert!(!scroll.move_top(ScrollType::PageHalfDown));
+		assert_eq!(scroll.get_top(), 10);
+
+		assert!(scroll.move_top(ScrollType::PageHalfUp));
+		assert_eq!(scroll.get_top(), 6);
 	}
 }
