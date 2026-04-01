@@ -1,6 +1,6 @@
 [package]
 name = "asyncgit"
-version = "0.28.0"
+version = "0.28.1"
 authors = ["extrawurst <mail@rusticorn.com>"]
 edition = "2021"
 description = "allow using git2 in a asynchronous context"
@@ -8,13 +8,8 @@ homepage = "https://github.com/gitui-org/gitui"
 repository = "https://github.com/gitui-org/gitui"
 readme = "README.md"
 license = "MIT"
-categories = ["concurrency", "asynchronous"]
+categories = ["asynchronous", "concurrency"]
 keywords = ["git"]
-
-[features]
-default = ["trace-libgit"]
-trace-libgit = []
-vendor-openssl = ["openssl-sys"]
 
 [dependencies]
 bitflags = "2"
@@ -23,18 +18,18 @@ dirs = "6.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
 git2 = "0.20"
-git2-hooks = { path = "../git2-hooks", version = ">=0.6" }
-gix = { version = "0.75.0", default-features = false, features = [
-    "max-performance",
-    "revision",
-    "mailmap",
-    "status",
+git2-hooks = { path = "../git2-hooks", version = "0.7" }
+gix = { version = "0.78.0", default-features = false, features = [
+  "mailmap",
+  "max-performance",
+  "revision",
+  "status",
 ] }
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
 # git2 = { git="https://github.com/extrawurst/git2-rs.git", rev="fc13dcc", features = ["vendored-openssl"]}
 # pinning to vendored openssl, using the git2 feature this gets lost with new resolver
-openssl-sys = { version = '0.9', features = ["vendored"], optional = true }
+openssl-sys = { version = "0.9", features = ["vendored"], optional = true }
 rayon = "1.11"
 rayon-core = "1.13"
 scopetime = { path = "../scopetime", version = "0.1" }
@@ -48,5 +43,10 @@ url = "2.5"
 env_logger = "0.11"
 invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
-serial_test = "3.2"
+serial_test = "3.3"
 tempfile = "3"
+
+[features]
+default = ["trace-libgit"]
+trace-libgit = []
+vendor-openssl = ["openssl-sys"]

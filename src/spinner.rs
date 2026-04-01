@@ -31,7 +31,7 @@ impl Spinner {
 	}
 
 	///
-	pub fn set_state(&mut self, active: bool) {
+	pub const fn set_state(&mut self, active: bool) {
 		self.active = active;
 	}
 

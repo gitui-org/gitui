@@ -141,7 +141,7 @@ pub fn get_tags_with_metadata(
 		})
 		.collect();
 
-	tags.sort_unstable_by(|a, b| b.time.cmp(&a.time));
+	tags.sort_unstable_by_key(|b| std::cmp::Reverse(b.time));
 
 	Ok(tags)
 }
