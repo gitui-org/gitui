@@ -86,7 +86,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["ghemoji", "regex-fancy", "trace-libgit", "vendor-openssl"]
+default = ["ghemoji", "regex-fancy", "trace-libgit"]
 ghemoji = ["gh-emoji"]
 # regex-* features are mutually exclusive.
 regex-fancy = ["syntect/regex-fancy", "two-face/syntect-fancy"]
