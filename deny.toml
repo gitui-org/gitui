@@ -30,20 +30,10 @@ skip-tree = [
   # this is needed for:
   #  `bwrap v1.3.0` (https://github.com/micl2e2/bwrap/pull/4)
   { name = "unicode-width" },
-  # currently needed due to `ratatui v0.29.0`
-  { name = "unicode-truncate" },
-  # currently needed due to:
-  # * `redox_users v0.4.6`
-  # * `syntect v5.2.0`
-  { name = "thiserror" },
   # currently needed due to:
   # * `windows v0.57.0`
   # * `iana-time-zone v0.1.60`
   { name = "windows-core" },
-  # currently needed due to:
-  # * `parking_lot_core v0.9.10`
-  # * `filetime v0.2.23`
-  { name = "redox_syscall" },
   # currently needed due to:
   # * `gix-hashtable v0.6.0`
   { name = "hashbrown" },
