@@ -60,4 +60,7 @@ skip-tree = [
   # * `gix-index v0.42.1`
   # * `tempfile v3.23.0`
   { name = "rustix" },
+  # 2026-04-01 `imara-diff` was added because `gix-diff` depends on 0.1.x while
+  # `gix-blame` depends on 0.2.x
+  { name = "imara-diff" },
 ]
