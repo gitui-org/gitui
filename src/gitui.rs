@@ -76,7 +76,11 @@ impl Gitui {
 	pub(crate) fn run_main_loop<B: ratatui::backend::Backend>(
 		&mut self,
 		terminal: &mut ratatui::Terminal<B>,
-	) -> Result<QuitState, anyhow::Error> {
+	) -> Result<QuitState, anyhow::Error>
+	where
+		<B as ratatui::backend::Backend>::Error:
+			'static + Send + Sync,
+	{
 		let spinner_ticker = tick(SPINNER_INTERVAL);
 		let mut spinner = Spinner::default();
 		let mut first_update = true;
@@ -151,7 +155,7 @@ impl Gitui {
 	fn draw<B: ratatui::backend::Backend>(
 		&self,
 		terminal: &mut ratatui::Terminal<B>,
-	) -> std::io::Result<()> {
+	) -> Result<(), B::Error> {
 		draw(terminal, &self.app)
 	}
 

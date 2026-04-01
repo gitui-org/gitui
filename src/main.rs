@@ -259,7 +259,7 @@ fn shutdown_terminal() {
 fn draw<B: ratatui::backend::Backend>(
 	terminal: &mut ratatui::Terminal<B>,
 	app: &App,
-) -> io::Result<()> {
+) -> Result<(), B::Error> {
 	if app.requires_redraw() {
 		terminal.clear()?;
 	}

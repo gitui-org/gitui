@@ -1,5 +1,5 @@
 use ratatui::{backend::Backend, Terminal};
-use std::{cell::Cell, char, io};
+use std::{cell::Cell, char};
 
 // static SPINNER_CHARS: &[char] = &['◢', '◣', '◤', '◥'];
 // static SPINNER_CHARS: &[char] = &['⢹', '⢺', '⢼', '⣸', '⣇', '⡧', '⡗', '⡏'];
@@ -39,7 +39,7 @@ impl Spinner {
 	pub fn draw<B: ratatui::backend::Backend>(
 		&self,
 		terminal: &mut Terminal<B>,
-	) -> io::Result<()> {
+	) -> Result<(), B::Error> {
 		let idx = self.idx;
 
 		let char_to_draw =
