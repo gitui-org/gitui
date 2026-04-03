@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=GitUI
+Comment=Terminal-ui for git
+Exec=gitui
+Terminal=true
+Type=Application
+Icon=io.github.gitui_org.gitui
