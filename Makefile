@@ -82,6 +82,12 @@ build-linux-arm-release:
 	cargo build --release --target=armv7-unknown-linux-gnueabihf --locked
 	cargo build --release --target=arm-unknown-linux-gnueabihf --locked
 
+release-linux-riscv64:
+	cargo build --release --locked
+	strip target/release/gitui
+	mkdir -p release
+	tar -C ./target/release/ -czvf ./release/gitui-linux-riscv64.tar.gz ./gitui
+
 test:
 	cargo nextest run --workspace
 
