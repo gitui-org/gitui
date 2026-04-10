@@ -1,0 +1,23 @@
+name: brew update
+
+on:
+  # only manually
+  workflow_dispatch:
+    inputs:
+      tag-name:
+        required: true
+        description: 'release tag'
+
+jobs:
+  update_brew:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Bump homebrew-core formula
+      uses: mislav/bump-homebrew-formula-action@v3
+      env:
+        COMMITTER_TOKEN: ${{ secrets.BREW_TOKEN }}
+      with:
+        formula-name: gitui
+        # https://github.com/mislav/bump-homebrew-formula-action/issues/58
+        formula-path: Formula/g/gitui.rb
+        tag-name: ${{ github.event.inputs.tag-name }}

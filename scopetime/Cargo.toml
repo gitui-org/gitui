@@ -1,0 +1,19 @@
+[package]
+name = "scopetime"
+version = "0.1.2"
+authors = ["extrawurst <mail@rusticorn.com>"]
+edition = "2021"
+description = "log runtime of arbitrary scope"
+homepage = "https://github.com/gitui-org/gitui"
+repository = "https://github.com/gitui-org/gitui"
+license = "MIT"
+readme = "README.md"
+categories = ["development-tools::profiling"]
+keywords = ["logging", "profiling"]
+
+[dependencies]
+log = "0.4"
+
+[features]
+default = []
+enabled = []

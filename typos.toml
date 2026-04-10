@@ -1,0 +1,8 @@
+# configuration for https://github.com/crate-ci/typos
+
+[default.extend-words]
+ratatui = "ratatui"
+syntact = "syntact"
+
+[files]
+extend-exclude = ["CHANGELOG.md"]
