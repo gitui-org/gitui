@@ -64,7 +64,7 @@ impl StatusTree {
 		self.update_visibility(None, 0, true);
 		self.available_selections = self.setup_available_selections();
 
-		//NOTE: now that visibility is set we can make sure selection is visible
+		// NOTE: now that visibility is set we can make sure selection is visible
 		if let Some(idx) = self.selection {
 			self.selection = Some(self.find_visible_idx(idx));
 		}
