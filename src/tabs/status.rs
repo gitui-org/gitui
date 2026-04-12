@@ -456,13 +456,27 @@ impl Status {
 	}
 
 	fn update_status(&mut self) -> Result<()> {
+		let diff_before_update = self.diff.current();
+
 		let stage_status = self.git_status_stage.last()?;
 		self.index.set_items(&stage_status.items)?;
 
 		let workdir_status = self.git_status_workdir.last()?;
 		self.index_wd.set_items(&workdir_status.items)?;
 
-		self.update_diff()?;
+		if Self::should_exit_diff_focus_after_status_update(
+			self.git_action_executed,
+			self.is_focus_on_diff(),
+			&diff_before_update,
+			self.selected_path().as_ref(),
+		) {
+			self.switch_focus(match self.diff_target {
+				DiffTarget::Stage => Focus::Stage,
+				DiffTarget::WorkingDir => Focus::WorkDir,
+			})?;
+		} else {
+			self.update_diff()?;
+		}
 
 		if self.git_action_executed {
 			self.git_action_executed = false;
@@ -480,6 +494,18 @@ impl Status {
 		}
 
 		Ok(())
+	}
+
+	fn should_exit_diff_focus_after_status_update(
+		git_action_executed: bool,
+		is_focus_on_diff: bool,
+		diff_before_update: &(String, bool),
+		selected_path_after_update: Option<&(String, bool)>,
+	) -> bool {
+		git_action_executed
+			&& is_focus_on_diff
+			&& !diff_before_update.0.is_empty()
+			&& selected_path_after_update != Some(diff_before_update)
 	}
 
 	///
