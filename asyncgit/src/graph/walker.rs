@@ -181,11 +181,14 @@ impl GraphWalker {
 		);
 
 		if let Some((from, to)) = merge_bridge {
+			let target_lane =
+				if from == commit_lane { to } else { from };
 			Self::draw_bridge(
 				&mut lanes,
 				from,
 				to,
 				commit_lane,
+				target_lane,
 				ConnType::MergeBridgeMid,
 				ConnType::MergeBridgeStart,
 				ConnType::MergeBridgeEnd,
@@ -206,6 +209,7 @@ impl GraphWalker {
 				&mut lanes,
 				from,
 				to,
+				branch_lane,
 				branch_lane,
 				ConnType::MergeBridgeMid,
 				ConnType::BranchUp,
@@ -287,18 +291,29 @@ impl GraphWalker {
 		from: usize,
 		to: usize,
 		color_lane: usize,
+		corner_lane: usize,
 		mid: ConnType,
-		start: ConnType,
-		end: ConnType,
+		corner_right: ConnType,
+		corner_left: ConnType,
 	) {
 		for lane in lanes.iter_mut().take(to).skip(from + 1) {
-			*lane = Some((mid, color_lane % 16));
+			match lane {
+				Some((
+					ConnType::Vertical | ConnType::VerticalDotted,
+					_,
+				)) => {
+					*lane = Some((ConnType::Cross, color_lane % 16));
+				}
+				_ => {
+					*lane = Some((mid, color_lane % 16));
+				}
+			}
 		}
 
-		if to > color_lane {
-			lanes[to] = Some((start, color_lane % 16));
-		} else if from < color_lane {
-			lanes[from] = Some((end, color_lane % 16));
+		if corner_lane == to {
+			lanes[to] = Some((corner_right, color_lane % 16));
+		} else if corner_lane == from {
+			lanes[from] = Some((corner_left, color_lane % 16));
 		}
 	}
 }
