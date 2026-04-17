@@ -9,6 +9,7 @@ pub use walker::GraphWalker;
 pub enum ConnType {
 	Vertical,
 	VerticalDotted,
+	Cross,
 	CommitNormal,
 	CommitBranch,
 	CommitMerge,
