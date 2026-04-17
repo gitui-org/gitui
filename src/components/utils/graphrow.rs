@@ -1,8 +1,9 @@
-pub const SYM_COMMIT: &str = "◆";
-pub const SYM_COMMIT_BRANCH: &str = "◈";
-pub const SYM_COMMIT_MERGE: &str = "◇";
-pub const SYM_COMMIT_STASH: &str = "⟡";
-pub const SYM_COMMIT_UNCOMMITTED: &str = "◻";
+pub const SYM_COMMIT: &str = "o";
+pub const SYM_COMMIT_BRANCH: &str = "*";
+pub const SYM_COMMIT_MERGE: &str = "M";
+pub const SYM_COMMIT_STASH: &str = "*";
+pub const SYM_COMMIT_UNCOMMITTED: &str = "+";
+pub const SYM_CROSS: &str = "╋";
 pub const SYM_VERTICAL: &str = "┃";
 pub const SYM_VERTICAL_DOTTED: &str = "╏";
 pub const SYM_HORIZONTAL: &str = "━";
