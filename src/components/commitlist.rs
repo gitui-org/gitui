@@ -1,7 +1,7 @@
 use super::utils::graphrow::{
 	SYM_BRANCH_DOWN, SYM_BRANCH_UP, SYM_BRANCH_UP_RIGHT, SYM_COMMIT,
 	SYM_COMMIT_BRANCH, SYM_COMMIT_MERGE, SYM_COMMIT_STASH,
-	SYM_COMMIT_UNCOMMITTED, SYM_HORIZONTAL, SYM_MERGE_BRIDGE_END,
+	SYM_COMMIT_UNCOMMITTED, SYM_CROSS, SYM_HORIZONTAL, SYM_MERGE_BRIDGE_END,
 	SYM_MERGE_BRIDGE_MID, SYM_MERGE_BRIDGE_START, SYM_SPACE,
 	SYM_VERTICAL, SYM_VERTICAL_DOTTED,
 };
@@ -45,6 +45,15 @@ use std::{
 
 const ELEMENTS_PER_LINE: usize = 9;
 const SLICE_SIZE: usize = 1200;
+
+const GRAPH_COLORS: &[Color] = &[
+	Color::Blue,
+	Color::Yellow,
+	Color::Magenta,
+	Color::Cyan,
+	Color::Green,
+	Color::Red,
+];
 
 ///
 pub struct CommitList {
@@ -487,76 +496,80 @@ impl CommitList {
 	) -> Vec<Span<'a>> {
 		let mut spans = Vec::new();
 
-		let graph_color =
-			self.theme.commit_hash(false).fg.unwrap_or(Color::Reset);
-
 		for (lane_index, conn) in row.lanes.iter().enumerate() {
 			if empty_lanes.contains(&lane_index) {
 				continue;
 			}
-			let (sym, color) = match conn {
+			let (sym, graph_color) = match conn {
 				None => (SYM_SPACE, Color::Reset),
-				Some((ConnType::Vertical, _)) => {
-					(SYM_VERTICAL, graph_color)
+				Some((ConnType::Vertical, color_idx)) => {
+					(SYM_VERTICAL, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::VerticalDotted, _)) => {
-					(SYM_VERTICAL_DOTTED, graph_color)
+				Some((ConnType::VerticalDotted, color_idx)) => {
+					(SYM_VERTICAL_DOTTED, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::CommitNormal, _)) => {
-					(SYM_COMMIT, graph_color)
+				Some((ConnType::Cross, color_idx)) => {
+					(SYM_CROSS, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::CommitBranch, _)) => {
-					(SYM_COMMIT_BRANCH, graph_color)
+				Some((ConnType::CommitNormal, color_idx)) => {
+					(SYM_COMMIT, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::CommitMerge, _)) => {
-					(SYM_COMMIT_MERGE, graph_color)
+				Some((ConnType::CommitBranch, color_idx)) => {
+					(SYM_COMMIT_BRANCH, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::CommitStash, _)) => {
-					(SYM_COMMIT_STASH, graph_color)
+				Some((ConnType::CommitMerge, color_idx)) => {
+					(SYM_COMMIT_MERGE, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::CommitUncommitted, _)) => {
-					(SYM_COMMIT_UNCOMMITTED, graph_color)
+				Some((ConnType::CommitStash, color_idx)) => {
+					(SYM_COMMIT_STASH, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::MergeBridgeStart, _)) => {
-					(SYM_MERGE_BRIDGE_START, graph_color)
+				Some((ConnType::CommitUncommitted, color_idx)) => {
+					(SYM_COMMIT_UNCOMMITTED, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::MergeBridgeMid, _)) => {
-					(SYM_MERGE_BRIDGE_MID, graph_color)
+				Some((ConnType::MergeBridgeStart, color_idx)) => {
+					(SYM_MERGE_BRIDGE_START, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::MergeBridgeEnd, _)) => {
-					(SYM_MERGE_BRIDGE_END, graph_color)
+				Some((ConnType::MergeBridgeMid, color_idx)) => {
+					(SYM_MERGE_BRIDGE_MID, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::BranchDown, _)) => {
-					(SYM_BRANCH_DOWN, graph_color)
+				Some((ConnType::MergeBridgeEnd, color_idx)) => {
+					(SYM_MERGE_BRIDGE_END, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::BranchUp, _)) => {
-					(SYM_BRANCH_UP, graph_color)
+				Some((ConnType::BranchDown, color_idx)) => {
+					(SYM_BRANCH_DOWN, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
-				Some((ConnType::BranchUpRight, _)) => {
-					(SYM_BRANCH_UP_RIGHT, graph_color)
+				Some((ConnType::BranchUp, color_idx)) => {
+					(SYM_BRANCH_UP, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
+				}
+				Some((ConnType::BranchUpRight, color_idx)) => {
+					(SYM_BRANCH_UP_RIGHT, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
 				}
 			};
-			spans.push(Span::styled(sym, Style::default().fg(color)));
+			spans.push(Span::styled(sym, Style::default().fg(graph_color)));
 
 			// Spacer
 			let mut is_bridge_lane = false;
+			let mut spacer_color = graph_color;
 
 			if let Some((from, to)) = row.merge_bridge {
 				if lane_index >= from && lane_index < to {
 					is_bridge_lane = true;
+					spacer_color = GRAPH_COLORS[row.commit_lane % GRAPH_COLORS.len()];
 				}
 			}
 
 			for &(from, to) in &row.branches {
 				if lane_index >= from && lane_index < to {
 					is_bridge_lane = true;
+					let branch_lane = if row.commit_lane == from { to } else { from };
+					spacer_color = GRAPH_COLORS[branch_lane % GRAPH_COLORS.len()];
 				}
 			}
 
 			if is_bridge_lane {
 				spans.push(Span::styled(
 					SYM_HORIZONTAL,
-					Style::default().fg(graph_color),
+					Style::default().fg(spacer_color),
 				));
 				continue;
 			}
@@ -1324,7 +1337,8 @@ mod tests {
 		let empty_lanes = std::collections::HashSet::new();
 		let spans = cl.build_graph_spans(&row, 1, &empty_lanes);
 
-		assert_eq!(spans.len(), 1);
+		assert_eq!(spans.len(), 2);
 		assert_eq!(spans[0].content, Cow::from(SYM_COMMIT));
+		assert_eq!(spans[1].content, Cow::from(SYM_SPACE));
 	}
 }
