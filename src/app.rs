@@ -54,6 +54,7 @@ use ratatui::{
 };
 use std::{
 	cell::{Cell, RefCell},
+	env,
 	path::{Path, PathBuf},
 	rc::Rc,
 };
@@ -178,14 +179,10 @@ impl App {
 
 		let mut select_file: Option<PathBuf> = None;
 		let tab = if let Some(file) = cliargs.select_file {
-			// convert to relative git path
-			if let Ok(abs) = file.canonicalize() {
-				if let Ok(path) = abs.strip_prefix(
-					env.repo.borrow().gitpath().canonicalize()?,
-				) {
-					select_file = Some(Path::new(".").join(path));
-				}
-			}
+			select_file = resolve_initial_select_file(
+				file.as_path(),
+				&env.repo.borrow(),
+			);
 			2
 		} else {
 			env.options.borrow().current_tab()
@@ -488,6 +485,48 @@ impl App {
 			false
 		}
 	}
+}
+
+fn resolve_initial_select_file(
+	file: &Path,
+	repo_path: &RepoPath,
+) -> Option<PathBuf> {
+	resolve_initial_select_file_from_cwd(
+		file,
+		repo_path,
+		&env::current_dir().ok()?,
+	)
+}
+
+fn resolve_initial_select_file_from_cwd(
+	file: &Path,
+	repo_path: &RepoPath,
+	cwd: &Path,
+) -> Option<PathBuf> {
+	let repo_root = PathBuf::from(repo_work_dir(repo_path).ok()?)
+		.canonicalize()
+		.ok()?;
+	let cwd = cwd.canonicalize().ok()?;
+	let mut candidates = Vec::new();
+
+	if file.is_absolute() {
+		candidates.push(file.to_path_buf());
+	} else {
+		candidates.push(cwd.join(file));
+		if cwd != repo_root {
+			candidates.push(repo_root.join(file));
+		}
+	}
+
+	for candidate in candidates {
+		if let Ok(abs) = candidate.canonicalize() {
+			if let Ok(path) = abs.strip_prefix(&repo_root) {
+				return Some(Path::new(".").join(path));
+			}
+		}
+	}
+
+	None
 }
 
 // private impls
@@ -1224,6 +1263,86 @@ impl App {
 			)]))
 			.alignment(Alignment::Right),
 			text_area,
+		);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{resolve_initial_select_file_from_cwd, RepoPath};
+	use std::{fs, path::Path, process::Command};
+	use tempfile::TempDir;
+
+	fn make_repo_with_nested_file() -> (TempDir, RepoPath) {
+		let temp_dir = TempDir::new().expect("create temp repo");
+		let status = Command::new("git")
+			.arg("init")
+			.arg("-q")
+			.arg(temp_dir.path())
+			.status()
+			.expect("run git init");
+		assert!(status.success(), "git init should succeed");
+
+		let nested_dir = temp_dir.path().join("frontend/src");
+		fs::create_dir_all(&nested_dir)
+			.expect("create nested frontend/src directory");
+		fs::write(nested_dir.join("index.html"), "<html>\n")
+			.expect("write nested test file");
+		let repo_path: RepoPath = temp_dir
+			.path()
+			.to_str()
+			.expect("temp path should be utf-8")
+			.into();
+		(temp_dir, repo_path)
+	}
+
+	#[test]
+	fn resolve_initial_select_file_from_repo_root() {
+		let (temp_dir, repo_path) = make_repo_with_nested_file();
+
+		let selected = resolve_initial_select_file_from_cwd(
+			Path::new("frontend/src/index.html"),
+			&repo_path,
+			temp_dir.path(),
+		);
+
+		assert_eq!(
+			selected,
+			Some(Path::new(".").join("frontend/src/index.html"))
+		);
+	}
+
+	#[test]
+	fn resolve_initial_select_file_from_subdir_cwd_relative_path() {
+		let (temp_dir, repo_path) = make_repo_with_nested_file();
+		let cwd = temp_dir.path().join("frontend");
+
+		let selected = resolve_initial_select_file_from_cwd(
+			Path::new("src/index.html"),
+			&repo_path,
+			&cwd,
+		);
+
+		assert_eq!(
+			selected,
+			Some(Path::new(".").join("frontend/src/index.html"))
+		);
+	}
+
+	#[test]
+	fn resolve_initial_select_file_from_subdir_repo_relative_path() {
+		let (temp_dir, repo_path) = make_repo_with_nested_file();
+		let cwd = temp_dir.path().join("frontend");
+
+		let selected = resolve_initial_select_file_from_cwd(
+			Path::new("frontend/src/index.html"),
+			&repo_path,
+			&cwd,
+		);
+
+		assert_eq!(
+			selected,
+			Some(Path::new(".").join("frontend/src/index.html"))
 		);
 	}
 }
