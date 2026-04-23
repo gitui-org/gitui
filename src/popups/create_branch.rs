@@ -11,9 +11,10 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::sync::{self, RepoPathRef};
-use crossterm::event::Event;
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use easy_cast::Cast;
 use ratatui::{layout::Rect, widgets::Paragraph, Frame};
+use std::borrow::Cow;
 
 pub struct CreateBranchPopup {
 	repo: RepoPathRef,
@@ -57,11 +58,28 @@ impl Component for CreateBranchPopup {
 
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.is_visible() {
-			if self.input.event(ev)?.is_consumed() {
+			let ev = match ev {
+				Event::Key(KeyEvent {
+					code: KeyCode::Char(c),
+					modifiers,
+					kind,
+					state,
+				}) => Cow::Owned(Event::Key(KeyEvent {
+					code: KeyCode::Char(strings::normalize_branch_name_char(
+						*c,
+					)),
+					modifiers: *modifiers,
+					kind: *kind,
+					state: *state,
+				})),
+				_ => Cow::Borrowed(ev),
+			};
+
+			if self.input.event(&ev)?.is_consumed() {
 				return Ok(EventState::Consumed);
 			}
 
-			if let Event::Key(e) = ev {
+			if let Event::Key(e) = ev.as_ref() {
 				if key_match(e, self.key_config.keys.enter) {
 					self.create_branch();
 				}
