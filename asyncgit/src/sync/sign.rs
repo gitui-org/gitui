@@ -234,12 +234,11 @@ impl SignBuilder {
 	}
 
 	fn path_contains_ssh_public_key(signing_key_path: &str) -> bool {
-		std::fs::read_to_string(signing_key_path)
-			.ok()
-			.map(|contents| {
+		std::fs::read_to_string(signing_key_path).ok().is_some_and(
+			|contents| {
 				Self::looks_like_ssh_public_key(contents.trim())
-			})
-			.unwrap_or(false)
+			},
+		)
 	}
 }
 
