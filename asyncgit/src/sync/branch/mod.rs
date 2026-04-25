@@ -148,11 +148,14 @@ pub fn get_branches_info(
 		(BranchType::Remote, remotes)
 	};
 
-	let mut branches_for_display: Vec<BranchInfo> = repo
+	let mut branches_with_keys: Vec<(BranchInfo, i64, i64)> = repo
 		.branches(Some(filter))?
 		.map(|b| {
 			let branch = b?.0;
 			let top_commit = branch.get().peel_to_commit()?;
+			let committer_time =
+				top_commit.committer().when().seconds();
+			let author_time = top_commit.author().when().seconds();
 			let reference = bytes2string(branch.get().name_bytes())?;
 			let upstream = branch.upstream();
 
@@ -186,7 +189,7 @@ pub fn get_branches_info(
 				})
 			};
 
-			Ok(BranchInfo {
+			let info = BranchInfo {
 				name: bytes2string(name_bytes)?,
 				reference,
 				top_commit_message: bytes2string(
@@ -194,14 +197,79 @@ pub fn get_branches_info(
 				)?,
 				top_commit: top_commit.id().into(),
 				details,
-			})
+			};
+			Ok((info, committer_time, author_time))
 		})
 		.filter_map(Result::ok)
 		.collect();
 
-	branches_for_display.sort_by(|a, b| a.name.cmp(&b.name));
+	let sort = BranchSort::from_repo(&repo);
+	branches_with_keys.sort_by(|a, b| {
+		let ord = match sort.field {
+			BranchSortField::Refname => a.0.name.cmp(&b.0.name),
+			BranchSortField::CommitterDate => a.1.cmp(&b.1),
+			BranchSortField::AuthorDate => a.2.cmp(&b.2),
+		};
+		if sort.descending {
+			ord.reverse()
+		} else {
+			ord
+		}
+	});
 
-	Ok(branches_for_display)
+	Ok(branches_with_keys
+		.into_iter()
+		.map(|(info, _, _)| info)
+		.collect())
+}
+
+/// Sort key honoured when listing branches; mirrors the `branch.sort`
+/// git config (`refname`, `committerdate`, `authordate`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum BranchSortField {
+	#[default]
+	Refname,
+	CommitterDate,
+	AuthorDate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct BranchSort {
+	field: BranchSortField,
+	descending: bool,
+}
+
+impl BranchSort {
+	fn from_repo(repo: &Repository) -> Self {
+		repo.config()
+			.ok()
+			.and_then(|cfg| cfg.get_string("branch.sort").ok())
+			.as_deref()
+			.map(Self::parse)
+			.unwrap_or_default()
+	}
+
+	fn parse(raw: &str) -> Self {
+		let trimmed = raw.trim();
+		let (descending, key) = trimmed
+			.strip_prefix('-')
+			.map_or((false, trimmed), |rest| (true, rest));
+		match key {
+			"committerdate" => Self {
+				field: BranchSortField::CommitterDate,
+				descending,
+			},
+			"authordate" => Self {
+				field: BranchSortField::AuthorDate,
+				descending,
+			},
+			"refname" => Self {
+				field: BranchSortField::Refname,
+				descending,
+			},
+			_ => Self::default(),
+		}
+	}
 }
 
 ///
@@ -739,6 +807,134 @@ mod tests_branches {
 			&upstream_merge_res.unwrap().unwrap(),
 			upstream_merge
 		);
+	}
+}
+
+#[cfg(test)]
+mod tests_branch_sort {
+	use super::*;
+	use crate::sync::tests::{repo_init, write_commit_file_at};
+
+	#[test]
+	fn parse_unset_is_refname_ascending() {
+		let sort = BranchSort::default();
+		assert_eq!(sort.field, BranchSortField::Refname);
+		assert!(!sort.descending);
+	}
+
+	#[test]
+	fn parse_committerdate() {
+		let sort = BranchSort::parse("committerdate");
+		assert_eq!(sort.field, BranchSortField::CommitterDate);
+		assert!(!sort.descending);
+	}
+
+	#[test]
+	fn parse_descending_prefix() {
+		let sort = BranchSort::parse("-committerdate");
+		assert_eq!(sort.field, BranchSortField::CommitterDate);
+		assert!(sort.descending);
+	}
+
+	#[test]
+	fn parse_authordate_and_refname() {
+		assert_eq!(
+			BranchSort::parse("authordate"),
+			BranchSort {
+				field: BranchSortField::AuthorDate,
+				descending: false,
+			}
+		);
+		assert_eq!(
+			BranchSort::parse("-refname"),
+			BranchSort {
+				field: BranchSortField::Refname,
+				descending: true,
+			}
+		);
+	}
+
+	#[test]
+	fn parse_unknown_falls_back_to_default() {
+		assert_eq!(
+			BranchSort::parse("version:refname"),
+			BranchSort::default()
+		);
+		assert_eq!(BranchSort::parse(""), BranchSort::default());
+	}
+
+	#[test]
+	fn parse_trims_whitespace() {
+		assert_eq!(
+			BranchSort::parse("  -committerdate  "),
+			BranchSort {
+				field: BranchSortField::CommitterDate,
+				descending: true,
+			}
+		);
+	}
+
+	#[test]
+	fn applies_committerdate_descending_from_config() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		// Two branches whose top commits have well-separated commit
+		// times so the sort order is unambiguous.
+		write_commit_file_at(
+			&repo,
+			"a.txt",
+			"a",
+			"older commit",
+			git2::Time::new(1_000_000, 0),
+		);
+		create_branch(repo_path, "older").unwrap();
+
+		write_commit_file_at(
+			&repo,
+			"b.txt",
+			"b",
+			"newer commit",
+			git2::Time::new(2_000_000, 0),
+		);
+		create_branch(repo_path, "newer").unwrap();
+
+		repo.config()
+			.unwrap()
+			.set_str("branch.sort", "-committerdate")
+			.unwrap();
+
+		let names: Vec<String> = get_branches_info(repo_path, true)
+			.unwrap()
+			.into_iter()
+			.map(|b| b.name)
+			.collect();
+
+		// "newer" sits on the newest commit, so it must lead.
+		// "older" sits on the original master commit, so it trails.
+		assert_eq!(names.first().map(String::as_str), Some("newer"));
+		assert_eq!(names.last().map(String::as_str), Some("master"));
+	}
+
+	#[test]
+	fn defaults_to_refname_ascending_when_config_unset() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		create_branch(repo_path, "zeta").unwrap();
+		create_branch(repo_path, "alpha").unwrap();
+
+		let names: Vec<String> = get_branches_info(repo_path, true)
+			.unwrap()
+			.into_iter()
+			.map(|b| b.name)
+			.collect();
+
+		assert_eq!(names, vec!["alpha", "master", "zeta"]);
 	}
 }
 
