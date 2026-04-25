@@ -153,6 +153,71 @@ mod tests {
 	use std::io::Write;
 	use tempfile::NamedTempFile;
 
+	fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+		KeyEvent::new(code, modifiers)
+	}
+
+	#[test]
+	fn test_vim_nav_up() {
+		let config = KeyConfig::default();
+		assert!(config
+			.is_nav_up(&key_event(KeyCode::Up, KeyModifiers::NONE)));
+		assert!(config.is_nav_up(&key_event(
+			KeyCode::Char('k'),
+			KeyModifiers::NONE
+		)));
+		assert!(!config.is_nav_up(&key_event(
+			KeyCode::Char('k'),
+			KeyModifiers::CONTROL
+		)));
+		assert!(!config.is_nav_up(&key_event(
+			KeyCode::Char('j'),
+			KeyModifiers::NONE
+		)));
+	}
+
+	#[test]
+	fn test_vim_nav_down() {
+		let config = KeyConfig::default();
+		assert!(config.is_nav_down(&key_event(
+			KeyCode::Down,
+			KeyModifiers::NONE
+		)));
+		assert!(config.is_nav_down(&key_event(
+			KeyCode::Char('j'),
+			KeyModifiers::NONE
+		)));
+		assert!(!config.is_nav_down(&key_event(
+			KeyCode::Char('j'),
+			KeyModifiers::CONTROL
+		)));
+		assert!(!config.is_nav_down(&key_event(
+			KeyCode::Char('k'),
+			KeyModifiers::NONE
+		)));
+	}
+
+	#[test]
+	fn test_vim_nav_right() {
+		let config = KeyConfig::default();
+		assert!(config.is_nav_right(&key_event(
+			KeyCode::Right,
+			KeyModifiers::NONE
+		)));
+		assert!(config.is_nav_right(&key_event(
+			KeyCode::Char('l'),
+			KeyModifiers::NONE
+		)));
+		assert!(!config.is_nav_right(&key_event(
+			KeyCode::Char('l'),
+			KeyModifiers::CONTROL
+		)));
+		assert!(!config.is_nav_right(&key_event(
+			KeyCode::Char('j'),
+			KeyModifiers::NONE
+		)));
+	}
+
 	#[test]
 	fn test_get_hint() {
 		let config = KeyConfig::default();

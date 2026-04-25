@@ -7,10 +7,7 @@ use super::{
 	Component, DrawableComponent, EventState, StatusTreeComponent,
 };
 use crate::{
-	accessors,
-	app::Environment,
-	keys::SharedKeyConfig,
-	strings,
+	accessors, app::Environment, keys::SharedKeyConfig, strings,
 };
 use anyhow::Result;
 use asyncgit::{

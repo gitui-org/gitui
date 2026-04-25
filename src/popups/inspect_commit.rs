@@ -166,7 +166,8 @@ impl Component for InspectCommitPopup {
 				{
 					self.details.focus(false);
 					self.diff.focus(true);
-				} else if key_match(e, self.key_config.keys.move_left) {
+				} else if key_match(e, self.key_config.keys.move_left)
+				{
 					self.hide_stacked(false);
 				} else if key_match(
 					e,

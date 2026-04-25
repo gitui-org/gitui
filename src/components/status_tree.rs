@@ -543,7 +543,8 @@ impl Component for StatusTreeComponent {
 					Ok(self
 						.move_selection(MoveSelection::PageDown)
 						.into())
-				} else if key_match(e, self.key_config.keys.move_left) {
+				} else if key_match(e, self.key_config.keys.move_left)
+				{
 					Ok(self
 						.move_selection(MoveSelection::Left)
 						.into())

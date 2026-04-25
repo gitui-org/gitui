@@ -328,7 +328,10 @@ impl Component for OptionsPopup {
 					self.move_selection(false);
 				} else if self.key_config.is_nav_right(key) {
 					self.switch_option(true);
-				} else if key_match(key, self.key_config.keys.move_left) {
+				} else if key_match(
+					key,
+					self.key_config.keys.move_left,
+				) {
 					self.switch_option(false);
 				}
 			}
