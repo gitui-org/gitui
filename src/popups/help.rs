@@ -137,10 +137,9 @@ impl Component for HelpPopup {
 			if let Event::Key(e) = ev {
 				if key_match(e, self.key_config.keys.exit_popup) {
 					self.hide();
-				} else if key_match(e, self.key_config.keys.move_down)
-				{
+				} else if self.key_config.is_nav_down(e) {
 					self.move_selection(true);
-				} else if key_match(e, self.key_config.keys.move_up) {
+				} else if self.key_config.is_nav_up(e) {
 					self.move_selection(false);
 				}
 			}

@@ -161,15 +161,12 @@ impl Component for InspectCommitPopup {
 					} else {
 						self.hide_stacked(false);
 					}
-				} else if key_match(
-					e,
-					self.key_config.keys.move_right,
-				) && self.can_focus_diff()
+				} else if self.key_config.is_nav_right(e)
+					&& self.can_focus_diff()
 				{
 					self.details.focus(false);
 					self.diff.focus(true);
-				} else if key_match(e, self.key_config.keys.move_left)
-				{
+				} else if key_match(e, self.key_config.keys.move_left) {
 					self.hide_stacked(false);
 				} else if key_match(
 					e,

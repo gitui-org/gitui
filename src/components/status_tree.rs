@@ -518,12 +518,11 @@ impl Component for StatusTreeComponent {
 				} else if key_match(e, self.key_config.keys.copy) {
 					self.copy_file_path();
 					Ok(EventState::Consumed)
-				} else if key_match(e, self.key_config.keys.move_down)
-				{
+				} else if self.key_config.is_nav_down(e) {
 					Ok(self
 						.move_selection(MoveSelection::Down)
 						.into())
-				} else if key_match(e, self.key_config.keys.move_up) {
+				} else if self.key_config.is_nav_up(e) {
 					Ok(self.move_selection(MoveSelection::Up).into())
 				} else if key_match(e, self.key_config.keys.home)
 					|| key_match(e, self.key_config.keys.shift_up)
@@ -544,15 +543,11 @@ impl Component for StatusTreeComponent {
 					Ok(self
 						.move_selection(MoveSelection::PageDown)
 						.into())
-				} else if key_match(e, self.key_config.keys.move_left)
-				{
+				} else if key_match(e, self.key_config.keys.move_left) {
 					Ok(self
 						.move_selection(MoveSelection::Left)
 						.into())
-				} else if key_match(
-					e,
-					self.key_config.keys.move_right,
-				) {
+				} else if self.key_config.is_nav_right(e) {
 					Ok(self
 						.move_selection(MoveSelection::Right)
 						.into())

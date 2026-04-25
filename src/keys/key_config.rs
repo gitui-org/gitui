@@ -1,11 +1,11 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::{fs::canonicalize, path::PathBuf, rc::Rc};
 
 use crate::{args::get_app_config_path, strings::symbol};
 
 use super::{
-	key_list::{GituiKeyEvent, KeysList},
+	key_list::{key_match, GituiKeyEvent, KeysList},
 	symbols::KeySymbols,
 };
 
@@ -50,6 +50,24 @@ impl KeyConfig {
 		);
 
 		Ok(Self { keys, symbols })
+	}
+
+	pub fn is_nav_up(&self, key: &KeyEvent) -> bool {
+		key_match(key, self.keys.move_up)
+			|| (key.code == KeyCode::Char('k')
+				&& key.modifiers == KeyModifiers::NONE)
+	}
+
+	pub fn is_nav_down(&self, key: &KeyEvent) -> bool {
+		key_match(key, self.keys.move_down)
+			|| (key.code == KeyCode::Char('j')
+				&& key.modifiers == KeyModifiers::NONE)
+	}
+
+	pub fn is_nav_right(&self, key: &KeyEvent) -> bool {
+		key_match(key, self.keys.move_right)
+			|| (key.code == KeyCode::Char('l')
+				&& key.modifiers == KeyModifiers::NONE)
 	}
 
 	fn get_key_symbol(&self, k: KeyCode) -> &str {

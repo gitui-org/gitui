@@ -322,23 +322,13 @@ impl Component for OptionsPopup {
 			if let Event::Key(key) = &event {
 				if key_match(key, self.key_config.keys.exit_popup) {
 					self.hide();
-				} else if key_match(key, self.key_config.keys.move_up)
-				{
+				} else if self.key_config.is_nav_up(key) {
 					self.move_selection(true);
-				} else if key_match(
-					key,
-					self.key_config.keys.move_down,
-				) {
+				} else if self.key_config.is_nav_down(key) {
 					self.move_selection(false);
-				} else if key_match(
-					key,
-					self.key_config.keys.move_right,
-				) {
+				} else if self.key_config.is_nav_right(key) {
 					self.switch_option(true);
-				} else if key_match(
-					key,
-					self.key_config.keys.move_left,
-				) {
+				} else if key_match(key, self.key_config.keys.move_left) {
 					self.switch_option(false);
 				}
 			}
