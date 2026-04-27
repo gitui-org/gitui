@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Changed
+* honour `branch.sort` git config when listing branches, including support for comma-separated multi-key values ([#2918](https://github.com/gitui-org/gitui/pull/2918))
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
 * open the external editor from the status diff view [[@WaterWhisperer](https://github.com/WaterWhisperer)] ([#2805](https://github.com/gitui-org/gitui/issues/2805))
 

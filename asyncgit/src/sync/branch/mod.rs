@@ -250,10 +250,12 @@ impl BranchSort {
 	}
 
 	fn parse(raw: &str) -> Self {
-		let trimmed = raw.trim();
-		let (descending, key) = trimmed
+		// git accepts comma-separated lists (e.g. `-committerdate,refname`);
+		// honour only the primary (first) key.
+		let primary = raw.split(',').next().unwrap_or("").trim();
+		let (descending, key) = primary
 			.strip_prefix('-')
-			.map_or((false, trimmed), |rest| (true, rest));
+			.map_or((false, primary), |rest| (true, rest));
 		match key {
 			"committerdate" => Self {
 				field: BranchSortField::CommitterDate,
@@ -870,6 +872,26 @@ mod tests_branch_sort {
 			BranchSort {
 				field: BranchSortField::CommitterDate,
 				descending: true,
+			}
+		);
+	}
+
+	#[test]
+	fn parse_comma_separated_uses_primary_key() {
+		// git allows multi-key sort like `-committerdate,refname`; we use
+		// only the first key and ignore the rest.
+		assert_eq!(
+			BranchSort::parse("-committerdate,refname"),
+			BranchSort {
+				field: BranchSortField::CommitterDate,
+				descending: true,
+			}
+		);
+		assert_eq!(
+			BranchSort::parse("authordate,-refname"),
+			BranchSort {
+				field: BranchSortField::AuthorDate,
+				descending: false,
 			}
 		);
 	}
