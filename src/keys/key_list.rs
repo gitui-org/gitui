@@ -228,7 +228,7 @@ impl Default for KeysList {
 			commit: GituiKeyEvent::new(KeyCode::Char('d'),  KeyModifiers::CONTROL),
 			newline: GituiKeyEvent::new(KeyCode::Enter,  KeyModifiers::empty()),
 			goto_line: GituiKeyEvent::new(KeyCode::Char('L'),  KeyModifiers::SHIFT),
-			diff_mode_toggle: GituiKeyEvent::new(KeyCode::Char('p'),  KeyModifiers::ALT),
+			diff_mode_toggle: GituiKeyEvent::new(KeyCode::Char('m'),  KeyModifiers::empty()),
 		}
 	}
 }

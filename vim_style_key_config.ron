@@ -32,7 +32,7 @@
     diff_stage_lines: Some(( code: Char('s'), modifiers: "")),
 
     // toggle between unified and side-by-side diff mode
-    diff_mode_toggle: Some(( code: Char('p'), modifiers: "ALT")),
+    diff_mode_toggle: Some(( code: Char('m'), modifiers: "")),
 
     stashing_save: Some(( code: Char('w'), modifiers: "")),
     stashing_toggle_index: Some(( code: Char('m'), modifiers: "")),

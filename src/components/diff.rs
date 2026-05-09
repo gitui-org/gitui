@@ -1468,11 +1468,6 @@ impl Component for DiffComponent {
 			true,
 			self.focused(),
 		));
-		out.push(CommandInfo::new(
-			strings::commands::diff_toggle_mode(&self.key_config),
-			true,
-			self.focused(),
-		));
 
 		CommandBlocking::PassingOn
 	}

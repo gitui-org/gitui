@@ -615,6 +615,11 @@ impl Component for FileRevlogPopup {
 				)
 				.order(1),
 			);
+			out.push(CommandInfo::new(
+				strings::commands::diff_toggle_mode(&self.key_config),
+				true,
+				true,
+			));
 
 			out.push(CommandInfo::new(
 				strings::commands::diff_focus_right(&self.key_config),
@@ -625,11 +630,6 @@ impl Component for FileRevlogPopup {
 				strings::commands::diff_focus_left(&self.key_config),
 				true,
 				self.diff.focused(),
-			));
-			out.push(CommandInfo::new(
-				strings::commands::diff_toggle_mode(&self.key_config),
-				true,
-				true,
 			));
 		}
 
