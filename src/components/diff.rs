@@ -1710,4 +1710,35 @@ mod tests {
 				if path == "src/main.rs"
 		));
 	}
+
+	#[test]
+	fn test_commands_no_longer_contains_toggle_diff() {
+		let env = Environment::test_env();
+		let diff = DiffComponent::new(&env, false);
+		let mut cmds = Vec::new();
+		diff.commands(&mut cmds, true);
+
+		let contains_toggle = cmds.iter().any(|c| {
+			c.text.name
+				== strings::commands::diff_toggle_mode(&env.key_config)
+					.name
+		});
+		assert!(!contains_toggle);
+	}
+
+	#[test]
+	fn test_diff_mode_toggle_event() {
+		let env = Environment::test_env();
+		let mut diff = DiffComponent::new(&env, false);
+		diff.focus(true);
+
+		let event = Event::Key(KeyEvent::from(
+			&env.key_config.keys.diff_mode_toggle,
+		));
+
+		assert!(matches!(
+			diff.event(&event).unwrap(),
+			EventState::Consumed
+		));
+	}
 }
