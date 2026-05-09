@@ -804,6 +804,12 @@ impl Component for Status {
 				true,
 				true,
 			));
+
+			out.push(CommandInfo::new(
+				strings::commands::diff_toggle_mode(&self.key_config),
+				true,
+				true,
+			));
 		}
 
 		self.commands_nav(out, force_all);
@@ -946,6 +952,12 @@ impl Component for Status {
 					self.key_config.keys.view_submodules,
 				) {
 					self.queue.push(InternalEvent::ViewSubmodules);
+					Ok(EventState::Consumed)
+				} else if key_match(
+					k,
+					self.key_config.keys.diff_mode_toggle,
+				) {
+					self.diff.toggle_diff_mode();
 					Ok(EventState::Consumed)
 				} else {
 					Ok(EventState::NotConsumed)

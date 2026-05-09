@@ -53,7 +53,7 @@ pub use command::{CommandInfo, CommandText};
 pub use commit_details::CommitDetailsComponent;
 pub use commitlist::CommitList;
 pub use cred::CredComponent;
-pub use diff::DiffComponent;
+pub use diff::{DiffComponent, DiffMode};
 pub use revision_files::RevisionFilesComponent;
 pub use syntax_text::SyntaxTextComponent;
 pub use textinput::{InputType, TextInputComponent};

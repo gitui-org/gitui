@@ -1,3 +1,4 @@
+use crate::components::DiffMode;
 use anyhow::Result;
 use asyncgit::sync::{
 	diff::DiffOptions, repo_dir, RepoPathRef,
@@ -22,6 +23,7 @@ struct OptionsData {
 	pub diff: DiffOptions,
 	pub status_show_untracked: Option<ShowUntrackedFilesConfig>,
 	pub commit_msgs: Vec<String>,
+	pub diff_mode: DiffMode,
 }
 
 const COMMIT_MSG_HISTORY_LENGTH: usize = 20;
@@ -104,6 +106,15 @@ impl Options {
 		self.data.diff.ignore_whitespace =
 			!self.data.diff.ignore_whitespace;
 
+		self.save();
+	}
+
+	pub const fn diff_mode(&self) -> DiffMode {
+		self.data.diff_mode
+	}
+
+	pub fn set_diff_mode(&mut self, mode: DiffMode) {
+		self.data.diff_mode = mode;
 		self.save();
 	}
 
