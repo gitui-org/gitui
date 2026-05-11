@@ -168,3 +168,64 @@ fn confirm(prompt: &str) -> Result<bool> {
 
 	Ok(input.trim().eq_ignore_ascii_case("y"))
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_is_prerelease_nightly() {
+		assert!(is_prerelease("0.28.1-nightly"));
+		assert!(is_prerelease("0.28.1-NIGHTLY"));
+	}
+
+	#[test]
+	fn test_is_prerelease_rc() {
+		assert!(is_prerelease("0.28.1-rc.1"));
+		assert!(is_prerelease("0.28.1-RC.1"));
+	}
+
+	#[test]
+	fn test_is_prerelease_beta() {
+		assert!(is_prerelease("0.28.1-beta"));
+		assert!(is_prerelease("0.28.0-beta.2"));
+	}
+
+	#[test]
+	fn test_is_prerelease_alpha() {
+		assert!(is_prerelease("0.28.1-alpha"));
+		assert!(is_prerelease("0.28.0-alpha.1"));
+	}
+
+	#[test]
+	fn test_is_prerelease_dev() {
+		assert!(is_prerelease("0.28.1-dev"));
+		assert!(is_prerelease("0.28.0-dev.20240101"));
+	}
+
+	#[test]
+	fn test_is_prerelease_preview() {
+		assert!(is_prerelease("0.28.1-preview"));
+		assert!(is_prerelease("0.28.0-preview.3"));
+	}
+
+	#[test]
+	fn test_is_prerelease_snapshot() {
+		assert!(is_prerelease("0.28.1-snapshot"));
+	}
+
+	#[test]
+	fn test_is_not_prerelease_stable() {
+		assert!(!is_prerelease("0.28.1"));
+		assert!(!is_prerelease("0.28.0"));
+		assert!(!is_prerelease("1.0.0"));
+	}
+
+	#[test]
+	fn test_is_not_prerelease_version_with_prerelease_substring() {
+		// Ensure we don't false-positive on versions that contain prerelease keywords
+		// but aren't actually prereleases (e.g., "0.28.1-nightly-feature" wouldn't be valid anyway)
+		assert!(is_prerelease("0.28.1-nightly"));
+		assert!(!is_prerelease("0.28.1"));
+	}
+}

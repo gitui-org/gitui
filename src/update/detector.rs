@@ -147,3 +147,47 @@ fn has_pacman_installation() -> bool {
 fn has_pacman_installation() -> bool {
 	false
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_install_method_display() {
+		assert_eq!(InstallMethod::Cargo.to_string(), "cargo");
+		assert_eq!(InstallMethod::Homebrew.to_string(), "homebrew");
+		assert_eq!(InstallMethod::Apt.to_string(), "apt");
+		assert_eq!(InstallMethod::Dnf.to_string(), "dnf");
+		assert_eq!(InstallMethod::Pacman.to_string(), "pacman");
+		assert_eq!(InstallMethod::Windows.to_string(), "windows");
+		assert_eq!(InstallMethod::Scoop.to_string(), "scoop");
+		assert_eq!(
+			InstallMethod::Chocolatey.to_string(),
+			"chocolatey"
+		);
+		assert_eq!(
+			InstallMethod::ScoopBucket.to_string(),
+			"scoop-bucket"
+		);
+		assert_eq!(InstallMethod::Unknown.to_string(), "unknown");
+	}
+
+	#[test]
+	fn test_install_method_equality() {
+		assert_eq!(InstallMethod::Cargo, InstallMethod::Cargo);
+		assert_ne!(InstallMethod::Cargo, InstallMethod::Dnf);
+	}
+
+	#[test]
+	fn test_install_method_clone() {
+		let method = InstallMethod::Dnf;
+		let cloned = method.clone();
+		assert_eq!(method, cloned);
+	}
+
+	#[test]
+	fn test_install_method_debug() {
+		let debug_str = format!("{:?}", InstallMethod::Cargo);
+		assert!(debug_str.contains("Cargo"));
+	}
+}
