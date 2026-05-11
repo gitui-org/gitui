@@ -62,6 +62,7 @@
 mod app;
 mod args;
 mod bug_report;
+mod update;
 mod clipboard;
 mod cmdbar;
 mod components;
