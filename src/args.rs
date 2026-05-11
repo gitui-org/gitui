@@ -44,7 +44,8 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		std::process::exit(0);
 	}
 
-	if let Some(update_cmd) = arg_matches.subcommand_matches("update") {
+	if let Some(update_cmd) = arg_matches.subcommand_matches("update")
+	{
 		let include_prerelease = update_cmd.get_flag("nightly");
 		if let Err(e) = self_update(include_prerelease) {
 			eprintln!("Update failed: {}", e);
@@ -61,9 +62,11 @@ pub fn process_cmdline() -> Result<CliArgs> {
 	let workdir = arg_matches
 		.get_one::<String>(WORKDIR_FLAG_ID)
 		.map(PathBuf::from);
-	let gitdir = arg_matches
-		.get_one::<String>(GIT_DIR_FLAG_ID)
-		.map_or_else(|| PathBuf::from(DEFAULT_GIT_DIR), PathBuf::from);
+	let gitdir =
+		arg_matches.get_one::<String>(GIT_DIR_FLAG_ID).map_or_else(
+			|| PathBuf::from(DEFAULT_GIT_DIR),
+			PathBuf::from,
+		);
 
 	let select_file = arg_matches
 		.get_one::<String>(FILE_FLAG_ID)
@@ -81,11 +84,15 @@ pub fn process_cmdline() -> Result<CliArgs> {
 
 	let confpath = get_app_config_path()?;
 	fs::create_dir_all(&confpath).with_context(|| {
-		format!("failed to create config directory: {}", confpath.display())
+		format!(
+			"failed to create config directory: {}",
+			confpath.display()
+		)
 	})?;
 	let theme = confpath.join(arg_theme);
 
-	let notify_watcher = *arg_matches.get_one(WATCHER_FLAG_ID).unwrap_or(&false);
+	let notify_watcher =
+		*arg_matches.get_one(WATCHER_FLAG_ID).unwrap_or(&false);
 
 	let key_bindings_path = arg_matches
 		.get_one::<String>(KEY_BINDINGS_FLAG_ID)
@@ -218,7 +225,11 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 	});
 
 	println!("Logging enabled. Log written to: {}", path.display());
-	WriteLogger::init(LevelFilter::Trace, Config::default(), File::create(path)?)?;
+	WriteLogger::init(
+		LevelFilter::Trace,
+		Config::default(),
+		File::create(path)?,
+	)?;
 	Ok(())
 }
 
@@ -228,7 +239,9 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 	} else {
 		dirs::config_dir()
 	}
-	.ok_or_else(|| anyhow::anyhow!("failed to find os config dir."))?;
+	.ok_or_else(|| {
+		anyhow::anyhow!("failed to find os config dir.")
+	})?;
 
 	path.push("gitui");
 	Ok(path)

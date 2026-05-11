@@ -62,7 +62,6 @@
 mod app;
 mod args;
 mod bug_report;
-mod update;
 mod clipboard;
 mod cmdbar;
 mod components;
@@ -79,6 +78,7 @@ mod string_utils;
 mod strings;
 mod tabs;
 mod ui;
+mod update;
 mod watcher;
 
 use crate::{
