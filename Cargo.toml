@@ -61,6 +61,7 @@ serde = "1.0"
 shellexpand = "3.1"
 simplelog = { version = "0.12", default-features = false }
 struct-patch = "0.10"
+tempfile = "3"
 syntect = { version = "5.3", default-features = false, features = [
   "default-syntaxes",
   "default-themes",
@@ -76,10 +77,10 @@ which = "8.0"
 
 [dev-dependencies]
 env_logger = "0.11"
+git2 = { version = "0.20", default-features = false }
 git2-testing = { path = "./git2-testing" }
 insta = { version = "1.41.0", features = ["filters"] }
 pretty_assertions = "1.4"
-tempfile = "3"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

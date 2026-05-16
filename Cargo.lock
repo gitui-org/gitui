@@ -1332,6 +1332,7 @@ dependencies = [
  "filetreelist",
  "fuzzy-matcher",
  "gh-emoji",
+ "git2",
  "git2-testing",
  "indexmap",
  "insta",
