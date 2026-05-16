@@ -17,7 +17,8 @@ use anyhow::Result;
 use asyncgit::{
 	asyncjob::AsyncSingleJob,
 	sync::{
-		get_commit_info, CommitId, CommitInfo, RepoPathRef, TreeFile,
+		get_commit_info, get_head, tree_file_content, CommitId,
+		CommitInfo, RepoPathRef, TreeFile,
 	},
 	AsyncGitNotification, AsyncTreeFilesJob,
 };
@@ -57,6 +58,10 @@ pub struct RevisionFilesComponent {
 	focus: Focus,
 	key_config: SharedKeyConfig,
 	select_file: Option<PathBuf>,
+	// Owns the most recent tempdir created for the "open" command.
+	// Dropped automatically when replaced or when the component is dropped,
+	// which removes the read-only tempfile.
+	open_tempdir: Option<tempfile::TempDir>,
 }
 
 impl RevisionFilesComponent {
@@ -81,6 +86,7 @@ impl RevisionFilesComponent {
 			repo: env.repo.clone(),
 			select_file,
 			visible: false,
+			open_tempdir: None,
 		}
 	}
 
@@ -265,24 +271,72 @@ impl RevisionFilesComponent {
 		})
 	}
 
-	fn selection_changed(&mut self) {
+	fn selected_tree_file(&self) -> Option<&TreeFile> {
 		//TODO: retrieve TreeFile from tree datastructure
-		if let Some(file) = self.selected_file_path_with_prefix() {
-			if let Some(files) = &self.files {
-				let path = Path::new(&file);
-				if let Some(item) =
-					files.iter().find(|f| f.path == path)
-				{
-					if let Ok(path) = path.strip_prefix("./") {
-						return self.current_file.load_file(
-							path.to_string_lossy().to_string(),
-							item,
-						);
-					}
-				}
-				self.current_file.clear();
+		self.selected_file_path_with_prefix().and_then(|file| {
+			let path = Path::new(&file).to_path_buf();
+			self.files.as_ref().and_then(|files| {
+				files.iter().find(|f| f.path == path)
+			})
+		})
+	}
+
+	fn selection_changed(&mut self) {
+		if let Some(tree_file) = self.selected_tree_file().cloned() {
+			if let Ok(path) = tree_file.path.strip_prefix("./") {
+				return self.current_file.load_file(
+					path.to_string_lossy().to_string(),
+					&tree_file,
+				);
 			}
+			self.current_file.clear();
 		}
+	}
+
+	/// Dumps the currently selected file at the current revision into a
+	/// fresh tempdir and returns its absolute path. The previous tempdir
+	/// (if any) is dropped here, removing its contents from disk before
+	/// the new one is created. The new tempdir is owned by `self` and
+	/// will be cleaned up when replaced or when the component is dropped.
+	///
+	/// The dumped file is set read-only to make it clear edits will not
+	/// be persisted back to the repository.
+	fn dump_selected_file_content_to_tempfile(
+		&mut self,
+	) -> Result<String> {
+		// Drop the previous tempdir (if any) BEFORE creating a new one,
+		// so that the on-disk footprint of stale revisions does not grow.
+		self.open_tempdir = None;
+
+		let rev = self
+			.revision()
+			.ok_or_else(|| anyhow::anyhow!("no revision selected"))?;
+		let rev_id = rev.id;
+
+		let file = self
+			.selected_tree_file()
+			.cloned()
+			.ok_or_else(|| anyhow::anyhow!("no file selected"))?;
+
+		let (temp_dir, file_path) = dump_blob_to_readonly_tempfile(
+			&self.repo.borrow(),
+			&file,
+			&rev_id.to_string(),
+		)?;
+
+		let path_string = file_path.to_string_lossy().to_string();
+		self.open_tempdir = Some(temp_dir);
+
+		Ok(path_string)
+	}
+
+	/// True if the currently displayed revision is HEAD.
+	/// Returns false on lookup error (worktree dirty / repo issues),
+	/// which keeps the safe behavior: prefer `open` over `edit`.
+	fn is_head(&self) -> bool {
+		let head = get_head(&self.repo.borrow()).ok();
+		let commit_id = self.revision().map(|rev| rev.id);
+		commit_id.is_some() && commit_id == head
 	}
 
 	fn draw_tree(&self, f: &mut Frame, area: Rect) -> Result<()> {
@@ -429,6 +483,8 @@ impl Component for RevisionFilesComponent {
 		let is_tree_focused = matches!(self.focus, Focus::Tree);
 
 		if is_tree_focused || force_all {
+			let is_head = self.is_head();
+
 			out.push(
 				CommandInfo::new(
 					strings::commands::blame_file(&self.key_config),
@@ -439,7 +495,12 @@ impl Component for RevisionFilesComponent {
 			);
 			out.push(CommandInfo::new(
 				strings::commands::edit_item(&self.key_config),
-				self.tree.selected_file().is_some(),
+				self.tree.selected_file().is_some() && is_head,
+				true,
+			));
+			out.push(CommandInfo::new(
+				strings::commands::open_item(&self.key_config),
+				self.tree.selected_file().is_some() && !is_head,
 				true,
 			));
 			out.push(
@@ -478,6 +539,8 @@ impl Component for RevisionFilesComponent {
 
 		if let Event::Key(key) = event {
 			let is_tree_focused = matches!(self.focus, Focus::Tree);
+			let is_head = self.is_head();
+
 			if is_tree_focused
 				&& tree_nav(&mut self.tree, &self.key_config, key)
 			{
@@ -516,7 +579,9 @@ impl Component for RevisionFilesComponent {
 					self.open_finder();
 					return Ok(EventState::Consumed);
 				}
-			} else if key_match(key, self.key_config.keys.edit_file) {
+			} else if key_match(key, self.key_config.keys.edit_file)
+				&& is_head
+			{
 				if let Some(file) =
 					self.selected_file_path_with_prefix()
 				{
@@ -527,6 +592,33 @@ impl Component for RevisionFilesComponent {
 						InternalEvent::OpenExternalEditor(Some(file)),
 					);
 					return Ok(EventState::Consumed);
+				}
+			} else if key_match(key, self.key_config.keys.open_file)
+				&& !is_head
+			{
+				let dump =
+					self.dump_selected_file_content_to_tempfile();
+				match dump {
+					Ok(file) => {
+						//Note: switch to status tab so its clear we
+						// are not altering a file inside a revision
+						self.queue
+							.push(InternalEvent::TabSwitchStatus);
+						self.queue.push(
+							InternalEvent::OpenExternalEditor(Some(
+								file,
+							)),
+						);
+						return Ok(EventState::Consumed);
+					}
+					Err(e) => {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!(
+								"failed to open file at revision:\n{e}"
+							),
+						));
+						return Ok(EventState::Consumed);
+					}
 				}
 			} else if key_match(key, self.key_config.keys.copy) {
 				if let Some(file) = self.selected_file_path() {
@@ -593,5 +685,133 @@ fn tree_nav(
 		true
 	} else {
 		false
+	}
+}
+
+/// Writes the contents of `file` (a blob entry from a git tree) into a
+/// fresh tempdir under `prefix`, marks the resulting file read-only, and
+/// returns ownership of the tempdir together with the absolute path to
+/// the dumped file.
+///
+/// The returned `tempfile::TempDir` MUST be kept alive by the caller for
+/// as long as the file needs to exist; dropping it removes the tempdir
+/// and the file inside.
+fn dump_blob_to_readonly_tempfile(
+	repo: &asyncgit::sync::RepoPath,
+	file: &TreeFile,
+	prefix: &str,
+) -> Result<(tempfile::TempDir, PathBuf)> {
+	let content = tree_file_content(repo, file)?;
+
+	let temp_dir =
+		tempfile::Builder::new().prefix(prefix).tempdir()?;
+
+	let file_name = file.path.file_name().ok_or_else(|| {
+		anyhow::anyhow!("selected entry has no file name component")
+	})?;
+	let file_path = temp_dir.path().join(file_name);
+	std::fs::write(&file_path, content)?;
+
+	// Mark read-only so the user gets feedback (and editors warn)
+	// when trying to save edits to a historical revision.
+	let mut perms = std::fs::metadata(&file_path)?.permissions();
+	perms.set_readonly(true);
+	std::fs::set_permissions(&file_path, perms)?;
+
+	Ok((temp_dir, file_path))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::dump_blob_to_readonly_tempfile;
+	use asyncgit::sync::{tree_files, RepoPath, TreeFile};
+	use git2_testing::repo_init;
+
+	fn commit_file(
+		repo: &git2::Repository,
+		name: &str,
+		content: &str,
+		message: &str,
+	) -> git2::Oid {
+		let workdir = repo.workdir().unwrap().to_path_buf();
+		std::fs::write(workdir.join(name), content).unwrap();
+
+		let mut index = repo.index().unwrap();
+		index.add_path(std::path::Path::new(name)).unwrap();
+		index.write().unwrap();
+		let tree_id = index.write_tree().unwrap();
+		let tree = repo.find_tree(tree_id).unwrap();
+		let sig = repo.signature().unwrap();
+
+		let parent = repo
+			.head()
+			.ok()
+			.and_then(|h| h.target())
+			.and_then(|oid| repo.find_commit(oid).ok());
+		let parents: Vec<&git2::Commit> = parent.iter().collect();
+
+		repo.commit(
+			Some("HEAD"),
+			&sig,
+			&sig,
+			message,
+			&tree,
+			&parents,
+		)
+		.unwrap()
+	}
+
+	#[test]
+	fn dumps_blob_to_readonly_tempfile_and_cleans_up_on_drop() {
+		let (_td, repo) = repo_init();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath =
+			root.as_os_str().to_str().unwrap().into();
+
+		// commit 1: original content
+		let c1 = commit_file(&repo, "hello.txt", "old content", "c1");
+		// commit 2: change content (so c1 is no longer HEAD revision)
+		let _c2 =
+			commit_file(&repo, "hello.txt", "new content", "c2");
+
+		let files: Vec<TreeFile> =
+			tree_files(&repo_path, c1.into()).unwrap();
+		assert_eq!(files.len(), 1);
+
+		let kept_path = {
+			let (tempdir, file_path) =
+				dump_blob_to_readonly_tempfile(
+					&repo_path, &files[0], "rev-test",
+				)
+				.unwrap();
+
+			// File contains the OLD revision content, not the
+			// current worktree content.
+			let on_disk =
+				std::fs::read_to_string(&file_path).unwrap();
+			assert_eq!(on_disk, "old content");
+
+			// Read-only permission bit set.
+			let perms =
+				std::fs::metadata(&file_path).unwrap().permissions();
+			assert!(perms.readonly());
+
+			// Tempdir prefix is honored.
+			let tempdir_name =
+				tempdir.path().file_name().unwrap().to_string_lossy();
+			assert!(
+				tempdir_name.starts_with("rev-test"),
+				"tempdir name was: {tempdir_name}"
+			);
+
+			file_path
+		};
+
+		// After the TempDir was dropped at the end of the block above,
+		// the tempfile must be gone from disk.
+		assert!(
+			!kept_path.exists(),
+			"tempfile {kept_path:?} should be removed after TempDir drop"
+		);
 	}
 }

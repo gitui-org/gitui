@@ -25,6 +25,7 @@
     shift_down: Some(( code: Char('J'), modifiers: "SHIFT")),
 
     edit_file: Some(( code: Char('I'), modifiers: "SHIFT")),
+    open_file: Some(( code: Char('O'), modifiers: "SHIFT")),
 
     status_reset_item: Some(( code: Char('U'), modifiers: "SHIFT")),
 
