@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
 * open the external editor from the status diff view [[@WaterWhisperer](https://github.com/WaterWhisperer)] ([#2805](https://github.com/gitui-org/gitui/issues/2805))
+* open external editor at the cursor line from any diff view (status, log, blame), with editor-specific goto syntax (Helix, VS Code, vi-style) [@paaloeye](https://github.com/paaloeye) ([#2952](https://github.com/gitui-org/gitui/pull/2952))
 
 ### Fixes
 * crash when opening submodule ([#2895](https://github.com/gitui-org/gitui/issues/2895))
