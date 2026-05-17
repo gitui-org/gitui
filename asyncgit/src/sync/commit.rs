@@ -22,6 +22,7 @@ pub fn amend(
 	let config = repo.config()?;
 
 	let commit = repo.find_commit(id.into())?;
+	let author = commit.author();
 
 	let mut index = repo.index()?;
 	let tree_id = index.write_tree()?;
@@ -33,8 +34,13 @@ pub fn amend(
 
 		let head = get_head_repo(&repo)?;
 		if head == commit.id().into() {
+			let preserved_author = owned_signature(&author)?;
 			undo_last_commit(repo_path)?;
-			return self::commit(repo_path, msg);
+			return commit_with_preserved_author(
+				repo_path,
+				msg,
+				Some(preserved_author),
+			);
 		}
 
 		return Err(Error::SignAmendNonLastCommit);
@@ -44,8 +50,8 @@ pub fn amend(
 
 	let new_id = commit.amend(
 		Some("HEAD"),
-		None,
-		Some(&committer), // Passing a value will overwrite the committer.
+		Some(&author),
+		Some(&committer),
 		None,
 		Some(msg),
 		Some(&tree),
@@ -80,13 +86,37 @@ pub(crate) fn signature_allow_undefined_name(
 	signature
 }
 
+fn owned_signature(
+	sig: &Signature<'_>,
+) -> std::result::Result<Signature<'static>, git2::Error> {
+	let name = sig.name().ok_or_else(|| {
+		git2::Error::from_str("commit author name is not valid utf-8")
+	})?;
+	let email = sig.email().ok_or_else(|| {
+		git2::Error::from_str("commit author email is not valid utf-8")
+	})?;
+	Signature::new(name, email, &sig.when())
+}
+
 /// this does not run any git hooks, git-hooks have to be executed manually, checkout `hooks_commit_msg` for example
 pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
+	commit_with_preserved_author(repo_path, msg, None)
+}
+
+fn commit_with_preserved_author(
+	repo_path: &RepoPath,
+	msg: &str,
+	preserved_author: Option<Signature<'static>>,
+) -> Result<CommitId> {
 	scope_time!("commit");
 
 	let repo = repo(repo_path)?;
 	let config = repo.config()?;
-	let signature = signature_allow_undefined_name(&repo)?;
+	let committer = signature_allow_undefined_name(&repo)?;
+	let author = match preserved_author {
+		Some(author) => author,
+		None => signature_allow_undefined_name(&repo)?,
+	};
 	let mut index = repo.index()?;
 	let tree_id = index.write_tree()?;
 	let tree = repo.find_tree(tree_id)?;
@@ -104,8 +134,8 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 		.unwrap_or(false)
 	{
 		let buffer = repo.commit_create_buffer(
-			&signature,
-			&signature,
+			&author,
+			&committer,
 			msg,
 			&tree,
 			parents.as_slice(),
@@ -144,8 +174,8 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 	} else {
 		repo.commit(
 			Some("HEAD"),
-			&signature,
-			&signature,
+			&author,
+			&committer,
 			msg,
 			&tree,
 			parents.as_slice(),
