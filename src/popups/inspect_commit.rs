@@ -170,7 +170,12 @@ impl Component for InspectCommitPopup {
 					self.diff.focus(true);
 				} else if key_match(e, self.key_config.keys.move_left)
 				{
-					self.hide_stacked(false);
+					if self.diff.focused() {
+						self.details.focus(true);
+						self.diff.focus(false);
+					} else {
+						self.hide_stacked(false);
+					}
 				} else if key_match(
 					e,
 					self.key_config.keys.open_file_tree,
