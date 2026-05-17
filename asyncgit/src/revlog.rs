@@ -146,6 +146,13 @@ impl AsyncLog {
 	}
 
 	///
+	pub fn invalidate(&self) {
+		if let Ok(mut head) = self.current_head.lock() {
+			*head = None;
+		}
+	}
+
+	///
 	pub fn fetch(&self) -> Result<FetchStatus> {
 		self.background.store(false, Ordering::Relaxed);
 
@@ -176,18 +183,21 @@ impl AsyncLog {
 		rayon_core::spawn(move || {
 			scope_time!("async::revlog");
 
-			Self::fetch_helper(
+			if let Err(e) = Self::fetch_helper(
 				&repo_path,
 				&arc_current,
 				&arc_background,
 				&sender,
 				filter,
-			)
-			.expect("failed to fetch");
+			) {
+				log::error!("revlog fetch_helper: {e}");
+			}
 
 			arc_pending.store(false, Ordering::Relaxed);
 
-			Self::notify(&sender);
+			if let Err(e) = sender.send(AsyncGitNotification::Log) {
+				log::error!("revlog notify error: {e}");
+			}
 		});
 
 		Ok(FetchStatus::Started)
