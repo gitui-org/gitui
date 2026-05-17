@@ -153,7 +153,7 @@ impl DiffComponent {
 	}
 	///
 	const fn can_edit_file(&self) -> bool {
-		!self.is_immutable && !self.current.path.is_empty()
+		!self.current.path.is_empty()
 	}
 	///
 	pub fn clear(&mut self, pending: bool) {
@@ -773,12 +773,13 @@ impl Component for DiffComponent {
 			.hidden(),
 		);
 
+		out.push(CommandInfo::new(
+			strings::commands::edit_item(&self.key_config),
+			self.can_edit_file(),
+			self.focused() && self.can_edit_file(),
+		));
+
 		if !self.is_immutable {
-			out.push(CommandInfo::new(
-				strings::commands::edit_item(&self.key_config),
-				self.can_edit_file(),
-				self.focused() && self.can_edit_file(),
-			));
 			out.push(CommandInfo::new(
 				strings::commands::diff_hunk_remove(&self.key_config),
 				self.selected_hunk.is_some(),
@@ -888,10 +889,32 @@ impl Component for DiffComponent {
 				} else if key_match(e, self.key_config.keys.edit_file)
 					&& self.can_edit_file()
 				{
+					let line = self.diff.as_ref().and_then(|d| {
+						let cursor = self.selection.get_start();
+						// walk the flat line list to the cursor position,
+						// same index space as selected_lines()
+						d.hunks
+							.iter()
+							.flat_map(|h| h.lines.iter())
+							.nth(cursor)
+							.and_then(|l| l.position.new_lineno)
+							.or_else(|| {
+								// cursor is on a deletion — use old_lineno
+								// as a best-effort fallback
+								d.hunks
+									.iter()
+									.flat_map(|h| h.lines.iter())
+									.nth(cursor)
+									.and_then(|l| {
+										l.position.old_lineno
+									})
+							})
+					});
 					self.queue.push(
-						InternalEvent::OpenExternalEditor(Some(
-							self.current.path.clone(),
-						)),
+						InternalEvent::OpenExternalEditor(
+							Some(self.current.path.clone()),
+							line,
+						),
 					);
 					Ok(EventState::Consumed)
 				} else if key_match(
@@ -1055,8 +1078,84 @@ mod tests {
 		let event = env.queue.pop();
 		assert!(matches!(
 			event,
-			Some(InternalEvent::OpenExternalEditor(Some(path)))
+			Some(InternalEvent::OpenExternalEditor(Some(path), _))
 				if path == "src/main.rs"
 		));
+	}
+
+	#[test]
+	fn diff_component_opens_editor_at_cursor_line() {
+		use asyncgit::sync::diff::{DiffLinePosition, Hunk};
+		use asyncgit::FileDiff;
+
+		let env = Environment::test_env();
+		let mut comp = DiffComponent::new(&env, false);
+		comp.focus(true);
+		comp.current.path = String::from("src/main.rs");
+
+		// build a minimal FileDiff: one hunk with a header line and
+		// two content lines at known new_lineno values
+		let hunk = Hunk {
+			header_hash: 0,
+			lines: vec![
+				DiffLine {
+					content: "@@ -1,2 +1,2 @@".into(),
+					line_type: DiffLineType::Header,
+					position: DiffLinePosition {
+						old_lineno: None,
+						new_lineno: None,
+					},
+				},
+				DiffLine {
+					content: "context".into(),
+					line_type: DiffLineType::None,
+					position: DiffLinePosition {
+						old_lineno: Some(1),
+						new_lineno: Some(1),
+					},
+				},
+				DiffLine {
+					content: "added line".into(),
+					line_type: DiffLineType::Add,
+					position: DiffLinePosition {
+						old_lineno: None,
+						new_lineno: Some(2),
+					},
+				},
+			],
+		};
+		let file_diff = FileDiff {
+			hunks: vec![hunk],
+			lines: 3,
+			untracked: false,
+			sizes: (0, 0),
+			size_delta: 0,
+		};
+		comp.update(String::from("src/main.rs"), false, file_diff);
+
+		// move cursor to the Add line (index 2 in the flat list)
+		comp.move_selection(ScrollType::Down);
+		comp.move_selection(ScrollType::Down);
+
+		let event = Event::Key(KeyEvent::new(
+			KeyCode::Char('e'),
+			KeyModifiers::empty(),
+		));
+		assert!(matches!(
+			comp.event(&event).unwrap(),
+			EventState::Consumed
+		));
+
+		let queued = env.queue.pop();
+		assert!(
+			matches!(
+				queued,
+				Some(InternalEvent::OpenExternalEditor(
+					Some(_),
+					Some(2)
+				))
+			),
+			"expected OpenExternalEditor with line Some(2)"
+		);
 	}
 }

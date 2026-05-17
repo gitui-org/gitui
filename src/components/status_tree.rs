@@ -509,9 +509,10 @@ impl Component for StatusTreeComponent {
 				{
 					if let Some(status_item) = self.selection_file() {
 						self.queue.push(
-							InternalEvent::OpenExternalEditor(Some(
-								status_item.path,
-							)),
+							InternalEvent::OpenExternalEditor(
+								Some(status_item.path),
+								None,
+							),
 						);
 					}
 					Ok(EventState::Consumed)
