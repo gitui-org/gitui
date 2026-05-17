@@ -6,7 +6,7 @@ use crate::{
 	sync::{get_stashes, repository::repo},
 	StatusItem, StatusItemType,
 };
-use git2::{Diff, Repository};
+use git2::{Delta, Diff, Repository};
 use scopetime::scope_time;
 use std::collections::HashSet;
 
@@ -67,17 +67,28 @@ pub fn get_commit_files(
 		)?
 	};
 
+
+fn path_from_delta(delta: git2::DiffDelta) -> String {
+	let path = if delta.status() == Delta::Deleted {
+		delta.old_file().path()
+	} else {
+		delta
+			.new_file()
+			.path()
+			.or_else(|| delta.old_file().path())
+	};
+	path
+		.map(|p| p.to_str().unwrap_or("").to_string())
+		.unwrap_or_default()
+}
+
 	let res = diff
 		.deltas()
 		.map(|delta| {
 			let status = StatusItemType::from(delta.status());
 
 			StatusItem {
-				path: delta
-					.new_file()
-					.path()
-					.map(|p| p.to_str().unwrap_or("").to_string())
-					.unwrap_or_default(),
+				path: path_from_delta(delta),
 				status,
 			}
 		})

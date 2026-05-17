@@ -15,7 +15,11 @@ use crate::{
 	ui::{self, style::SharedTheme},
 };
 use anyhow::Result;
-use asyncgit::{hash, sync::CommitId, StatusItem, StatusItemType};
+use asyncgit::{
+	hash,
+	sync::{utils::repo_work_dir, CommitId, RepoPathRef},
+	StatusItem, StatusItemType,
+};
 use crossterm::event::Event;
 use ratatui::{layout::Rect, text::Span, Frame};
 use std::{borrow::Cow, cell::Cell, path::Path};
@@ -32,6 +36,7 @@ pub struct StatusTreeComponent {
 	focused: bool,
 	show_selection: bool,
 	queue: Queue,
+	repo: RepoPathRef,
 	theme: SharedTheme,
 	key_config: SharedKeyConfig,
 	scroll_top: Cell<usize>,
@@ -49,6 +54,7 @@ impl StatusTreeComponent {
 			focused: focus,
 			show_selection: focus,
 			queue: env.queue.clone(),
+			repo: env.repo.clone(),
 			theme: env.theme.clone(),
 			key_config: env.key_config.clone(),
 			scroll_top: Cell::new(0),
@@ -508,6 +514,31 @@ impl Component for StatusTreeComponent {
 				} else if key_match(e, self.key_config.keys.edit_file)
 				{
 					if let Some(status_item) = self.selection_file() {
+						if let Some(commit_id) = self.revision {
+							let from_parent = matches!(
+								status_item.status,
+								StatusItemType::Deleted
+							);
+							let missing = repo_work_dir(
+								&self.repo.borrow(),
+							)
+							.ok()
+							.map(|wd| {
+								std::path::Path::new(&wd)
+									.join(&status_item.path)
+							})
+							.is_none_or(|p| !p.exists());
+							if from_parent || missing {
+								self.queue.push(
+									InternalEvent::OpenExternalEditorAtCommit {
+										path: status_item.path,
+										commit: commit_id,
+										from_parent,
+									},
+								);
+								return Ok(EventState::Consumed);
+							}
+						}
 						self.queue.push(
 							InternalEvent::OpenExternalEditor(Some(
 								status_item.path,

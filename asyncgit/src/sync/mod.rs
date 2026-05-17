@@ -103,7 +103,7 @@ pub use tags::{
 	delete_tag, get_tags, get_tags_with_metadata, CommitTags, Tag,
 	TagWithMetadata, Tags,
 };
-pub use tree::{tree_file_content, tree_files, TreeFile};
+pub use tree::{file_content_at_commit, tree_file_content, tree_files, TreeFile};
 pub use utils::{
 	get_head, get_head_tuple, repo_dir, repo_open_error,
 	stage_add_all, stage_add_file, stage_addremoved, Head,

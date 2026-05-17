@@ -119,6 +119,7 @@ pub struct App {
 	// "Flags"
 	requires_redraw: Cell<bool>,
 	file_to_open: Option<String>,
+	pending_external_editor: Option<(String, Option<asyncgit::sync::CommitId>, bool)>,
 }
 
 pub struct Environment {
@@ -244,6 +245,7 @@ impl App {
 			key_config: env.key_config,
 			requires_redraw: Cell::new(false),
 			file_to_open: None,
+			pending_external_editor: None,
 			repo: env.repo,
 			repo_path_text,
 			popup_stack: PopupStack::default(),
@@ -372,10 +374,19 @@ impl App {
 			self.external_editor_popup.hide();
 			if matches!(polling_state, InputState::Paused) {
 				let result =
-					if let Some(path) = self.file_to_open.take() {
+					if let Some((path, commit, from_parent)) =
+						self.pending_external_editor.take()
+					{
 						ExternalEditorPopup::open_file_in_editor(
 							&self.repo.borrow(),
 							Path::new(&path),
+							commit.map(|c| (c, from_parent)),
+						)
+					} else if let Some(path) = self.file_to_open.take() {
+						ExternalEditorPopup::open_file_in_editor(
+							&self.repo.borrow(),
+							Path::new(&path),
+							None,
 						)
 					} else {
 						let changes =
@@ -816,9 +827,22 @@ impl App {
 				}
 			}
 			InternalEvent::OpenExternalEditor(path) => {
+				self.pending_external_editor = None;
 				self.input.set_polling(false);
 				self.external_editor_popup.show()?;
 				self.file_to_open = path;
+				flags.insert(NeedsUpdate::COMMANDS);
+			}
+			InternalEvent::OpenExternalEditorAtCommit {
+				path,
+				commit,
+				from_parent,
+			} => {
+				self.file_to_open = None;
+				self.pending_external_editor =
+					Some((path, Some(commit), from_parent));
+				self.input.set_polling(false);
+				self.external_editor_popup.show()?;
 				flags.insert(NeedsUpdate::COMMANDS);
 			}
 			InternalEvent::Push(branch, push_type, force, delete) => {
