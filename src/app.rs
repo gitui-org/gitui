@@ -1,6 +1,6 @@
 use crate::{
 	accessors,
-	args::CliArgs,
+	args::{resolve_select_file_path, CliArgs},
 	cmdbar::CommandBar,
 	components::{
 		command_pump, event_pump, CommandInfo, Component,
@@ -178,14 +178,13 @@ impl App {
 
 		let mut select_file: Option<PathBuf> = None;
 		let tab = if let Some(file) = cliargs.select_file {
-			// convert to relative git path
-			if let Ok(abs) = file.canonicalize() {
-				if let Ok(path) = abs.strip_prefix(
-					env.repo.borrow().gitpath().canonicalize()?,
-				) {
-					select_file = Some(Path::new(".").join(path));
-				}
-			}
+			let workdir =
+				PathBuf::from(repo_work_dir(&env.repo.borrow())?);
+			select_file = resolve_select_file_path(
+				&file,
+				&workdir,
+				&std::env::current_dir()?,
+			);
 			2
 		} else {
 			env.options.borrow().current_tab()

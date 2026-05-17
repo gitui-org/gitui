@@ -9,7 +9,7 @@ use simplelog::{Config, LevelFilter, WriteLogger};
 use std::{
 	env,
 	fs::{self, File},
-	path::PathBuf,
+	path::{Path, PathBuf},
 };
 
 const BUG_REPORT_FLAG_ID: &str = "bugreport";
@@ -236,6 +236,73 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 
 	path.push("gitui");
 	Ok(path)
+}
+
+/// Resolves `--file` to a path relative to the repository workdir.
+pub(crate) fn resolve_select_file_path(
+	file: &Path,
+	repo_workdir: &Path,
+	cwd: &Path,
+) -> Option<PathBuf> {
+	let repo_workdir = repo_workdir.canonicalize().ok()?;
+	let absolute = if file.is_absolute() {
+		file.to_path_buf()
+	} else {
+		cwd.join(file)
+	};
+	let absolute = absolute.canonicalize().ok()?;
+
+	absolute
+		.strip_prefix(&repo_workdir)
+		.ok()
+		.map(Path::to_path_buf)
+}
+
+#[cfg(test)]
+mod select_file_tests {
+	use super::*;
+	use std::fs;
+	use tempfile::tempdir;
+
+	#[test]
+	fn resolve_select_file_from_subdirectory() {
+		let repo = tempdir().unwrap();
+		let frontend = repo.path().join("frontend");
+		fs::create_dir_all(frontend.join("src")).unwrap();
+		fs::write(frontend.join("src/index.html"), "hi").unwrap();
+
+		let cwd = frontend.clone();
+		let file = Path::new("src/index.html");
+		let resolved = resolve_select_file_path(
+			file,
+			repo.path(),
+			&cwd,
+		)
+		.unwrap();
+
+		assert_eq!(resolved, Path::new("frontend/src/index.html"));
+	}
+
+	#[test]
+	fn resolve_select_file_from_repo_root() {
+		let repo = tempdir().unwrap();
+		fs::create_dir_all(repo.path().join("frontend/src")).unwrap();
+		fs::write(
+			repo.path().join("frontend/src/index.html"),
+			"hi",
+		)
+		.unwrap();
+
+		let file = Path::new("frontend/src/index.html");
+		let resolved = resolve_select_file_path(
+			file,
+			repo.path(),
+			repo.path(),
+		)
+		.unwrap();
+
+		assert_eq!(resolved, file);
+	}
 }
 
 #[test]
