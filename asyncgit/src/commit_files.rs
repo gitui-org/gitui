@@ -108,14 +108,19 @@ impl AsyncCommitFiles {
 		self.pending.fetch_add(1, Ordering::Relaxed);
 
 		rayon_core::spawn(move || {
-			Self::fetch_helper(&repo, params, &arc_current)
-				.expect("failed to fetch");
+			if let Err(e) =
+				Self::fetch_helper(&repo, params, &arc_current)
+			{
+				log::error!("commit_files fetch_helper: {e}");
+			}
 
 			arc_pending.fetch_sub(1, Ordering::Relaxed);
 
-			sender
-				.send(AsyncGitNotification::CommitFiles)
-				.expect("error sending");
+			if let Err(e) =
+				sender.send(AsyncGitNotification::CommitFiles)
+			{
+				log::error!("commit_files notify error: {e}");
+			}
 		});
 
 		Ok(())
