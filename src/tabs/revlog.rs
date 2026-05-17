@@ -16,8 +16,8 @@ use anyhow::Result;
 use asyncgit::{
 	asyncjob::AsyncSingleJob,
 	sync::{
-		self, filter_commit_by_search, CommitId, LogFilterSearch,
-		LogFilterSearchOptions, RepoPathRef,
+		self, filter_commit_by_search, filter_commits_exclude_merges,
+		CommitId, LogFilterSearch, LogFilterSearchOptions, RepoPathRef,
 	},
 	AsyncBranchesJob, AsyncCommitFilterJob, AsyncGitNotification,
 	AsyncLog, AsyncTags, CommitFilesParams, FetchStatus,
@@ -66,6 +66,7 @@ pub struct Revlog {
 	list: CommitList,
 	git_log: AsyncLog,
 	search: LogSearch,
+	hide_merge_commits: bool,
 	git_tags: AsyncTags,
 	git_local_branches: AsyncSingleJob<AsyncBranchesJob>,
 	git_remote_branches: AsyncSingleJob<AsyncBranchesJob>,
@@ -83,16 +84,14 @@ impl Revlog {
 			repo: env.repo.clone(),
 			queue: env.queue.clone(),
 			commit_details: CommitDetailsComponent::new(env),
-			list: CommitList::new(
-				env,
-				&strings::log_title(&env.key_config),
-			),
+			list: CommitList::new(env, &strings::log_title(false)),
 			git_log: AsyncLog::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
 				None,
 			),
 			search: LogSearch::Off,
+			hide_merge_commits: false,
 			git_tags: AsyncTags::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
@@ -404,6 +403,34 @@ impl Revlog {
 	fn can_start_search(&self) -> bool {
 		!self.git_log.is_pending() && !self.is_search_pending()
 	}
+
+	fn can_toggle_hide_merges(&self) -> bool {
+		matches!(self.search, LogSearch::Off) && !self.git_log.is_pending()
+	}
+
+	fn toggle_hide_merge_commits(&mut self) {
+		if !self.can_toggle_hide_merges() {
+			return;
+		}
+
+		self.hide_merge_commits = !self.hide_merge_commits;
+		let filter = if self.hide_merge_commits {
+			Some(filter_commits_exclude_merges())
+		} else {
+			None
+		};
+
+		self.git_log = AsyncLog::new(
+			self.repo.borrow().clone(),
+			&self.sender,
+			filter,
+		);
+		self.git_log.invalidate();
+		self.list.clear();
+		self.list
+			.set_title(strings::log_title(self.hide_merge_commits));
+		let _ = self.git_log.fetch();
+	}
 }
 
 impl DrawableComponent for Revlog {
@@ -577,6 +604,13 @@ impl Component for Revlog {
 					return Ok(EventState::Consumed);
 				} else if key_match(
 					k,
+					self.key_config.keys.log_hide_merges,
+				) && self.can_toggle_hide_merges()
+				{
+					self.toggle_hide_merge_commits();
+					return Ok(EventState::Consumed);
+				} else if key_match(
+					k,
 					self.key_config.keys.compare_commits,
 				) && self.list.marked_count() > 0
 					&& !self.is_search_pending()
@@ -727,6 +761,14 @@ impl Component for Revlog {
 		out.push(CommandInfo::new(
 			strings::commands::log_find_commit(&self.key_config),
 			self.can_start_search(),
+			self.visible || force_all,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::log_toggle_hide_merges(
+				&self.key_config,
+				self.hide_merge_commits,
+			),
+			self.can_toggle_hide_merges(),
 			self.visible || force_all,
 		));
 

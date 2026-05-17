@@ -222,3 +222,15 @@ pub fn filter_commit_by_search(
 		},
 	))
 }
+
+///
+pub fn filter_commits_exclude_merges() -> SharedCommitFilterFn {
+	Arc::new(Box::new(
+		move |repo: &Repository,
+		      commit_id: &CommitId|
+		      -> Result<bool> {
+			let commit = repo.find_commit((*commit_id).into())?;
+			Ok(commit.parent_count() <= 1)
+		},
+	))
+}
