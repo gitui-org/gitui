@@ -24,8 +24,10 @@ impl TerminalWriter {
 		{
 			let use_tty = force_tty || !io::stdout().is_terminal();
 			if use_tty {
-				if let Ok(file) = std::fs::File::open("/dev/tty") {
-					return Ok(Self::Tty(file));
+				match std::fs::File::open("/dev/tty") {
+					Ok(file) => return Ok(Self::Tty(file)),
+					Err(err) if force_tty => return Err(err),
+					Err(_) => {}
 				}
 			}
 		}
@@ -101,4 +103,22 @@ pub fn execute<C: Command>(cmd: C) -> io::Result<()> {
 		writer.execute(cmd)?;
 		Ok(())
 	})
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn open_stdout_when_not_forcing_tty() {
+		let writer = TerminalWriter::open(false).unwrap();
+		assert!(matches!(writer, TerminalWriter::Stdout(_)));
+	}
+
+	#[test]
+	#[cfg(not(unix))]
+	fn open_tty_errors_on_non_unix() {
+		let err = TerminalWriter::open(true).unwrap_err();
+		assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+	}
 }
