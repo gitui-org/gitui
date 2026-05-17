@@ -7,7 +7,7 @@ use crate::{
 		DiffComponent, DrawableComponent, EventState,
 		FileTreeItemKind,
 	},
-	keys::{key_match, SharedKeyConfig},
+	keys::{key_match, KeyRepeatGuard, SharedKeyConfig},
 	options::SharedOptions,
 	queue::{Action, InternalEvent, NeedsUpdate, Queue, ResetItem},
 	strings, try_or_popup,
@@ -81,6 +81,7 @@ pub struct Status {
 	git_action_executed: bool,
 	options: SharedOptions,
 	key_config: SharedKeyConfig,
+	key_repeat_guard: KeyRepeatGuard,
 }
 
 impl DrawableComponent for Status {
@@ -198,6 +199,7 @@ impl Status {
 				env.repo.clone(),
 			),
 			key_config: env.key_config.clone(),
+			key_repeat_guard: KeyRepeatGuard::new(),
 			options: env.options.clone(),
 			repo: env.repo.clone(),
 		}
@@ -581,6 +583,17 @@ impl Status {
 		}
 	}
 
+	fn record_navigation_key(&mut self, key: &crossterm::event::KeyEvent) {
+		let keys = &self.key_config.keys;
+		if key_match(key, keys.move_up)
+			|| key_match(key, keys.move_down)
+			|| key_match(key, keys.move_left)
+			|| key_match(key, keys.move_right)
+		{
+			self.key_repeat_guard.record_key_event(key);
+		}
+	}
+
 	fn fetch(&self) {
 		if self.can_fetch() {
 			self.queue.push(InternalEvent::FetchRemotes);
@@ -820,6 +833,9 @@ impl Component for Status {
 			if event_pump(ev, self.components_mut().as_mut_slice())?
 				.is_consumed()
 			{
+				if let Event::Key(k) = ev {
+					self.record_navigation_key(k);
+				}
 				self.git_action_executed = true;
 				return Ok(EventState::Consumed);
 			}
@@ -847,6 +863,25 @@ impl Component for Status {
 					self.switch_focus(Focus::Diff).map(Into::into)
 				} else if key_match(
 					k,
+					self.key_config.keys.move_left,
+				) && self.is_focus_on_diff()
+				{
+					let binding = self.key_config.keys.move_left;
+					let allow = self
+						.key_repeat_guard
+						.allow_edge_navigation(binding);
+					self.key_repeat_guard.record(binding);
+					if allow {
+						return self
+							.switch_focus(match self.diff_target {
+								DiffTarget::Stage => Focus::Stage,
+								DiffTarget::WorkingDir => Focus::WorkDir,
+							})
+							.map(Into::into);
+					}
+					return Ok(EventState::Consumed);
+				} else if key_match(
+					k,
 					self.key_config.keys.exit_popup,
 				) {
 					self.switch_focus(match self.diff_target {
@@ -858,12 +893,32 @@ impl Component for Status {
 					&& self.focus == Focus::WorkDir
 					&& !self.index.is_empty()
 				{
-					self.switch_focus(Focus::Stage).map(Into::into)
+					let binding = self.key_config.keys.move_down;
+					let allow = self
+						.key_repeat_guard
+						.allow_edge_navigation(binding);
+					self.key_repeat_guard.record(binding);
+					if allow {
+						return self
+							.switch_focus(Focus::Stage)
+							.map(Into::into);
+					}
+					return Ok(EventState::Consumed);
 				} else if key_match(k, self.key_config.keys.move_up)
 					&& self.focus == Focus::Stage
 					&& !self.index_wd.is_empty()
 				{
-					self.switch_focus(Focus::WorkDir).map(Into::into)
+					let binding = self.key_config.keys.move_up;
+					let allow = self
+						.key_repeat_guard
+						.allow_edge_navigation(binding);
+					self.key_repeat_guard.record(binding);
+					if allow {
+						return self
+							.switch_focus(Focus::WorkDir)
+							.map(Into::into);
+					}
+					return Ok(EventState::Consumed);
 				} else if key_match(
 					k,
 					self.key_config.keys.select_branch,
