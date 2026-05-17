@@ -7,7 +7,6 @@ use super::{
 	Component, DrawableComponent, EventState, StatusTreeComponent,
 };
 use crate::{
-	accessors,
 	app::Environment,
 	keys::{key_match, SharedKeyConfig},
 	strings,
@@ -36,7 +35,13 @@ pub struct CommitDetailsComponent {
 }
 
 impl CommitDetailsComponent {
-	accessors!(self, [single_details, compare_details, file_tree]);
+	fn components_mut(&mut self) -> Vec<&mut dyn Component> {
+		if self.is_compare() {
+			vec![&mut self.compare_details, &mut self.file_tree]
+		} else {
+			vec![&mut self.single_details, &mut self.file_tree]
+		}
+	}
 
 	///
 	pub fn new(env: &Environment) -> Self {
@@ -185,11 +190,29 @@ impl Component for CommitDetailsComponent {
 		force_all: bool,
 	) -> CommandBlocking {
 		if self.visible || force_all {
-			command_pump(
-				out,
-				force_all,
-				self.components().as_slice(),
-			);
+			if self.details_focused() || force_all {
+				if self.is_compare() {
+					command_pump(
+						out,
+						force_all,
+						&[&self.compare_details as &dyn Component],
+					);
+				} else {
+					command_pump(
+						out,
+						force_all,
+						&[&self.single_details as &dyn Component],
+					);
+				}
+			}
+
+			if self.file_tree.focused() || force_all {
+				command_pump(
+					out,
+					force_all,
+					&[&self.file_tree as &dyn Component],
+				);
+			}
 		}
 
 		CommandBlocking::PassingOn
