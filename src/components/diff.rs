@@ -888,10 +888,32 @@ impl Component for DiffComponent {
 				} else if key_match(e, self.key_config.keys.edit_file)
 					&& self.can_edit_file()
 				{
+					let line = self.diff.as_ref().and_then(|d| {
+						let cursor = self.selection.get_start();
+						// walk the flat line list to the cursor position,
+						// same index space as selected_lines()
+						d.hunks
+							.iter()
+							.flat_map(|h| h.lines.iter())
+							.nth(cursor)
+							.and_then(|l| l.position.new_lineno)
+							.or_else(|| {
+								// cursor is on a deletion — use old_lineno
+								// as a best-effort fallback
+								d.hunks
+									.iter()
+									.flat_map(|h| h.lines.iter())
+									.nth(cursor)
+									.and_then(|l| {
+										l.position.old_lineno
+									})
+							})
+					});
 					self.queue.push(
-						InternalEvent::OpenExternalEditor(Some(
-							self.current.path.clone(),
-						)),
+						InternalEvent::OpenExternalEditor(
+							Some(self.current.path.clone()),
+							line,
+						),
 					);
 					Ok(EventState::Consumed)
 				} else if key_match(
@@ -1055,7 +1077,7 @@ mod tests {
 		let event = env.queue.pop();
 		assert!(matches!(
 			event,
-			Some(InternalEvent::OpenExternalEditor(Some(path)))
+			Some(InternalEvent::OpenExternalEditor(Some(path), _))
 				if path == "src/main.rs"
 		));
 	}
