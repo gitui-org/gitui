@@ -1082,4 +1082,80 @@ mod tests {
 				if path == "src/main.rs"
 		));
 	}
+
+	#[test]
+	fn diff_component_opens_editor_at_cursor_line() {
+		use asyncgit::sync::diff::{DiffLinePosition, Hunk};
+		use asyncgit::FileDiff;
+
+		let env = Environment::test_env();
+		let mut comp = DiffComponent::new(&env, false);
+		comp.focus(true);
+		comp.current.path = String::from("src/main.rs");
+
+		// build a minimal FileDiff: one hunk with a header line and
+		// two content lines at known new_lineno values
+		let hunk = Hunk {
+			header_hash: 0,
+			lines: vec![
+				DiffLine {
+					content: "@@ -1,2 +1,2 @@".into(),
+					line_type: DiffLineType::Header,
+					position: DiffLinePosition {
+						old_lineno: None,
+						new_lineno: None,
+					},
+				},
+				DiffLine {
+					content: "context".into(),
+					line_type: DiffLineType::None,
+					position: DiffLinePosition {
+						old_lineno: Some(1),
+						new_lineno: Some(1),
+					},
+				},
+				DiffLine {
+					content: "added line".into(),
+					line_type: DiffLineType::Add,
+					position: DiffLinePosition {
+						old_lineno: None,
+						new_lineno: Some(2),
+					},
+				},
+			],
+		};
+		let file_diff = FileDiff {
+			hunks: vec![hunk],
+			lines: 3,
+			untracked: false,
+			sizes: (0, 0),
+			size_delta: 0,
+		};
+		comp.update(String::from("src/main.rs"), false, file_diff);
+
+		// move cursor to the Add line (index 2 in the flat list)
+		comp.move_selection(ScrollType::Down);
+		comp.move_selection(ScrollType::Down);
+
+		let event = Event::Key(KeyEvent::new(
+			KeyCode::Char('e'),
+			KeyModifiers::empty(),
+		));
+		assert!(matches!(
+			comp.event(&event).unwrap(),
+			EventState::Consumed
+		));
+
+		let queued = env.queue.pop();
+		assert!(
+			matches!(
+				queued,
+				Some(InternalEvent::OpenExternalEditor(
+					Some(_),
+					Some(2)
+				))
+			),
+			"expected OpenExternalEditor with line Some(2)"
+		);
+	}
 }
