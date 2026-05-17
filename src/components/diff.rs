@@ -153,7 +153,7 @@ impl DiffComponent {
 	}
 	///
 	const fn can_edit_file(&self) -> bool {
-		!self.is_immutable && !self.current.path.is_empty()
+		!self.current.path.is_empty()
 	}
 	///
 	pub fn clear(&mut self, pending: bool) {
@@ -773,12 +773,13 @@ impl Component for DiffComponent {
 			.hidden(),
 		);
 
+		out.push(CommandInfo::new(
+			strings::commands::edit_item(&self.key_config),
+			self.can_edit_file(),
+			self.focused() && self.can_edit_file(),
+		));
+
 		if !self.is_immutable {
-			out.push(CommandInfo::new(
-				strings::commands::edit_item(&self.key_config),
-				self.can_edit_file(),
-				self.focused() && self.can_edit_file(),
-			));
 			out.push(CommandInfo::new(
 				strings::commands::diff_hunk_remove(&self.key_config),
 				self.selected_hunk.is_some(),
