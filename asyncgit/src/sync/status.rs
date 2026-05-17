@@ -175,13 +175,21 @@ pub fn get_status(
 ) -> Result<Vec<StatusItem>> {
 	scope_time!("get_status");
 
+	let git2_repo = crate::sync::repository::repo(repo_path)?;
+
+	// Bare repos without a linked worktree cannot run worktree status (see #2867).
+	if matches!(status_type, StatusType::WorkingDir | StatusType::Both)
+		&& git2_repo.is_bare()
+		&& !git2_repo.is_worktree()
+	{
+		return Ok(Vec::new());
+	}
+
 	let repo: gix::Repository = gix_repo(repo_path)?;
 
 	let show_untracked = if let Some(config) = show_untracked {
 		config
 	} else {
-		let git2_repo = crate::sync::repository::repo(repo_path)?;
-
 		// Calling `untracked_files_config_repo` ensures compatibility with `gitui` <= 0.27.
 		// `untracked_files_config_repo` defaults to `All` while both `libgit2` and `gix` default to
 		// `Normal`. According to [show-untracked-files], `normal` is the default value that `git`
@@ -366,6 +374,127 @@ mod tests {
 				path: "foo".into(),
 				status: StatusItemType::New
 			}]
+		);
+	}
+
+	/// Regression for https://github.com/gitui-org/gitui/issues/2876
+	#[test]
+	fn test_info_exclude_honored_in_linked_worktree() {
+		use std::process::Command;
+
+		let (_td, repo) = repo_init().unwrap();
+		let main_root = repo.workdir().unwrap().to_path_buf();
+		let main_repo_path: RepoPath =
+			main_root.as_os_str().to_str().unwrap().into();
+
+		let exclude = main_root.join(".git/info/exclude");
+		std::fs::write(&exclude, ".cache/\n").unwrap();
+
+		let linked_td = TempDir::new().unwrap();
+		let linked_root = linked_td.path().to_path_buf();
+		let status = Command::new("git")
+			.args([
+				"worktree",
+				"add",
+				"-b",
+				"wt",
+				linked_root.to_str().unwrap(),
+				"HEAD",
+			])
+			.current_dir(&main_root)
+			.status()
+			.unwrap();
+		assert!(status.success());
+
+		let cache_dir = linked_root.join(".cache");
+		std::fs::create_dir_all(&cache_dir).unwrap();
+		std::fs::write(cache_dir.join("foo"), "clangd").unwrap();
+
+		let main_status = get_status(
+			&main_repo_path,
+			StatusType::WorkingDir,
+			None,
+		)
+		.unwrap();
+		assert!(
+			main_status.is_empty(),
+			"main worktree should honor info/exclude: {main_status:?}"
+		);
+
+		let linked_repo_path: RepoPath =
+			linked_root.as_os_str().to_str().unwrap().into();
+		let linked_status = get_status(
+			&linked_repo_path,
+			StatusType::WorkingDir,
+			None,
+		)
+		.unwrap();
+		assert!(
+			linked_status.is_empty(),
+			"linked worktree should honor info/exclude: {linked_status:?}"
+		);
+
+		assert!(
+			is_workdir_clean(&linked_repo_path, None).unwrap(),
+			"libgit2 status should honor info/exclude in linked worktree"
+		);
+
+		// Simulate explicit GIT_DIR + GIT_WORK_TREE (bare-style open).
+		let gitdir = std::fs::read_to_string(linked_root.join(".git"))
+			.unwrap()
+			.trim()
+			.strip_prefix("gitdir: ")
+			.unwrap()
+			.to_string();
+		let explicit_path = RepoPath::Workdir {
+			gitdir: gitdir.into(),
+			workdir: linked_root.clone(),
+		};
+		let explicit_status = get_status(
+			&explicit_path,
+			StatusType::WorkingDir,
+			None,
+		)
+		.unwrap();
+		assert!(
+			explicit_status.is_empty(),
+			"explicit worktree gitdir should honor info/exclude: {explicit_status:?}"
+		);
+	}
+
+	#[test]
+	fn test_crosslinked_bare_repo_no_workdir_status() {
+		use crate::sync::tests::debug_cmd_print;
+		use std::fs;
+
+		let base = TempDir::new().unwrap();
+		let repo0 = base.path().join("repo0");
+		let repo1 = base.path().join("repo1");
+		fs::create_dir_all(&repo0).unwrap();
+		fs::create_dir_all(&repo1).unwrap();
+
+		let repo0_path: &RepoPath =
+			&repo0.as_os_str().to_str().unwrap().into();
+
+		debug_cmd_print(repo0_path, "git init --bare");
+		debug_cmd_print(repo0_path, "git init --separate-git-dir=../repo1");
+
+		let repo1_path: &RepoPath =
+			&repo1.as_os_str().to_str().unwrap().into();
+
+		debug_cmd_print(repo1_path, "git init --bare");
+		debug_cmd_print(repo1_path, "git init --separate-git-dir=../repo0");
+
+		let status = get_status(
+			repo0_path,
+			StatusType::WorkingDir,
+			None,
+		)
+		.unwrap();
+
+		assert!(
+			status.is_empty(),
+			"bare cross-linked repo should not report workdir files: {status:?}"
 		);
 	}
 }
