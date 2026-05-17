@@ -372,6 +372,23 @@ pub fn checkout_commit(
 	}
 }
 
+/// Whether `name` refers to a remote symbolic `HEAD` ref (e.g. `origin/HEAD`).
+pub fn is_remote_head_ref(name: &str) -> bool {
+	name == "HEAD"
+		|| name
+			.split_once('/')
+			.is_some_and(|(_, local)| local == "HEAD")
+}
+
+fn local_branch_name_from_remote(remote_name: &str) -> Option<String> {
+	if is_remote_head_ref(remote_name) {
+		return None;
+	}
+
+	let local = remote_name.split_once('/')?.1;
+	Some(local.to_string())
+}
+
 ///
 pub fn checkout_remote_branch(
 	repo_path: &RepoPath,
@@ -391,10 +408,11 @@ pub fn checkout_remote_branch(
 		return Err(Error::UncommittedChanges);
 	}
 
-	let name = branch.name.find('/').map_or_else(
-		|| branch.name.clone(),
-		|pos| branch.name[pos..].to_string(),
-	);
+	let name = local_branch_name_from_remote(&branch.name).ok_or_else(|| {
+		Error::Generic(
+			"cannot checkout remote HEAD reference".to_string(),
+		)
+	})?;
 
 	let commit = repo.find_commit(branch.top_commit.into())?;
 	let mut new_branch = repo.branch(&name, &commit, false)?;
@@ -1019,6 +1037,40 @@ mod test_remote_branches {
 			&get_branch_name(&clone2_dir.into()).unwrap(),
 			"foo"
 		);
+	}
+
+	#[test]
+	fn test_checkout_remote_head_fails() {
+		let (r1_dir, _repo) = repo_init_bare().unwrap();
+
+		let (clone1_dir, clone1) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone1_dir = clone1_dir.path().to_str().unwrap();
+
+		write_commit_file(&clone1, "test.txt", "test", "commit1");
+		push_branch(
+			&clone1_dir.into(),
+			"origin",
+			"master",
+			false,
+			false,
+			None,
+			None,
+		)
+		.unwrap();
+
+		let (clone2_dir, _clone2) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone2_dir = clone2_dir.path().to_str().unwrap();
+
+		let branches =
+			get_branches_info(&clone2_dir.into(), false).unwrap();
+		let head = branches
+			.iter()
+			.find(|b| b.name == "origin/HEAD")
+			.expect("origin/HEAD");
+
+		assert!(checkout_remote_branch(&clone2_dir.into(), head).is_err());
 	}
 
 	#[test]
