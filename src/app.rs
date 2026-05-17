@@ -197,7 +197,7 @@ impl App {
 
 		let mut select_file: Option<PathBuf> = None;
 		let tab = if let Some(file) = cliargs.select_file {
-			select_file = resolve_select_file(file, &repo.borrow())?;
+			select_file = resolve_select_file(file, &env.repo.borrow())?;
 			2
 		} else {
 			env.options.borrow().current_tab()
