@@ -119,6 +119,7 @@ pub struct App {
 	// "Flags"
 	requires_redraw: Cell<bool>,
 	file_to_open: Option<String>,
+	line_to_open: Option<u32>,
 }
 
 pub struct Environment {
@@ -244,6 +245,7 @@ impl App {
 			key_config: env.key_config,
 			requires_redraw: Cell::new(false),
 			file_to_open: None,
+			line_to_open: None,
 			repo: env.repo,
 			repo_path_text,
 			popup_stack: PopupStack::default(),
@@ -376,6 +378,7 @@ impl App {
 						ExternalEditorPopup::open_file_in_editor(
 							&self.repo.borrow(),
 							Path::new(&path),
+							self.line_to_open.take(),
 						)
 					} else {
 						let changes =
@@ -815,10 +818,11 @@ impl App {
 					flags.insert(NeedsUpdate::ALL);
 				}
 			}
-			InternalEvent::OpenExternalEditor(path) => {
+			InternalEvent::OpenExternalEditor(path, line) => {
 				self.input.set_polling(false);
 				self.external_editor_popup.show()?;
 				self.file_to_open = path;
+				self.line_to_open = line;
 				flags.insert(NeedsUpdate::COMMANDS);
 			}
 			InternalEvent::Push(branch, push_type, force, delete) => {

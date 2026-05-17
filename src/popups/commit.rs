@@ -189,6 +189,7 @@ impl CommitPopup {
 		ExternalEditorPopup::open_file_in_editor(
 			&self.repo.borrow(),
 			&file_path,
+			None,
 		)?;
 
 		let mut message = String::new();
@@ -587,7 +588,9 @@ impl Component for CommitPopup {
 						self.key_config.keys.open_commit_editor,
 					) {
 						self.queue.push(
-							InternalEvent::OpenExternalEditor(None),
+							InternalEvent::OpenExternalEditor(
+								None, None,
+							),
 						);
 						self.hide();
 						true
