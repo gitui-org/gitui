@@ -140,13 +140,13 @@ impl AsyncDiff {
 
 			arc_pending.fetch_sub(1, Ordering::Relaxed);
 
-			sender
-				.send(if notify {
-					AsyncGitNotification::Diff
-				} else {
-					AsyncGitNotification::FinishUnchanged
-				})
-				.expect("error sending diff");
+			if let Err(e) = sender.send(if notify {
+				AsyncGitNotification::Diff
+			} else {
+				AsyncGitNotification::FinishUnchanged
+			}) {
+				log::error!("diff notify error: {e}");
+			}
 		});
 
 		Ok(None)
