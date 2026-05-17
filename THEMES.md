@@ -36,6 +36,10 @@ Notes:
 
 ## Preset Themes
 
+This repository ships example themes under [`themes/`](themes/):
+
+* **Gruvbox Light** — copy `themes/gruvbox-light.ron` to your [configuration directory](#configuration) and run `gitui -t gruvbox-light.ron`
+
 You can find preset themes by Catppuccin [here](https://github.com/catppuccin/gitui.git).
 
 ## Syntax Highlighting

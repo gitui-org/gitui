@@ -398,4 +398,16 @@ mod tests {
 		assert_eq!(theme.selection_fg, Color::Rgb(255, 255, 255));
 		assert_eq!(theme.syntax, "InspiredGitHub");
 	}
+
+	#[test]
+	fn test_gruvbox_light_preset_loads() {
+		let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+			.join("themes/gruvbox-light.ron");
+		let theme = Theme::init(&path);
+
+		assert_eq!(theme.command_fg, Color::Rgb(60, 56, 54));
+		assert_eq!(theme.selection_bg, Color::Rgb(235, 219, 178));
+		assert_eq!(theme.commit_hash, Color::Rgb(69, 133, 136));
+		assert_eq!(theme.syntax, "InspiredGitHub");
+	}
 }

@@ -1,0 +1,27 @@
+// Gruvbox Light preset — use with: gitui -t gruvbox-light.ron
+// (copy to your gitui config directory first; see THEMES.md)
+(
+    selected_tab: Some("#458588"),
+    command_fg: Some("#3c3836"),
+    selection_bg: Some("#ebdbb2"),
+    selection_fg: Some("#3c3836"),
+    use_selection_fg: Some(true),
+    cmdbar_bg: Some("#ebdbb2"),
+    disabled_fg: Some("#928374"),
+    diff_line_add: Some("#98971a"),
+    diff_line_delete: Some("#cc241d"),
+    diff_file_added: Some("#98971a"),
+    diff_file_removed: Some("#cc241d"),
+    diff_file_moved: Some("#b16286"),
+    diff_file_modified: Some("#d79921"),
+    commit_hash: Some("#458588"),
+    commit_time: Some("#928374"),
+    commit_author: Some("#689d6a"),
+    danger_fg: Some("#cc241d"),
+    push_gauge_bg: Some("#458588"),
+    push_gauge_fg: Some("#fbf1c7"),
+    tag_fg: Some("#d65d0e"),
+    branch_fg: Some("#458588"),
+    block_title_focused: Some("#3c3836"),
+    syntax: Some("InspiredGitHub"),
+)
