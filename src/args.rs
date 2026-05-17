@@ -20,6 +20,7 @@ const WORKDIR_FLAG_ID: &str = "workdir";
 const FILE_FLAG_ID: &str = "file";
 const GIT_DIR_FLAG_ID: &str = "directory";
 const WATCHER_FLAG_ID: &str = "watcher";
+const TTY_FLAG_ID: &str = "tty";
 const KEY_BINDINGS_FLAG_ID: &str = "key_bindings";
 const KEY_SYMBOLS_FLAG_ID: &str = "key_symbols";
 const DEFAULT_THEME: &str = "theme.ron";
@@ -33,6 +34,8 @@ pub struct CliArgs {
 	pub notify_watcher: bool,
 	pub key_bindings_path: Option<PathBuf>,
 	pub key_symbols_path: Option<PathBuf>,
+	/// Render the TUI on `/dev/tty` instead of stdout (Unix only).
+	pub use_tty: bool,
 }
 
 pub fn process_cmdline() -> Result<CliArgs> {
@@ -92,6 +95,8 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		.get_one::<String>(KEY_SYMBOLS_FLAG_ID)
 		.map(PathBuf::from);
 
+	let use_tty = arg_matches.get_flag(TTY_FLAG_ID);
+
 	Ok(CliArgs {
 		theme,
 		select_file,
@@ -99,6 +104,7 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		notify_watcher,
 		key_bindings_path,
 		key_symbols_path,
+		use_tty,
 	})
 }
 
@@ -159,6 +165,12 @@ fn app() -> ClapApp {
 			Arg::new(WATCHER_FLAG_ID)
 				.help("Use notify-based file system watcher instead of tick-based update. This is more performant, but can cause issues on some platforms. See https://github.com/gitui-org/gitui/blob/master/FAQ.md#watcher for details.")
 				.long("watcher")
+				.action(clap::ArgAction::SetTrue),
+		)
+		.arg(
+			Arg::new(TTY_FLAG_ID)
+				.help("Render on /dev/tty instead of stdout (Unix). When stdout is not a terminal, /dev/tty is used automatically for editor embedding (e.g. Helix :insert-output).")
+				.long("tty")
 				.action(clap::ArgAction::SetTrue),
 		)
 		.arg(
