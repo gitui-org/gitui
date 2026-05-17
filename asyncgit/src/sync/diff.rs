@@ -317,7 +317,10 @@ fn raw_diff_to_file_diff(
 
 		let new_file_diff = if diff.deltas().len() == 1 {
 			if let Some(delta) = diff.deltas().next() {
-				if delta.status() == Delta::Untracked {
+				if matches!(
+					delta.status(),
+					Delta::Untracked | Delta::Conflicted
+				) {
 					let relative_path =
 						delta.new_file().path().ok_or_else(|| {
 							Error::Generic(
@@ -665,5 +668,71 @@ mod tests {
 		assert_eq!(diff.size_delta, 1);
 
 		Ok(())
+	}
+
+	#[test]
+	fn test_merge_conflict_workdir_diff() {
+		use crate::sync::{
+			status::{get_status, StatusItemType, StatusType},
+			tests::debug_cmd_print,
+		};
+
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		File::create(root.join("file.txt"))
+			.unwrap()
+			.write_all(b"Original Line\n")
+			.unwrap();
+		debug_cmd_print(repo_path, "git add file.txt");
+		debug_cmd_print(repo_path, "git commit -m init");
+
+		debug_cmd_print(repo_path, "git checkout -b feature");
+		File::create(root.join("file.txt"))
+			.unwrap()
+			.write_all(b"Feature Line\n")
+			.unwrap();
+		debug_cmd_print(repo_path, "git add file.txt");
+		debug_cmd_print(repo_path, "git commit -m feature");
+
+		debug_cmd_print(repo_path, "git checkout -");
+		File::create(root.join("file.txt"))
+			.unwrap()
+			.write_all(b"Master Line\n")
+			.unwrap();
+		debug_cmd_print(repo_path, "git commit -am master");
+
+		debug_cmd_print(repo_path, "git merge feature || true");
+
+		let status = get_status(repo_path, StatusType::WorkingDir, None)
+			.unwrap();
+		assert!(
+			status.iter().any(|s| {
+				s.path == "file.txt"
+					&& s.status == StatusItemType::Conflicted
+			}),
+			"expected conflicted file in workdir status: {status:?}"
+		);
+
+		let diff =
+			get_diff(repo_path, "file.txt", false, None).unwrap();
+
+		assert!(
+			!diff.hunks.is_empty(),
+			"workdir diff should show conflict markers; got {diff:?}"
+		);
+		let content: String = diff
+			.hunks
+			.iter()
+			.flat_map(|h| h.lines.iter())
+			.map(|l| l.content.as_ref())
+			.collect::<Vec<_>>()
+			.join("\n");
+		assert!(
+			content.contains("<<<<<<<"),
+			"diff should include conflict markers: {content}"
+		);
 	}
 }
