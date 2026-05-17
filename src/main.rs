@@ -134,6 +134,8 @@ pub enum SyntaxHighlightProgress {
 pub enum AsyncAppNotification {
 	///
 	SyntaxHighlighting(SyntaxHighlightProgress),
+	/// background stash in `StashMsgPopup` finished
+	StashSaveDone,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
