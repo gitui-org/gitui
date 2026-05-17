@@ -1,7 +1,8 @@
 //! sync git api (various methods)
 
 use super::{
-	repository::repo, CommitId, RepoPath, ShowUntrackedFilesConfig,
+	repository::{repo, repo_discover_path},
+	CommitId, RepoPath, ShowUntrackedFilesConfig,
 };
 use crate::{
 	error::{Error, Result},
@@ -35,7 +36,7 @@ pub fn repo_open_error(repo_path: &RepoPath) -> Option<String> {
 	}
 
 	gix::ThreadSafeRepository::discover_with_environment_overrides(
-		repo_path.gitpath(),
+		repo_discover_path(repo_path).ok()?,
 	)
 	.map_or_else(|e| Some(e.to_string()), |_| None)
 }
