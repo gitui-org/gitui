@@ -49,15 +49,20 @@ impl RepoWatcher {
 		loop {
 			let ev = receiver.recv()?;
 
-			if let Ok(ev) = ev {
-				log::debug!("notify events: {}", ev.len());
+			match ev {
+				Ok(events) => {
+					log::debug!("notify events: {}", events.len());
 
-				for (idx, ev) in ev.iter().enumerate() {
-					log::debug!("notify [{idx}]: {ev:?}");
+					for (idx, event) in events.iter().enumerate() {
+						log::debug!("notify [{idx}]: {event:?}");
+					}
+
+					if !events.is_empty() {
+						sender.send(())?;
+					}
 				}
-
-				if !ev.is_empty() {
-					sender.send(())?;
+				Err(e) => {
+					log::warn!("notify debouncer error: {e}");
 				}
 			}
 		}
@@ -71,12 +76,27 @@ fn create_watcher(
 ) {
 	scope_time!("create_watcher");
 
-	let mut bouncer =
-		new_debouncer(timeout, tx).expect("Watch create error");
-	bouncer
+	let mut bouncer = match new_debouncer(timeout, tx) {
+		Ok(bouncer) => bouncer,
+		Err(e) => {
+			log::warn!(
+				"failed to create filesystem watcher: {e}; \
+				 file change notifications disabled"
+			);
+			return;
+		}
+	};
+
+	if let Err(e) = bouncer
 		.watcher()
-		.watch(Path::new(&workdir), RecursiveMode::Recursive)
-		.expect("Watch error");
+		.watch(Path::new(workdir), RecursiveMode::Recursive)
+	{
+		log::warn!(
+			"failed to watch repository for changes ({e}); \
+			 file change notifications disabled"
+		);
+		return;
+	}
 
 	std::mem::forget(bouncer);
 }
