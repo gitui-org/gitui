@@ -565,19 +565,44 @@ impl Status {
 	fn push(&self, force: bool) {
 		if self.can_push() {
 			if let Some(branch) = self.git_branch_name.last() {
-				if force {
-					self.queue.push(InternalEvent::ConfirmAction(
-						Action::ForcePush(branch, force),
-					));
-				} else {
-					self.queue.push(InternalEvent::Push(
-						branch,
-						PushType::Branch,
-						force,
-						false,
-					));
+				match sync::find_push_todo_markers(
+					&self.repo.borrow(),
+					branch.as_str(),
+				) {
+					Ok(markers) if !markers.is_empty() => {
+						let details =
+							sync::format_push_todo_markers(&markers);
+						self.queue.push(InternalEvent::ConfirmAction(
+							Action::PushDespiteTodos {
+								branch: branch.clone(),
+								force,
+								details,
+							},
+						));
+					}
+					_ => {
+						self.push_without_todo_warning(
+							branch.as_str(),
+							force,
+						);
+					}
 				}
 			}
+		}
+	}
+
+	fn push_without_todo_warning(&self, branch: &str, force: bool) {
+		if force {
+			self.queue.push(InternalEvent::ConfirmAction(
+				Action::ForcePush(branch.to_string(), force),
+			));
+		} else {
+			self.queue.push(InternalEvent::Push(
+				branch.to_string(),
+				PushType::Branch,
+				force,
+				false,
+			));
 		}
 	}
 
@@ -845,6 +870,16 @@ impl Component for Status {
 				) && self.can_focus_diff()
 				{
 					self.switch_focus(Focus::Diff).map(Into::into)
+				} else if key_match(
+					k,
+					self.key_config.keys.move_left,
+				) && self.is_focus_on_diff()
+				{
+					self.switch_focus(match self.diff_target {
+						DiffTarget::Stage => Focus::Stage,
+						DiffTarget::WorkingDir => Focus::WorkDir,
+					})
+					.map(Into::into)
 				} else if key_match(
 					k,
 					self.key_config.keys.exit_popup,

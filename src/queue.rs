@@ -58,6 +58,11 @@ pub enum Action {
 	AbortRebase,
 	AbortRevert,
 	UndoCommit,
+	PushDespiteTodos {
+		branch: String,
+		force: bool,
+		details: String,
+	},
 }
 
 #[derive(Debug)]

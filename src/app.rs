@@ -148,6 +148,25 @@ impl Environment {
 	}
 }
 
+/// Resolves `--file` to a path relative to the repository workdir (as used by the file tree).
+fn resolve_select_file(file: PathBuf, repo: &RepoPath) -> Result<Option<PathBuf>> {
+	let workdir = PathBuf::from(repo_work_dir(repo)?);
+	let workdir_canon = workdir.canonicalize()?;
+
+	let candidates = [
+		file.canonicalize().ok(),
+		workdir.join(&file).canonicalize().ok(),
+	];
+
+	for abs in candidates.into_iter().flatten() {
+		if let Ok(rel) = abs.strip_prefix(&workdir_canon) {
+			return Ok(Some(Path::new(".").join(rel)));
+		}
+	}
+
+	Ok(None)
+}
+
 // public interface
 impl App {
 	///
@@ -178,14 +197,7 @@ impl App {
 
 		let mut select_file: Option<PathBuf> = None;
 		let tab = if let Some(file) = cliargs.select_file {
-			// convert to relative git path
-			if let Ok(abs) = file.canonicalize() {
-				if let Ok(path) = abs.strip_prefix(
-					env.repo.borrow().gitpath().canonicalize()?,
-				) {
-					select_file = Some(Path::new(".").join(path));
-				}
-			}
+			select_file = resolve_select_file(file, &env.repo.borrow())?;
 			2
 		} else {
 			env.options.borrow().current_tab()
@@ -1030,6 +1042,20 @@ impl App {
 					"undo commit failed:",
 					undo_last_commit(&self.repo.borrow())
 				);
+			}
+			Action::PushDespiteTodos { branch, force, .. } => {
+				if force {
+					self.queue.push(InternalEvent::ConfirmAction(
+						Action::ForcePush(branch, force),
+					));
+				} else {
+					self.queue.push(InternalEvent::Push(
+						branch,
+						PushType::Branch,
+						force,
+						false,
+					));
+				}
 			}
 		}
 

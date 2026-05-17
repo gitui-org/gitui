@@ -20,6 +20,7 @@ mod ignore;
 mod logwalker;
 mod merge;
 mod patches;
+mod push_todo;
 mod rebase;
 pub mod remotes;
 mod repository;
@@ -77,6 +78,9 @@ pub use merge::{
 	abort_pending_rebase, abort_pending_state,
 	continue_pending_rebase, merge_branch, merge_commit, merge_msg,
 	mergehead_ids, rebase_progress,
+};
+pub use push_todo::{
+	find_push_todo_markers, format_push_todo_markers, PushTodoMarker,
 };
 pub use rebase::rebase_branch;
 pub use remotes::{

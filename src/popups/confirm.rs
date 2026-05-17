@@ -214,6 +214,10 @@ impl ConfirmPopup {
                     strings::confirm_title_undo_commit(),
                     strings::confirm_msg_undo_commit(),
                 ),
+				Action::PushDespiteTodos { details, .. } => (
+					strings::confirm_title_push_todos(),
+					strings::confirm_msg_push_todos(details),
+				),
             };
 		}
 
