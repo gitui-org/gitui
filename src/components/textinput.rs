@@ -259,15 +259,31 @@ impl TextInputComponent {
 		}
 	}
 
+	fn is_text_char_input(ctrl: bool, alt: bool) -> bool {
+		if !ctrl && !alt {
+			return true;
+		}
+
+		#[cfg(windows)]
+		{
+			// AltGr is commonly reported as Ctrl+Alt on Windows (e.g. German `{` `}`)
+			if ctrl && alt {
+				return true;
+			}
+		}
+
+		false
+	}
+
 	#[allow(clippy::too_many_lines, clippy::unnested_or_patterns)]
 	fn process_inputs(ta: &mut TextArea<'_>, input: &Input) -> bool {
 		match input {
 			Input {
 				key: Key::Char(c),
-				ctrl: false,
-				alt: false,
+				ctrl,
+				alt,
 				..
-			} => {
+			} if Self::is_text_char_input(*ctrl, *alt) => {
 				ta.insert_char(*c);
 				true
 			}
@@ -886,5 +902,17 @@ mod tests {
 			ta.move_cursor(CursorMove::WordBack);
 			assert_eq!(ta.cursor(), save_cursor);
 		}
+	}
+
+	#[test]
+	fn test_is_text_char_input_without_modifiers() {
+		assert!(TextInputComponent::is_text_char_input(false, false));
+		assert!(!TextInputComponent::is_text_char_input(true, false));
+	}
+
+	#[test]
+	#[cfg(windows)]
+	fn test_is_text_char_input_altgr() {
+		assert!(TextInputComponent::is_text_char_input(true, true));
 	}
 }
