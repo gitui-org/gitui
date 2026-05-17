@@ -22,6 +22,7 @@ pub fn amend(
 	let config = repo.config()?;
 
 	let commit = repo.find_commit(id.into())?;
+	let author = commit.author();
 
 	let mut index = repo.index()?;
 	let tree_id = index.write_tree()?;
@@ -33,8 +34,13 @@ pub fn amend(
 
 		let head = get_head_repo(&repo)?;
 		if head == commit.id().into() {
+			let preserved_author = owned_signature(&author)?;
 			undo_last_commit(repo_path)?;
-			return self::commit(repo_path, msg);
+			return commit_with_preserved_author(
+				repo_path,
+				msg,
+				Some(preserved_author),
+			);
 		}
 
 		return Err(Error::SignAmendNonLastCommit);
@@ -44,8 +50,8 @@ pub fn amend(
 
 	let new_id = commit.amend(
 		Some("HEAD"),
-		None,
-		Some(&committer), // Passing a value will overwrite the committer.
+		Some(&author),
+		Some(&committer),
 		None,
 		Some(msg),
 		Some(&tree),
@@ -80,13 +86,37 @@ pub(crate) fn signature_allow_undefined_name(
 	signature
 }
 
+fn owned_signature(
+	sig: &Signature<'_>,
+) -> std::result::Result<Signature<'static>, git2::Error> {
+	let name = sig.name().ok_or_else(|| {
+		git2::Error::from_str("commit author name is not valid utf-8")
+	})?;
+	let email = sig.email().ok_or_else(|| {
+		git2::Error::from_str("commit author email is not valid utf-8")
+	})?;
+	Signature::new(name, email, &sig.when())
+}
+
 /// this does not run any git hooks, git-hooks have to be executed manually, checkout `hooks_commit_msg` for example
 pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
+	commit_with_preserved_author(repo_path, msg, None)
+}
+
+fn commit_with_preserved_author(
+	repo_path: &RepoPath,
+	msg: &str,
+	preserved_author: Option<Signature<'static>>,
+) -> Result<CommitId> {
 	scope_time!("commit");
 
 	let repo = repo(repo_path)?;
 	let config = repo.config()?;
-	let signature = signature_allow_undefined_name(&repo)?;
+	let committer = signature_allow_undefined_name(&repo)?;
+	let author = match preserved_author {
+		Some(author) => author,
+		None => signature_allow_undefined_name(&repo)?,
+	};
 	let mut index = repo.index()?;
 	let tree_id = index.write_tree()?;
 	let tree = repo.find_tree(tree_id)?;
@@ -104,8 +134,8 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 		.unwrap_or(false)
 	{
 		let buffer = repo.commit_create_buffer(
-			&signature,
-			&signature,
+			&author,
+			&committer,
 			msg,
 			&tree,
 			parents.as_slice(),
@@ -123,29 +153,15 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 			signature_field.as_deref(),
 		)?;
 
-		// manually advance to the new commit ID
-		// repo.commit does that on its own, repo.commit_signed does not
-		// if there is no head, read default branch or default to "master"
-		if let Ok(mut head) = repo.head() {
-			head.set_target(commit_id, msg)?;
-		} else {
-			let default_branch_name = config
-				.get_str("init.defaultBranch")
-				.unwrap_or("master");
-			repo.reference(
-				&format!("refs/heads/{default_branch_name}"),
-				commit_id,
-				true,
-				msg,
-			)?;
-		}
+		// `repo.commit` advances HEAD on its own; `repo.commit_signed` does not.
+		update_head_after_signed_commit(&repo, &config, commit_id, msg)?;
 
 		commit_id
 	} else {
 		repo.commit(
 			Some("HEAD"),
-			&signature,
-			&signature,
+			&author,
+			&committer,
 			msg,
 			&tree,
 			parents.as_slice(),
@@ -153,6 +169,64 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 	};
 
 	Ok(commit_id.into())
+}
+
+/// Point `HEAD` at `commit_id` after `commit_signed` (see gitui-org/gitui#2689).
+fn update_head_after_signed_commit(
+	repo: &Repository,
+	config: &git2::Config,
+	commit_id: git2::Oid,
+	log_message: &str,
+) -> Result<()> {
+	match repo.head() {
+		Ok(mut head) => {
+			// Unborn `HEAD` points at `refs/heads/<branch>` before that ref exists.
+			if head.target().is_none() {
+				let branch_name = head.shorthand().ok_or_else(|| {
+					Error::Generic("unborn HEAD has no branch name".into())
+				})?;
+				write_branch_ref(
+					repo,
+					&format!("refs/heads/{branch_name}"),
+					commit_id,
+				)?;
+				return Ok(());
+			}
+			head.set_target(commit_id, log_message)?;
+			Ok(())
+		}
+		Err(_) => {
+			let branch_name = config
+				.get_str("init.defaultBranch")
+				.unwrap_or("main");
+			let branch_ref = format!("refs/heads/{branch_name}");
+			write_branch_ref(repo, &branch_ref, commit_id)?;
+			std::fs::write(
+				repo.path().join("HEAD"),
+				format!("ref: {branch_ref}\n"),
+			)
+			.map_err(|e| Error::Generic(e.to_string()))?;
+			Ok(())
+		}
+	}
+}
+
+fn write_branch_ref(
+	repo: &Repository,
+	branch_ref: &str,
+	commit_id: git2::Oid,
+) -> Result<()> {
+	let suffix = branch_ref.strip_prefix("refs/").ok_or_else(|| {
+		Error::Generic(format!("unexpected ref name: {branch_ref}"))
+	})?;
+	let ref_path = repo.path().join("refs").join(suffix);
+	if let Some(parent) = ref_path.parent() {
+		std::fs::create_dir_all(parent)
+			.map_err(|e| Error::Generic(e.to_string()))?;
+	}
+	std::fs::write(ref_path, format!("{commit_id}\n"))
+		.map_err(|e| Error::Generic(e.to_string()))?;
+	Ok(())
 }
 
 /// Tag a commit.
@@ -207,10 +281,13 @@ mod tests {
 		commit, get_commit_details, get_commit_files, stage_add_file,
 		tags::get_tags,
 		tests::{get_statuses, repo_init, repo_init_empty},
-		utils::get_head,
+		utils::{get_head, get_head_repo},
 		LogWalker,
 	};
-	use commit::{amend, commit_message_prettify, tag_commit};
+	use commit::{
+		amend, commit_message_prettify, tag_commit,
+		update_head_after_signed_commit,
+	};
 	use git2::Repository;
 	use std::{fs::File, io::Write, path::Path};
 
@@ -219,6 +296,55 @@ mod tests {
 		let mut walk = LogWalker::new(repo, max).unwrap();
 		walk.read(&mut items).unwrap();
 		items.len()
+	}
+
+	#[test]
+	fn test_first_commit_on_empty_repo() -> Result<()> {
+		let file_path = Path::new("foo");
+		let (_td, repo) = repo_init_empty()?;
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		File::create(root.join(file_path))?.write_all(b"test")?;
+		stage_add_file(repo_path, file_path)?;
+
+		let id = commit(repo_path, "first commit")?;
+
+		assert_eq!(count_commits(&repo, 10), 1);
+		assert_eq!(get_head(repo_path)?, id);
+		assert_eq!(repo.head()?.target(), Some(id.into()));
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_update_head_after_signed_commit_on_unborn_head() -> Result<()> {
+		let file_path = Path::new("foo");
+		let (_td, repo) = repo_init_empty()?;
+		let root = repo.path().parent().unwrap();
+
+		File::create(root.join(file_path))?.write_all(b"test")?;
+		let mut index = repo.index()?;
+		index.add_path(file_path)?;
+		index.write()?;
+		let tree = repo.find_tree(index.write_tree()?)?;
+		let sig = repo.signature()?;
+		let commit_id = repo.commit(None, &sig, &sig, "msg", &tree, &[])?;
+
+		assert!(get_head_repo(&repo).is_err());
+
+		update_head_after_signed_commit(
+			&repo,
+			&repo.config()?,
+			commit_id,
+			"msg",
+		)?;
+
+		let head = repo.head()?;
+		assert_eq!(head.target(), Some(commit_id));
+
+		Ok(())
 	}
 
 	#[test]
