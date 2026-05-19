@@ -71,11 +71,11 @@ impl DrawableComponent for InspectCommitPopup {
 			return Ok(());
 		}
 		let constraints = match rect.width {
-			..80 => [
+			..64 => [
 				Constraint::Percentage(50),
 				Constraint::Percentage(50),
 			],
-			80..100 => [Constraint::Max(32), Constraint::Fill(1)],
+			64..100 => [Constraint::Max(32), Constraint::Fill(1)],
 			100..120 => [Constraint::Max(38), Constraint::Fill(1)],
 			120..152 => [Constraint::Max(42), Constraint::Fill(1)],
 			_ => [Constraint::Max(50), Constraint::Fill(1)],
