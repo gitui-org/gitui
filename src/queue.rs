@@ -8,7 +8,8 @@ use crate::{
 };
 use asyncgit::{
 	sync::{
-		diff::DiffLinePosition, CommitId, LogFilterSearchOptions,
+		diff::DiffLinePosition, BranchInfo, CommitId,
+		LogFilterSearchOptions,
 	},
 	PushType,
 };
@@ -157,6 +158,12 @@ pub enum InternalEvent {
 	RewordCommit(CommitId),
 	///
 	CommitSearch(LogFilterSearchOptions),
+	///
+	OpenGotoLinePopup(usize),
+	///
+	GotoLine(usize),
+	///
+	CheckoutOption(BranchInfo),
 }
 
 /// single threaded simple queue for components to communicate with each other

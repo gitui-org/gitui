@@ -12,7 +12,7 @@ use std::{
 };
 
 static FAST_POLL_DURATION: Duration = Duration::from_millis(100);
-static SLOW_POLL_DURATION: Duration = Duration::from_millis(10000);
+static SLOW_POLL_DURATION: Duration = Duration::from_secs(10);
 
 ///
 #[derive(Clone, Copy, Debug)]

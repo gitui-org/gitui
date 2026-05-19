@@ -234,6 +234,16 @@ impl Component for BlameFilePopup {
 				)
 				.order(1),
 			);
+			out.push(
+				CommandInfo::new(
+					strings::commands::open_line_number_popup(
+						&self.key_config,
+					),
+					true,
+					has_result,
+				)
+				.order(1),
+			);
 		}
 
 		visibility_blocking(self)
@@ -306,6 +316,22 @@ impl Component for BlameFilePopup {
 								FileRevOpen::new(filepath),
 							),
 						));
+					}
+				} else if key_match(
+					key,
+					self.key_config.keys.goto_line,
+				) {
+					let maybe_blame_result = &self
+						.blame
+						.as_ref()
+						.and_then(|blame| blame.result());
+					if let Some(blame_result) = maybe_blame_result {
+						let max_line = blame_result.lines().len() - 1;
+						self.queue.push(
+							InternalEvent::OpenGotoLinePopup(
+								max_line,
+							),
+						);
 					}
 				}
 
@@ -740,6 +766,14 @@ impl BlameFilePopup {
 
 				selection
 			})
+	}
+
+	pub fn goto_line(&mut self, line: usize) {
+		self.visible = true;
+		let mut table_state = self.table_state.take();
+		table_state
+			.select(Some(line.clamp(0, self.get_max_line_number())));
+		self.table_state.set(table_state);
 	}
 
 	fn selected_commit(&self) -> Option<CommitId> {

@@ -130,7 +130,7 @@ impl CommandBar {
 		}
 	}
 
-	pub fn toggle_more(&mut self) {
+	pub const fn toggle_more(&mut self) {
 		if self.expandable {
 			self.expanded = !self.expanded;
 		}

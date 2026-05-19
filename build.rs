@@ -34,14 +34,14 @@ fn main() {
 	let build_date = now.date_naive();
 
 	let build_name = if std::env::var("GITUI_RELEASE").is_ok() {
+		env!("CARGO_PKG_VERSION").to_string()
+	} else {
 		format!(
-			"{} {} ({})",
+			"{}-nightly {} ({})",
 			env!("CARGO_PKG_VERSION"),
 			build_date,
 			get_git_hash()
 		)
-	} else {
-		format!("nightly {} ({})", build_date, get_git_hash())
 	};
 
 	println!("cargo:warning=buildname '{build_name}'");

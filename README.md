@@ -80,11 +80,11 @@ These are the high level goals before calling out `1.0`:
 
 * visualize branching structure in log tab ([#81](https://github.com/gitui-org/gitui/issues/81))
 * interactive rebase ([#32](https://github.com/gitui-org/gitui/issues/32))
+- no git-lfs support (see [#2812](https://github.com/gitui-org/gitui/issues/2812))
 
 ## 5. <a name="limitations"></a> Known Limitations <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
 - no sparse repo support (see [#1226](https://github.com/gitui-org/gitui/issues/1226))
-- no git-lfs support (see [#1089](https://github.com/gitui-org/gitui/discussions/1089))
 - *credential.helper* for https needs to be **explicitly** configured (see [#800](https://github.com/gitui-org/gitui/issues/800))
 
 Currently, this tool does not fully substitute the _git shell_, however both tools work well in tandem.
@@ -163,6 +163,12 @@ scoop install gitui
 choco install gitui
 ```
 
+##### [Mise](https://github.com/jdx/mise)
+
+```shell
+mise use -g gitui@latest
+```
+
 ##### [Nix](https://search.nixos.org/packages?channel=unstable&show=gitui&from=0&size=50&sort=relevance&query=gitui) (Nix/NixOS)
 
 Nixpkg
@@ -220,7 +226,7 @@ see [NIGHTLIES.md](./NIGHTLIES.md)
 
 ### Requirements
 
-- Minimum supported `rust`/`cargo` version: `1.82`
+- Minimum supported `rust`/`cargo` version: `1.88`
   - See [Install Rust](https://www.rust-lang.org/tools/install)
 
 - To build openssl dependency (see https://docs.rs/openssl/latest/openssl/)

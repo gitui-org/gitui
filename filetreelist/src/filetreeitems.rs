@@ -59,7 +59,7 @@ impl FileTreeItems {
 	}
 
 	/// how many individual items (files/paths) are in the list
-	pub fn len(&self) -> usize {
+	pub const fn len(&self) -> usize {
 		self.tree_items.len()
 	}
 

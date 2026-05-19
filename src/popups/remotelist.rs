@@ -146,12 +146,14 @@ impl Component for RemoteListPopup {
 			} else if key_match(
 				e,
 				self.key_config.keys.update_remote_name,
-			) {
+			) && self.valid_selection()
+			{
 				self.rename_remote();
 			} else if key_match(
 				e,
 				self.key_config.keys.update_remote_url,
-			) {
+			) && self.valid_selection()
+			{
 				self.update_remote_url();
 			}
 		}
@@ -411,7 +413,7 @@ impl RemoteListPopup {
 		Ok(true)
 	}
 
-	fn valid_selection(&self) -> bool {
+	const fn valid_selection(&self) -> bool {
 		!self.remote_names.is_empty()
 			&& self.remote_names.len() >= self.selection as usize
 	}

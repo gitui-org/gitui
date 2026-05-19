@@ -438,6 +438,46 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 	}
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum CheckoutOptions {
+	KeepLocalChanges,
+	DiscardAllLocalChagnes,
+}
+
+impl CheckoutOptions {
+	pub const fn previous(self) -> Self {
+		match self {
+			Self::KeepLocalChanges => Self::DiscardAllLocalChagnes,
+			Self::DiscardAllLocalChagnes => Self::KeepLocalChanges,
+		}
+	}
+
+	pub const fn next(self) -> Self {
+		match self {
+			Self::KeepLocalChanges => Self::DiscardAllLocalChagnes,
+			Self::DiscardAllLocalChagnes => Self::KeepLocalChanges,
+		}
+	}
+
+	pub const fn to_string_pair(
+		self,
+	) -> (&'static str, &'static str) {
+		const CHECKOUT_OPTION_UNCHANGE: &str =
+			" 🟡 Keep local changes";
+		const CHECKOUT_OPTION_DISCARD: &str =
+			" 🔴 Discard all local changes";
+
+		match self {
+			Self::KeepLocalChanges => {
+				("Don't change", CHECKOUT_OPTION_UNCHANGE)
+			}
+			Self::DiscardAllLocalChagnes => {
+				("Discard", CHECKOUT_OPTION_DISCARD)
+			}
+		}
+	}
+}
+
 pub mod commit {
 	use crate::keys::SharedKeyConfig;
 
@@ -1449,6 +1489,18 @@ pub mod commands {
 			CMD_GROUP_LOG,
 		)
 	}
+	pub fn open_line_number_popup(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Go to [{}]",
+				key_config.get_hint(key_config.keys.goto_line),
+			),
+			"go to a given line number in the blame view",
+			CMD_GROUP_GENERAL,
+		)
+	}
 	pub fn log_tag_commit(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {
@@ -1868,6 +1920,17 @@ pub mod commands {
 			),
 			"find commit from sha",
 			CMD_GROUP_LOG,
+		)
+	}
+
+	pub fn goto_line(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Go To [{}]",
+				key_config.get_hint(key_config.keys.enter),
+			),
+			"Go to the given line",
+			CMD_GROUP_GENERAL,
 		)
 	}
 }

@@ -145,9 +145,16 @@ impl PushPopup {
 		};
 
 		// run pre push hook - can reject push
-		if let HookResult::NotOk(e) =
-			hooks_pre_push(&self.repo.borrow())?
-		{
+		let repo = self.repo.borrow();
+		if let HookResult::NotOk(e) = hooks_pre_push(
+			&repo,
+			&remote,
+			&asyncgit::sync::PrePushTarget::Branch {
+				branch: &self.branch,
+				delete: self.modifier.delete(),
+			},
+			cred.clone(),
+		)? {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"pre-push hook failed:\n{e}"

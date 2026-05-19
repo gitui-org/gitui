@@ -34,7 +34,7 @@ impl NewFromOldContent {
 		Ok(())
 	}
 
-	fn skip_old_line(&mut self) {
+	const fn skip_old_line(&mut self) {
 		self.old_index += 1;
 	}
 

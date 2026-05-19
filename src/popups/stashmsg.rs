@@ -138,7 +138,7 @@ impl StashMsgPopup {
 	}
 
 	///
-	pub fn options(&mut self, options: StashingOptions) {
+	pub const fn options(&mut self, options: StashingOptions) {
 		self.options = options;
 	}
 }

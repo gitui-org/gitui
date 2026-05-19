@@ -49,7 +49,7 @@ pub struct AsyncLog {
 
 static LIMIT_COUNT: usize = 3000;
 static SLEEP_FOREGROUND: Duration = Duration::from_millis(2);
-static SLEEP_BACKGROUND: Duration = Duration::from_millis(1000);
+static SLEEP_BACKGROUND: Duration = Duration::from_secs(1);
 
 impl AsyncLog {
 	///
