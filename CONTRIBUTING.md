@@ -24,7 +24,12 @@ make a contribution.
 
 ## Cross-compiling for OpenHarmony
 
-GitUI can be built for OpenHarmony (target `aarch64-unknown-linux-ohos`). This requires the [OpenHarmony SDK](https://www.openharmony.cn/) native toolchain.
+GitUI can be built for OpenHarmony (target `aarch64-unknown-linux-ohos`). This requires the OpenHarmony SDK native toolchain.
+
+Download the SDK command-line tools from [HarmonyOS Developer](https://developer.huawei.com/consumer/cn/download/command-line-tools-for-hmos). After installation, the default SDK path is typically:
+
+- Linux: `~/command-line-tools/sdk/default/openharmony`
+- macOS: `~/Library/command-line-tools/sdk/default/openharmony`
 
 First, install the `aarch64-unknown-linux-ohos` Rust target:
 
