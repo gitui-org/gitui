@@ -7,6 +7,22 @@ use git2::{Repository, RepositoryOpenFlags};
 
 use crate::error::Result;
 
+#[cfg(target_env = "ohos")]
+use std::sync::Once;
+
+#[cfg(target_env = "ohos")]
+static INIT_OHOS: Once = Once::new();
+
+#[cfg(target_env = "ohos")]
+pub(crate) fn init_ohos_owner_validation() {
+	INIT_OHOS.call_once(|| {
+		#[allow(unsafe_code)]
+		unsafe {
+			git2::opts::set_verify_owner_validation(false).ok();
+		}
+	});
+}
+
 ///
 pub type RepoPathRef = RefCell<RepoPath>;
 
@@ -55,6 +71,9 @@ impl From<&str> for RepoPath {
 }
 
 pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
+	#[cfg(target_env = "ohos")]
+	init_ohos_owner_validation();
+
 	let repo = Repository::open_ext(
 		repo_path.gitpath(),
 		RepositoryOpenFlags::FROM_ENV,
