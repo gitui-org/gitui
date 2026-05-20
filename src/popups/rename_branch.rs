@@ -65,9 +65,9 @@ impl Component for RenameBranchPopup {
 					kind,
 					state,
 				}) => Cow::Owned(Event::Key(KeyEvent {
-					code: KeyCode::Char(strings::normalize_branch_name_char(
-						*c,
-					)),
+					code: KeyCode::Char(
+						strings::normalize_branch_name_char(*c),
+					),
 					modifiers: *modifiers,
 					kind: *kind,
 					state: *state,

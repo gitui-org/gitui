@@ -439,10 +439,10 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 }
 
 pub const fn normalize_branch_name_char(c: char) -> char {
-    match c {
-        ' ' => '-',
-        c => c,
-    }
+	match c {
+		' ' => '-',
+		c => c,
+	}
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
