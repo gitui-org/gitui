@@ -1,11 +1,12 @@
 use crate::{
 	error::Result,
 	sync::{
-		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
-		RepoPath, SharedCommitFilterFn,
+		repo, CommitId, LogWalker, RepoPath, SharedCommitFilterFn,
 	},
 	AsyncGitNotification, Error,
 };
+#[cfg(not(target_env = "ohos"))]
+use crate::sync::{gix_repo, LogWalkerWithoutFilter};
 use crossbeam_channel::Sender;
 use scopetime::scope_time;
 use std::{
@@ -200,25 +201,45 @@ impl AsyncLog {
 		sender: &Sender<AsyncGitNotification>,
 		filter: Option<SharedCommitFilterFn>,
 	) -> Result<()> {
-		filter.map_or_else(
-			|| {
-				Self::fetch_helper_without_filter(
-					repo_path,
-					arc_current,
-					arc_background,
-					sender,
-				)
-			},
-			|filter| {
-				Self::fetch_helper_with_filter(
-					repo_path,
-					arc_current,
-					arc_background,
-					sender,
-					filter,
-				)
-			},
-		)
+		#[cfg(target_env = "ohos")]
+		{
+			Self::fetch_helper_with_filter(
+				repo_path,
+				arc_current,
+				arc_background,
+				sender,
+				filter.unwrap_or_else(|| {
+					Arc::new(Box::new(
+						|_: &git2::Repository, _: &CommitId| {
+							Ok(true)
+						},
+					))
+				}),
+			)
+		}
+
+		#[cfg(not(target_env = "ohos"))]
+		{
+			filter.map_or_else(
+				|| {
+					Self::fetch_helper_without_filter(
+						repo_path,
+						arc_current,
+						arc_background,
+						sender,
+					)
+				},
+				|filter| {
+					Self::fetch_helper_with_filter(
+						repo_path,
+						arc_current,
+						arc_background,
+						sender,
+						filter,
+					)
+				},
+			)
+		}
 	}
 
 	fn fetch_helper_with_filter(
@@ -265,6 +286,7 @@ impl AsyncLog {
 		Ok(())
 	}
 
+	#[cfg(not(target_env = "ohos"))]
 	fn fetch_helper_without_filter(
 		repo_path: &RepoPath,
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
