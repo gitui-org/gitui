@@ -1,40 +1,34 @@
 use crate::sync::CommitId;
 use std::collections::HashMap;
 
-pub struct Oids {
-	/// alias
-	pub ids: Vec<CommitId>,
+/// mapping of `CommitId` to a numeric alias
+pub struct GraphOids(HashMap<CommitId, usize>);
 
-	/// `CommitId` to alias
-	pub aliases: HashMap<CommitId, u32>,
-}
-
-impl Default for Oids {
+impl Default for GraphOids {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl Oids {
+impl GraphOids {
+	///
 	pub fn new() -> Self {
-		Self {
-			ids: Vec::new(),
-			aliases: HashMap::new(),
-		}
+		Self(HashMap::new())
 	}
 
-	pub fn get_or_insert(&mut self, id: &CommitId) -> u32 {
-		if let Some(&alias) = self.aliases.get(id) {
+	///
+	pub fn get_or_insert(&mut self, id: &CommitId) -> usize {
+		if let Some(&alias) = self.0.get(id) {
 			return alias;
 		}
-		let alias =
-			u32::try_from(self.ids.len()).expect("too many oids");
-		self.ids.push(*id);
-		self.aliases.insert(*id, alias);
+
+		let alias = self.0.len();
+		self.0.insert(*id, alias);
 		alias
 	}
 
-	pub fn get(&self, id: &CommitId) -> Option<u32> {
-		self.aliases.get(id).copied()
+	///
+	pub fn get(&self, id: &CommitId) -> Option<usize> {
+		self.0.get(id).copied()
 	}
 }
