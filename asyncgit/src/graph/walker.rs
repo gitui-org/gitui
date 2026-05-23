@@ -1,16 +1,16 @@
 use super::buffer::Buffer;
 use super::chunk::{Chunk, Markers};
-use super::oids::Oids;
-use super::{ConnType, GraphRow};
+use super::oids::GraphOids;
+use super::{ConnectionType, GraphRow, MAX_LANE_COLORS};
 use crate::sync::{CommitId, CommitInfo};
 use im::Vector;
 use std::collections::{HashMap, HashSet};
 
 pub struct GraphWalker {
 	pub buffer: Buffer,
-	pub oids: Oids,
+	pub oids: GraphOids,
 	pub branch_lane_map: HashMap<CommitId, usize>,
-	pub mergers_map: HashMap<u32, u32>,
+	pub mergers_map: HashMap<usize, usize>,
 }
 
 impl Default for GraphWalker {
@@ -23,7 +23,7 @@ impl GraphWalker {
 	pub fn new() -> Self {
 		Self {
 			buffer: Buffer::new(),
-			oids: Oids::new(),
+			oids: GraphOids::new(),
 			branch_lane_map: HashMap::new(),
 			mergers_map: HashMap::new(),
 		}
@@ -189,9 +189,9 @@ impl GraphWalker {
 				to,
 				commit_lane,
 				target_lane,
-				ConnType::MergeBridgeMid,
-				ConnType::MergeBridgeStart,
-				ConnType::MergeBridgeEnd,
+				ConnectionType::MergeBridgeMid,
+				ConnectionType::MergeBridgeStart,
+				ConnectionType::MergeBridgeEnd,
 			);
 		}
 
@@ -211,9 +211,9 @@ impl GraphWalker {
 				to,
 				branch_lane,
 				branch_lane,
-				ConnType::MergeBridgeMid,
-				ConnType::BranchUp,
-				ConnType::BranchUpRight,
+				ConnectionType::MergeBridgeMid,
+				ConnectionType::BranchUp,
+				ConnectionType::BranchUpRight,
 			);
 		}
 
@@ -232,9 +232,9 @@ impl GraphWalker {
 	#[allow(clippy::too_many_arguments)]
 	fn fill_lanes(
 		&self,
-		lanes: &mut [Option<(ConnType, usize)>],
+		lanes: &mut [Option<(ConnectionType, usize)>],
 		curr: &Vector<Option<Chunk>>,
-		alias: Option<u32>,
+		alias: Option<usize>,
 		head_id: Option<&CommitId>,
 		is_stash: bool,
 		is_merge: bool,
@@ -245,7 +245,7 @@ impl GraphWalker {
 			let Some(chunk) = chunk_item.as_ref() else {
 				if branching_lanes.contains(&lane_idx) {
 					lanes[lane_idx] =
-						Some((ConnType::BranchUp, lane_idx % 16));
+						Some((ConnectionType::BranchUp, lane_idx % MAX_LANE_COLORS));
 				}
 				continue;
 			};
@@ -253,13 +253,13 @@ impl GraphWalker {
 			if alias.is_some() && chunk.alias == alias {
 				let conn_type =
 					match (is_stash, is_merge, is_branch_tip) {
-						(true, _, _) => ConnType::CommitStash,
-						(_, true, _) => ConnType::CommitMerge,
-						(_, _, true) => ConnType::CommitBranch,
-						_ => ConnType::CommitNormal,
+						(true, _, _) => ConnectionType::CommitStash,
+						(_, true, _) => ConnectionType::CommitMerge,
+						(_, _, true) => ConnectionType::CommitBranch,
+						_ => ConnectionType::CommitNormal,
 					};
 
-				lanes[lane_idx] = Some((conn_type, lane_idx % 16));
+				lanes[lane_idx] = Some((conn_type, lane_idx % MAX_LANE_COLORS));
 			} else {
 				let is_dotted = head_id
 					.and_then(|h| self.oids.get(h))
@@ -276,44 +276,52 @@ impl GraphWalker {
 				}
 
 				let conn = if is_dotted {
-					ConnType::VerticalDotted
+					ConnectionType::VerticalDotted
 				} else {
-					ConnType::Vertical
+					ConnectionType::Vertical
 				};
 
-				lanes[lane_idx] = Some((conn, lane_idx % 16));
+				lanes[lane_idx] = Some((conn, lane_idx % MAX_LANE_COLORS));
 			}
 		}
 	}
 
 	fn draw_bridge(
-		lanes: &mut [Option<(ConnType, usize)>],
+		lanes: &mut [Option<(ConnectionType, usize)>],
 		from: usize,
 		to: usize,
 		color_lane: usize,
 		corner_lane: usize,
-		mid: ConnType,
-		corner_right: ConnType,
-		corner_left: ConnType,
+		mid: ConnectionType,
+		corner_right: ConnectionType,
+		corner_left: ConnectionType,
 	) {
 		for lane in lanes.iter_mut().take(to).skip(from + 1) {
 			match lane {
 				Some((
-					ConnType::Vertical | ConnType::VerticalDotted,
+					ConnectionType::Vertical | ConnectionType::VerticalDotted,
 					_,
 				)) => {
-					*lane = Some((ConnType::Cross, color_lane % 16));
+					*lane = Some((ConnectionType::Cross, color_lane % MAX_LANE_COLORS));
 				}
 				_ => {
-					*lane = Some((mid, color_lane % 16));
+					*lane = Some((mid, color_lane % MAX_LANE_COLORS));
 				}
 			}
 		}
 
 		if corner_lane == to {
-			lanes[to] = Some((corner_right, color_lane % 16));
+			let new_corner = match (lanes[to], corner_right) {
+				(Some((ConnectionType::MergeBridgeStart, _)), ConnectionType::BranchUp) => ConnectionType::BranchUpMergeStart,
+				_ => corner_right,
+			};
+			lanes[to] = Some((new_corner, color_lane % MAX_LANE_COLORS));
 		} else if corner_lane == from {
-			lanes[from] = Some((corner_left, color_lane % 16));
+			let new_corner = match (lanes[from], corner_left) {
+				(Some((ConnectionType::MergeBridgeEnd, _)), ConnectionType::BranchUpRight) => ConnectionType::BranchUpRightMergeEnd,
+				_ => corner_left,
+			};
+			lanes[from] = Some((new_corner, color_lane % MAX_LANE_COLORS));
 		}
 	}
 }

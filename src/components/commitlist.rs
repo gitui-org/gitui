@@ -1,9 +1,10 @@
 use super::utils::graphrow::{
 	SYM_BRANCH_DOWN, SYM_BRANCH_UP, SYM_BRANCH_UP_RIGHT, SYM_COMMIT,
 	SYM_COMMIT_BRANCH, SYM_COMMIT_MERGE, SYM_COMMIT_STASH,
-	SYM_COMMIT_UNCOMMITTED, SYM_CROSS, SYM_HORIZONTAL, SYM_MERGE_BRIDGE_END,
-	SYM_MERGE_BRIDGE_MID, SYM_MERGE_BRIDGE_START, SYM_SPACE,
-	SYM_VERTICAL, SYM_VERTICAL_DOTTED,
+	SYM_COMMIT_UNCOMMITTED, SYM_CROSS, SYM_HORIZONTAL,
+	SYM_MERGE_BRIDGE_END, SYM_MERGE_BRIDGE_MID,
+	SYM_MERGE_BRIDGE_START, SYM_SPACE, SYM_VERTICAL,
+	SYM_VERTICAL_DOTTED,
 };
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::{
-	graph::{ConnType, GraphRow},
+	graph::{ConnectionType, GraphRow},
 	sync::{
 		self, checkout_commit, BranchDetails, BranchInfo, CommitId,
 		RepoPathRef, Tags,
@@ -502,50 +503,78 @@ impl CommitList {
 			}
 			let (sym, graph_color) = match conn {
 				None => (SYM_SPACE, Color::Reset),
-				Some((ConnType::Vertical, color_idx)) => {
-					(SYM_VERTICAL, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::VerticalDotted, color_idx)) => {
-					(SYM_VERTICAL_DOTTED, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::Cross, color_idx)) => {
-					(SYM_CROSS, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::CommitNormal, color_idx)) => {
-					(SYM_COMMIT, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::CommitBranch, color_idx)) => {
-					(SYM_COMMIT_BRANCH, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::CommitMerge, color_idx)) => {
-					(SYM_COMMIT_MERGE, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::CommitStash, color_idx)) => {
-					(SYM_COMMIT_STASH, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::CommitUncommitted, color_idx)) => {
-					(SYM_COMMIT_UNCOMMITTED, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::MergeBridgeStart, color_idx)) => {
-					(SYM_MERGE_BRIDGE_START, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::MergeBridgeMid, color_idx)) => {
-					(SYM_MERGE_BRIDGE_MID, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::MergeBridgeEnd, color_idx)) => {
-					(SYM_MERGE_BRIDGE_END, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::BranchDown, color_idx)) => {
-					(SYM_BRANCH_DOWN, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::BranchUp, color_idx)) => {
-					(SYM_BRANCH_UP, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
-				Some((ConnType::BranchUpRight, color_idx)) => {
-					(SYM_BRANCH_UP_RIGHT, GRAPH_COLORS[color_idx % GRAPH_COLORS.len()])
-				}
+				Some((ConnectionType::Vertical, color_idx)) => (
+					SYM_VERTICAL,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::VerticalDotted, color_idx)) => (
+					SYM_VERTICAL_DOTTED,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::Cross, color_idx)) => (
+					SYM_CROSS,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::BranchUpMergeStart, color_idx)) => (
+					SYM_BRANCH_UP, // Reusing '┛'
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((
+					ConnectionType::BranchUpRightMergeEnd,
+					color_idx,
+				)) => (
+					SYM_BRANCH_UP_RIGHT, // Reusing '┗'
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::CommitNormal, color_idx)) => (
+					SYM_COMMIT,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::CommitBranch, color_idx)) => (
+					SYM_COMMIT_BRANCH,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::CommitMerge, color_idx)) => (
+					SYM_COMMIT_MERGE,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::CommitStash, color_idx)) => (
+					SYM_COMMIT_STASH,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::CommitUncommitted, color_idx)) => (
+					SYM_COMMIT_UNCOMMITTED,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::MergeBridgeStart, color_idx)) => (
+					SYM_MERGE_BRIDGE_START,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::MergeBridgeMid, color_idx)) => (
+					SYM_MERGE_BRIDGE_MID,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::MergeBridgeEnd, color_idx)) => (
+					SYM_MERGE_BRIDGE_END,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::BranchDown, color_idx)) => (
+					SYM_BRANCH_DOWN,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::BranchUp, color_idx)) => (
+					SYM_BRANCH_UP,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
+				Some((ConnectionType::BranchUpRight, color_idx)) => (
+					SYM_BRANCH_UP_RIGHT,
+					GRAPH_COLORS[color_idx % GRAPH_COLORS.len()],
+				),
 			};
-			spans.push(Span::styled(sym, Style::default().fg(graph_color)));
+			spans.push(Span::styled(
+				sym,
+				Style::default().fg(graph_color),
+			));
 
 			// Spacer
 			let mut is_bridge_lane = false;
@@ -554,15 +583,21 @@ impl CommitList {
 			if let Some((from, to)) = row.merge_bridge {
 				if lane_index >= from && lane_index < to {
 					is_bridge_lane = true;
-					spacer_color = GRAPH_COLORS[row.commit_lane % GRAPH_COLORS.len()];
+					spacer_color = GRAPH_COLORS
+						[row.commit_lane % GRAPH_COLORS.len()];
 				}
 			}
 
 			for &(from, to) in &row.branches {
 				if lane_index >= from && lane_index < to {
 					is_bridge_lane = true;
-					let branch_lane = if row.commit_lane == from { to } else { from };
-					spacer_color = GRAPH_COLORS[branch_lane % GRAPH_COLORS.len()];
+					let branch_lane = if row.commit_lane == from {
+						to
+					} else {
+						from
+					};
+					spacer_color = GRAPH_COLORS
+						[branch_lane % GRAPH_COLORS.len()];
 				}
 			}
 
@@ -788,7 +823,7 @@ impl CommitList {
 						if !matches!(
 							conn,
 							None | Some((
-								ConnType::MergeBridgeMid,
+								ConnectionType::MergeBridgeMid,
 								_
 							))
 						) {
@@ -849,7 +884,7 @@ impl CommitList {
 				local_branches,
 				self.remote_branches_string(e),
 				&self.theme,
-				width,
+				width.into(),
 				now,
 				marked,
 				&empty_lanes,
@@ -1330,12 +1365,11 @@ mod tests {
 			is_merge: false,
 			is_branch_tip: false,
 			is_stash: false,
-			lanes: vec![Some((ConnType::CommitNormal, 0))],
+			lanes: vec![Some((ConnectionType::CommitNormal, 0))],
 			merge_bridge: None,
 			branches: vec![],
 		};
-		let empty_lanes = std::collections::HashSet::new();
-		let spans = cl.build_graph_spans(&row, 1, &empty_lanes);
+		let spans = cl.build_graph_spans(&row, 1);
 
 		assert_eq!(spans.len(), 2);
 		assert_eq!(spans[0].content, Cow::from(SYM_COMMIT));
