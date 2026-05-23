@@ -18,7 +18,7 @@ pub struct Buffer {
 	pub current: Vector<Option<Chunk>>,
 	pub deltas: Vec<Delta>,
 	pub checkpoints: BTreeMap<usize, Vector<Option<Chunk>>>,
-	mergers: Vec<u32>,
+	mergers: Vec<usize>,
 	pending_delta: Vec<DeltaOp>,
 }
 
@@ -39,7 +39,7 @@ impl Buffer {
 		}
 	}
 
-	pub fn merger(&mut self, alias: u32) {
+	pub fn merger(&mut self, alias: usize) {
 		self.mergers.push(alias);
 	}
 
