@@ -5,8 +5,12 @@ pub mod walker;
 
 pub use walker::GraphWalker;
 
+/// The maximum number of colors to use for graph lanes
+pub const MAX_LANE_COLORS: usize = 16;
+
+/// The type of connection between nodes in the graph
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConnType {
+pub enum ConnectionType {
 	Vertical,
 	VerticalDotted,
 	Cross,
@@ -21,6 +25,8 @@ pub enum ConnType {
 	BranchDown,
 	BranchUp,
 	BranchUpRight,
+	BranchUpMergeStart,
+	BranchUpRightMergeEnd,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -42,8 +48,8 @@ pub struct GraphRow {
 
 	/// Connections emitted per lane:
 	/// None = empty space
-	/// Some((ConnType, `color_index`)) = draw this connector in this color
-	pub lanes: Vec<Option<(ConnType, usize)>>,
+	/// Some((ConnectionType, `color_index`)) = draw this connector in this color
+	pub lanes: Vec<Option<(ConnectionType, usize)>>,
 
 	/// Horizontal merge bridge: if this commit merges rightward,
 	/// (`from_lane`, `to_lane`) — the span to draw ─ ╭ ╮ across
