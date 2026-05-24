@@ -14,10 +14,23 @@ pub fn reword(
 	commit: CommitId,
 	message: &str,
 ) -> Result<CommitId> {
+	reword_with_sign(repo_path, commit, message, None)
+}
+
+/// This is the same as reword, but allows overriding signing behavior for this operation
+pub fn reword_with_sign(
+	repo_path: &RepoPath,
+	commit: CommitId,
+	message: &str,
+	sign_override: Option<bool>,
+) -> Result<CommitId> {
 	let repo = repo(repo_path)?;
 	let config = repo.config()?;
+	let should_sign = sign_override.unwrap_or_else(|| {
+		config.get_bool("commit.gpgsign").unwrap_or(false)
+	});
 
-	if config.get_bool("commit.gpgsign").unwrap_or(false) {
+	if should_sign {
 		// HACK: we undo the last commit and create a new one
 		use crate::sync::utils::undo_last_commit;
 
@@ -32,7 +45,11 @@ pub fn reword(
 				.len() == 0
 			{
 				undo_last_commit(repo_path)?;
-				return super::commit(repo_path, message);
+				return super::commit_with_sign(
+					repo_path,
+					message,
+					Some(true),
+				);
 			}
 
 			return Err(Error::SignRewordLastCommitStaged);

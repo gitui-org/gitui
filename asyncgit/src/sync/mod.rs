@@ -45,7 +45,9 @@ pub use branch::{
 	merge_rebase::merge_upstream_rebase, rename::rename_branch,
 	validate_branch_name, BranchCompare, BranchDetails, BranchInfo,
 };
-pub use commit::{amend, commit, tag_commit};
+pub use commit::{
+	amend, amend_with_sign, commit, commit_with_sign, tag_commit,
+};
 pub use commit_details::{
 	get_commit_details, CommitDetails, CommitMessage, CommitSignature,
 };
@@ -55,7 +57,10 @@ pub use commit_filter::{
 	LogFilterSearchOptions, SearchFields, SearchOptions,
 	SharedCommitFilterFn,
 };
-pub use commit_revert::{commit_revert, revert_commit, revert_head};
+pub use commit_revert::{
+	commit_revert, commit_revert_with_sign, revert_commit,
+	revert_head,
+};
 pub use commits_info::{
 	get_commit_info, get_commits_info, CommitId, CommitInfo,
 };
@@ -75,8 +80,9 @@ pub use ignore::add_to_ignore;
 pub use logwalker::{LogWalker, LogWalkerWithoutFilter};
 pub use merge::{
 	abort_pending_rebase, abort_pending_state,
-	continue_pending_rebase, merge_branch, merge_commit, merge_msg,
-	mergehead_ids, rebase_progress,
+	continue_pending_rebase, merge_branch, merge_commit,
+	merge_commit_with_sign, merge_msg, mergehead_ids,
+	rebase_progress,
 };
 pub use rebase::rebase_branch;
 pub use remotes::{
@@ -88,7 +94,7 @@ pub use remotes::{
 pub(crate) use repository::{gix_repo, repo};
 pub use repository::{RepoPath, RepoPathRef};
 pub use reset::{reset_repo, reset_stage, reset_workdir};
-pub use reword::reword;
+pub use reword::{reword, reword_with_sign};
 pub use staging::{discard_lines, stage_lines};
 pub use stash::{
 	get_stashes, stash_apply, stash_drop, stash_pop, stash_save,

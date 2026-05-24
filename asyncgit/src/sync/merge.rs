@@ -1,7 +1,9 @@
 use crate::{
 	error::{Error, Result},
 	sync::{
-		branch::merge_commit::commit_merge_with_head,
+		branch::merge_commit::{
+			commit_merge_with_head, commit_merge_with_head_with_sign,
+		},
 		rebase::{
 			abort_rebase, continue_rebase, get_rebase_progress,
 		},
@@ -136,6 +138,16 @@ pub fn merge_commit(
 	msg: &str,
 	ids: &[CommitId],
 ) -> Result<CommitId> {
+	merge_commit_with_sign(repo_path, msg, ids, None)
+}
+
+///
+pub fn merge_commit_with_sign(
+	repo_path: &RepoPath,
+	msg: &str,
+	ids: &[CommitId],
+	sign_override: Option<bool>,
+) -> Result<CommitId> {
 	scope_time!("merge_commit");
 
 	let repo = repo(repo_path)?;
@@ -146,7 +158,16 @@ pub fn merge_commit(
 		commits.push(repo.find_commit((*id).into())?);
 	}
 
-	let id = commit_merge_with_head(&repo, &commits, msg)?;
+	let id = if sign_override.is_some() {
+		commit_merge_with_head_with_sign(
+			&repo,
+			&commits,
+			msg,
+			sign_override,
+		)?
+	} else {
+		commit_merge_with_head(&repo, &commits, msg)?
+	};
 
 	Ok(id)
 }

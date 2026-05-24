@@ -41,9 +41,19 @@ pub fn commit_revert(
 	repo_path: &RepoPath,
 	msg: &str,
 ) -> Result<CommitId> {
+	commit_revert_with_sign(repo_path, msg, None)
+}
+
+///
+pub fn commit_revert_with_sign(
+	repo_path: &RepoPath,
+	msg: &str,
+	sign_override: Option<bool>,
+) -> Result<CommitId> {
 	scope_time!("commit_revert");
 
-	let id = crate::sync::commit(repo_path, msg)?;
+	let id =
+		crate::sync::commit_with_sign(repo_path, msg, sign_override)?;
 
 	repo(repo_path)?.cleanup_state()?;
 

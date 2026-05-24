@@ -3,7 +3,10 @@
 use super::BranchType;
 use crate::{
 	error::{Error, Result},
-	sync::{merge_msg, repository::repo, CommitId, RepoPath},
+	sync::{
+		commit::signature_allow_undefined_name, merge_msg,
+		repository::repo, sign::SignBuilder, CommitId, RepoPath,
+	},
 };
 use git2::Commit;
 use scopetime::scope_time;
@@ -66,8 +69,20 @@ pub(crate) fn commit_merge_with_head(
 	commits: &[Commit],
 	msg: &str,
 ) -> Result<CommitId> {
-	let signature =
-		crate::sync::commit::signature_allow_undefined_name(repo)?;
+	commit_merge_with_head_with_sign(repo, commits, msg, None)
+}
+
+pub(crate) fn commit_merge_with_head_with_sign(
+	repo: &git2::Repository,
+	commits: &[Commit],
+	msg: &str,
+	sign_override: Option<bool>,
+) -> Result<CommitId> {
+	let config = repo.config()?;
+	let should_sign = sign_override.unwrap_or_else(|| {
+		config.get_bool("commit.gpgsign").unwrap_or(false)
+	});
+	let signature = signature_allow_undefined_name(repo)?;
 	let mut index = repo.index()?;
 	let tree_id = index.write_tree()?;
 	let tree = repo.find_tree(tree_id)?;
@@ -78,8 +93,46 @@ pub(crate) fn commit_merge_with_head(
 	let mut parents = vec![&head_commit];
 	parents.extend(commits);
 
-	let commit_id = repo
-		.commit(
+	let commit_id = if should_sign {
+		let buffer = repo.commit_create_buffer(
+			&signature,
+			&signature,
+			msg,
+			&tree,
+			parents.as_slice(),
+		)?;
+
+		let commit = std::str::from_utf8(&buffer).map_err(|_e| {
+			crate::sync::sign::SignError::Shellout(
+				"utf8 conversion error".to_string(),
+			)
+		})?;
+
+		let signer = SignBuilder::from_gitconfig(repo, &config)?;
+		let (signature, signature_field) = signer.sign(&buffer)?;
+		let commit_id = repo.commit_signed(
+			commit,
+			&signature,
+			signature_field.as_deref(),
+		)?;
+
+		if let Ok(mut head) = repo.head() {
+			head.set_target(commit_id, msg)?;
+		} else {
+			let default_branch_name = config
+				.get_str("init.defaultBranch")
+				.unwrap_or("master");
+			repo.reference(
+				&format!("refs/heads/{default_branch_name}"),
+				commit_id,
+				true,
+				msg,
+			)?;
+		}
+
+		CommitId::new(commit_id)
+	} else {
+		repo.commit(
 			Some("HEAD"),
 			&signature,
 			&signature,
@@ -87,7 +140,9 @@ pub(crate) fn commit_merge_with_head(
 			&tree,
 			parents.as_slice(),
 		)?
-		.into();
+		.into()
+	};
+
 	repo.cleanup_state()?;
 	Ok(commit_id)
 }

@@ -49,6 +49,7 @@ pub struct TextInputComponent {
 	theme: SharedTheme,
 	key_config: SharedKeyConfig,
 	input_type: InputType,
+	multiline_popup_height: u16,
 	current_area: Cell<Rect>,
 	embed: bool,
 	textarea: Option<TextAreaComponent>,
@@ -72,6 +73,7 @@ impl TextInputComponent {
 			default_msg: default_msg.to_string(),
 			selected: None,
 			input_type: InputType::Multiline,
+			multiline_popup_height: 20,
 			current_area: Cell::new(Rect::default()),
 			embed: false,
 			textarea: None,
@@ -85,6 +87,14 @@ impl TextInputComponent {
 		input_type: InputType,
 	) -> Self {
 		self.input_type = input_type;
+		self
+	}
+
+	pub const fn with_multiline_popup_height(
+		mut self,
+		height: u16,
+	) -> Self {
+		self.multiline_popup_height = height;
 		self
 	}
 
@@ -623,7 +633,11 @@ impl DrawableComponent for TextInputComponent {
 			let area = if self.embed {
 				rect
 			} else if self.input_type == InputType::Multiline {
-				let area = ui::centered_rect(60, 20, f.area());
+				let area = ui::centered_rect(
+					60,
+					self.multiline_popup_height,
+					f.area(),
+				);
 				ui::rect_inside(
 					Size::new(10, 3),
 					f.area().into(),

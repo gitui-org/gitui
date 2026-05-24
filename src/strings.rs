@@ -1193,6 +1193,22 @@ pub mod commands {
 		)
 	}
 
+	pub fn toggle_gpgsign(
+		key_config: &SharedKeyConfig,
+		current_signing: bool,
+	) -> CommandText {
+		let verb = if current_signing { "disable" } else { "enable" };
+		CommandText::new(
+			format!(
+				"{} signing [{}]",
+				verb,
+				key_config.get_hint(key_config.keys.toggle_gpgsign),
+			),
+			"toggle GPG/SSH commit signing (-S) for this commit",
+			CMD_GROUP_COMMIT_POPUP,
+		)
+	}
+
 	pub fn commit_amend(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(

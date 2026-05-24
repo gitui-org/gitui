@@ -10,16 +10,36 @@ use git2::{
 };
 use scopetime::scope_time;
 
+fn gpgsign_enabled(
+	config: &git2::Config,
+	sign_override: Option<bool>,
+) -> bool {
+	sign_override.unwrap_or_else(|| {
+		config.get_bool("commit.gpgsign").unwrap_or(false)
+	})
+}
+
 ///
 pub fn amend(
 	repo_path: &RepoPath,
 	id: CommitId,
 	msg: &str,
 ) -> Result<CommitId> {
+	amend_with_sign(repo_path, id, msg, None)
+}
+
+///
+pub fn amend_with_sign(
+	repo_path: &RepoPath,
+	id: CommitId,
+	msg: &str,
+	sign_override: Option<bool>,
+) -> Result<CommitId> {
 	scope_time!("amend");
 
 	let repo = repo(repo_path)?;
 	let config = repo.config()?;
+	let should_sign = gpgsign_enabled(&config, sign_override);
 
 	let commit = repo.find_commit(id.into())?;
 
@@ -27,14 +47,18 @@ pub fn amend(
 	let tree_id = index.write_tree()?;
 	let tree = repo.find_tree(tree_id)?;
 
-	if config.get_bool("commit.gpgsign").unwrap_or(false) {
+	if should_sign {
 		// HACK: we undo the last commit and create a new one
 		use crate::sync::utils::undo_last_commit;
 
 		let head = get_head_repo(&repo)?;
 		if head == commit.id().into() {
 			undo_last_commit(repo_path)?;
-			return self::commit(repo_path, msg);
+			return self::commit_with_sign(
+				repo_path,
+				msg,
+				Some(true),
+			);
 		}
 
 		return Err(Error::SignAmendNonLastCommit);
@@ -82,10 +106,20 @@ pub(crate) fn signature_allow_undefined_name(
 
 /// this does not run any git hooks, git-hooks have to be executed manually, checkout `hooks_commit_msg` for example
 pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
+	commit_with_sign(repo_path, msg, None)
+}
+
+/// this does not run any git hooks, git-hooks have to be executed manually, checkout `hooks_commit_msg` for example
+pub fn commit_with_sign(
+	repo_path: &RepoPath,
+	msg: &str,
+	sign_override: Option<bool>,
+) -> Result<CommitId> {
 	scope_time!("commit");
 
 	let repo = repo(repo_path)?;
 	let config = repo.config()?;
+	let should_sign = gpgsign_enabled(&config, sign_override);
 	let signature = signature_allow_undefined_name(&repo)?;
 	let mut index = repo.index()?;
 	let tree_id = index.write_tree()?;
@@ -99,10 +133,7 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 
 	let parents = parents.iter().collect::<Vec<_>>();
 
-	let commit_id = if config
-		.get_bool("commit.gpgsign")
-		.unwrap_or(false)
-	{
+	let commit_id = if should_sign {
 		let buffer = repo.commit_create_buffer(
 			&signature,
 			&signature,

@@ -63,6 +63,7 @@ pub struct CommitPopup {
 	commit_msg_history_idx: usize,
 	options: SharedOptions,
 	verify: bool,
+	sign: bool,
 }
 
 const FIRST_LINE_LIMIT: usize = 50;
@@ -78,7 +79,8 @@ impl CommitPopup {
 				"",
 				&strings::commit_msg(&env.key_config),
 				true,
-			),
+			)
+			.with_multiline_popup_height(64),
 			key_config: env.key_config.clone(),
 			git_branch_name: cached::BranchName::new(
 				env.repo.clone(),
@@ -89,6 +91,7 @@ impl CommitPopup {
 			commit_msg_history_idx: 0,
 			options: env.options.clone(),
 			verify: true,
+			sign: false,
 		}
 	}
 
@@ -279,19 +282,35 @@ impl CommitPopup {
 
 	fn do_commit(&self, msg: &str) -> Result<()> {
 		match &self.mode {
-			Mode::Normal => sync::commit(&self.repo.borrow(), msg)?,
-			Mode::Amend(amend) => {
-				sync::amend(&self.repo.borrow(), *amend, msg)?
-			}
-			Mode::Merge(ids) => {
-				sync::merge_commit(&self.repo.borrow(), msg, ids)?
-			}
-			Mode::Revert => {
-				sync::commit_revert(&self.repo.borrow(), msg)?
-			}
+			Mode::Normal => sync::commit_with_sign(
+				&self.repo.borrow(),
+				msg,
+				Some(self.sign),
+			)?,
+			Mode::Amend(amend) => sync::amend_with_sign(
+				&self.repo.borrow(),
+				*amend,
+				msg,
+				Some(self.sign),
+			)?,
+			Mode::Merge(ids) => sync::merge_commit_with_sign(
+				&self.repo.borrow(),
+				msg,
+				ids,
+				Some(self.sign),
+			)?,
+			Mode::Revert => sync::commit_revert_with_sign(
+				&self.repo.borrow(),
+				msg,
+				Some(self.sign),
+			)?,
 			Mode::Reword(id) => {
-				let commit =
-					sync::reword(&self.repo.borrow(), *id, msg)?;
+				let commit = sync::reword_with_sign(
+					&self.repo.borrow(),
+					*id,
+					msg,
+					Some(self.sign),
+				)?;
 				self.queue.push(InternalEvent::TabSwitchStatus);
 
 				commit
@@ -308,6 +327,17 @@ impl CommitPopup {
 		matches!(self.mode, Mode::Normal)
 			&& sync::get_head(&self.repo.borrow()).is_ok()
 			&& (self.is_empty() || !self.is_changed())
+	}
+
+	fn can_toggle_sign(&self) -> bool {
+		matches!(
+			self.mode,
+			Mode::Normal
+				| Mode::Amend(_)
+				| Mode::Merge(_)
+				| Mode::Revert
+				| Mode::Reword(_)
+		)
 	}
 
 	fn is_empty(&self) -> bool {
@@ -349,11 +379,20 @@ impl CommitPopup {
 		self.verify = !self.verify;
 	}
 
+	fn toggle_gpgsign(&mut self) {
+		self.sign = !self.sign;
+	}
+
 	pub fn open(&mut self, reword: Option<CommitId>) -> Result<()> {
 		//only clear text if it was not a normal commit dlg before, so to preserve old commit msg that was edited
 		if !matches!(self.mode, Mode::Normal) {
 			self.input.clear();
 		}
+
+		self.sign =
+			get_config_string(&self.repo.borrow(), "commit.gpgsign")?
+				.and_then(|value| value.parse::<bool>().ok())
+				.unwrap_or(false);
 
 		self.mode = Mode::Normal;
 
@@ -518,6 +557,15 @@ impl Component for CommitPopup {
 			));
 
 			out.push(CommandInfo::new(
+				strings::commands::toggle_gpgsign(
+					&self.key_config,
+					self.sign,
+				),
+				self.can_toggle_sign(),
+				true,
+			));
+
+			out.push(CommandInfo::new(
 				strings::commands::commit_amend(&self.key_config),
 				self.can_amend(),
 				true,
@@ -574,6 +622,13 @@ impl Component for CommitPopup {
 					) && self.can_commit()
 					{
 						self.toggle_verify();
+						true
+					} else if key_match(
+						e,
+						self.key_config.keys.toggle_gpgsign,
+					) && self.can_toggle_sign()
+					{
+						self.toggle_gpgsign();
 						true
 					} else if key_match(
 						e,
