@@ -178,10 +178,6 @@ pub enum Error {
 	SignAmendNonLastCommit,
 
 	///
-	#[error("reword error: config commit.gpgsign=true detected.\ngpg signing is not supported for rewording non-last commits")]
-	SignRewordNonLastCommit,
-
-	///
 	#[error("reword error: config commit.gpgsign=true detected.\ngpg signing is not supported for rewording commits with staged changes\ntry unstaging or stashing your changes")]
 	SignRewordLastCommitStaged,
 }
