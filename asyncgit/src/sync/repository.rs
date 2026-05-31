@@ -87,6 +87,7 @@ pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
 	Ok(repo)
 }
 
+#[cfg(not(target_env = "ohos"))]
 pub fn gix_repo(repo_path: &RepoPath) -> Result<gix::Repository> {
 	let mut repo: gix::Repository = gix::ThreadSafeRepository::discover_with_environment_overrides(
 		repo_path.gitpath(),

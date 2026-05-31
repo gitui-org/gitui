@@ -5,9 +5,11 @@ use crate::{
 	error::Result,
 	sync::{
 		commit_details::get_author_of_commit,
-		repository::{gix_repo, repo},
+		repository::repo,
 	},
 };
+#[cfg(not(target_env = "ohos"))]
+use crate::sync::repository::gix_repo;
 use git2::{Commit, Error, Oid};
 use scopetime::scope_time;
 use unicode_truncate::UnicodeTruncateStr;
@@ -169,27 +171,44 @@ pub fn get_commit_info(
 ) -> Result<CommitInfo> {
 	scope_time!("get_commit_info");
 
-	let repo: gix::Repository = gix_repo(repo_path)?;
-	let mailmap = repo.open_mailmap();
+	#[cfg(target_env = "ohos")]
+	{
+		let mut infos = get_commits_info(
+			repo_path,
+			&[*commit_id],
+			usize::MAX,
+		)?;
+		return infos.pop().ok_or_else(|| {
+			crate::error::Error::Generic(
+				"commit not found".into(),
+			)
+		});
+	}
 
-	let commit = repo.find_commit(*commit_id)?;
-	let commit_ref = commit.decode()?;
+	#[cfg(not(target_env = "ohos"))]
+	{
+		let repo: gix::Repository = gix_repo(repo_path)?;
+		let mailmap = repo.open_mailmap();
 
-	let message = gix_get_message(&commit_ref, None);
+		let commit = repo.find_commit(*commit_id)?;
+		let commit_ref = commit.decode()?;
 
-	let author = commit_ref.author()?;
+		let message = gix_get_message(&commit_ref, None);
 
-	let author = mailmap.try_resolve(author).map_or_else(
-		|| author.name.into(),
-		|signature| signature.name,
-	);
+		let author = commit_ref.author()?;
 
-	Ok(CommitInfo {
-		message,
-		author: author.to_string(),
-		time: commit_ref.time()?.seconds,
-		id: commit.id().detach().into(),
-	})
+		let author = mailmap.try_resolve(author).map_or_else(
+			|| author.name.into(),
+			|signature| signature.name,
+		);
+
+		Ok(CommitInfo {
+			message,
+			author: author.to_string(),
+			time: commit_ref.time()?.seconds,
+			id: commit.id().detach().into(),
+		})
+	}
 }
 
 /// if `message_limit` is set the message will be
@@ -212,6 +231,7 @@ pub fn get_message(
 
 /// if `message_limit` is set the message will be
 /// limited to the first line and truncated to fit
+#[cfg(not(target_env = "ohos"))]
 pub fn gix_get_message(
 	commit_ref: &gix::objs::CommitRef,
 	message_limit: Option<usize>,

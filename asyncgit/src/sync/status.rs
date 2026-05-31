@@ -4,9 +4,11 @@ use crate::{
 	error::Result,
 	sync::{
 		config::untracked_files_config_repo,
-		repository::{gix_repo, repo},
+		repository::repo,
 	},
 };
+#[cfg(not(target_env = "ohos"))]
+use crate::sync::repository::gix_repo;
 use git2::{Delta, Status, StatusOptions, StatusShow};
 use scopetime::scope_time;
 use std::path::Path;
@@ -60,6 +62,38 @@ impl From<gix::diff::index::ChangeRef<'_, '_>> for StatusItemType {
 			ChangeRef::Deletion { .. } => Self::Deleted,
 			ChangeRef::Modification { .. }
 			| ChangeRef::Rewrite { .. } => Self::Modified,
+		}
+	}
+}
+
+impl StatusItemType {
+	/// Convert from worktree-only status flags.
+	pub fn from_wt(s: Status) -> Self {
+		if s.is_wt_new() {
+			Self::New
+		} else if s.is_wt_deleted() {
+			Self::Deleted
+		} else if s.is_wt_renamed() {
+			Self::Renamed
+		} else if s.is_wt_typechange() {
+			Self::Typechange
+		} else {
+			Self::Modified
+		}
+	}
+
+	/// Convert from index-only status flags.
+	pub fn from_index(s: Status) -> Self {
+		if s.is_index_new() {
+			Self::New
+		} else if s.is_index_deleted() {
+			Self::Deleted
+		} else if s.is_index_renamed() {
+			Self::Renamed
+		} else if s.is_index_typechange() {
+			Self::Typechange
+		} else {
+			Self::Modified
 		}
 	}
 }
@@ -168,6 +202,7 @@ impl From<ShowUntrackedFilesConfig> for gix::status::UntrackedFiles {
 }
 
 /// guarantees sorting
+#[cfg(not(target_env = "ohos"))]
 pub fn get_status(
 	repo_path: &RepoPath,
 	status_type: StatusType,
@@ -275,6 +310,91 @@ pub fn get_status(
 					res.push(StatusItem { path, status });
 				}
 			}
+		}
+	}
+
+	res.sort_by(|a, b| {
+		Path::new(a.path.as_str()).cmp(Path::new(b.path.as_str()))
+	});
+
+	Ok(res)
+}
+
+/// git2-based status for OpenHarmony targets.
+/// On OHOS, gix-odb's slot map for pack indices can overflow
+/// (InsufficientSlots), so we fall back to git2.
+#[cfg(target_env = "ohos")]
+pub fn get_status(
+	repo_path: &RepoPath,
+	status_type: StatusType,
+	show_untracked: Option<ShowUntrackedFilesConfig>,
+) -> Result<Vec<StatusItem>> {
+	scope_time!("get_status");
+
+	let repo = repo(repo_path)?;
+
+	let show_untracked = if let Some(config) = show_untracked {
+		config
+	} else {
+		untracked_files_config_repo(&repo)?
+	};
+
+	let mut options = StatusOptions::default();
+	options
+		.show(status_type.into())
+		.update_index(true)
+		.include_untracked(show_untracked.include_untracked())
+		.renames_head_to_index(true)
+		.recurse_untracked_dirs(
+			show_untracked.recurse_untracked_dirs(),
+		);
+
+	let statuses = repo.statuses(Some(&mut options))?;
+
+	let mut res = Vec::with_capacity(statuses.len());
+
+	for entry in statuses.iter() {
+		let Some(path) = entry.path() else {
+			continue;
+		};
+
+		let status = entry.status();
+
+		if status_type == StatusType::Both {
+			if status.is_wt_new()
+				|| status.is_wt_deleted()
+				|| status.is_wt_modified()
+				|| status.is_wt_renamed()
+				|| status.is_wt_typechange()
+			{
+				res.push(StatusItem {
+					path: path.to_string(),
+					status: StatusItemType::from_wt(status),
+				});
+			}
+			if status.is_index_new()
+				|| status.is_index_deleted()
+				|| status.is_index_modified()
+				|| status.is_index_renamed()
+				|| status.is_index_typechange()
+			{
+				res.push(StatusItem {
+					path: path.to_string(),
+					status: StatusItemType::from_index(status),
+				});
+			}
+			if status.is_conflicted() {
+				res.push(StatusItem {
+					path: path.to_string(),
+					status: StatusItemType::Conflicted,
+				});
+			}
+		} else {
+			let status: StatusItemType = status.into();
+			res.push(StatusItem {
+				path: path.to_string(),
+				status,
+			});
 		}
 	}
 
