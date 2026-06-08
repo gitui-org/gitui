@@ -88,6 +88,15 @@ impl From<Oid> for CommitId {
 	}
 }
 
+impl From<gix::Id<'_>> for CommitId {
+	fn from(object_id: gix::Id<'_>) -> Self {
+		#[allow(clippy::expect_used)]
+		let oid = Oid::from_bytes(object_id.as_bytes()).expect("`Oid::from_bytes(object_id.as_bytes())` is expected to never fail");
+
+		Self::new(oid)
+	}
+}
+
 impl From<gix::ObjectId> for CommitId {
 	fn from(object_id: gix::ObjectId) -> Self {
 		#[allow(clippy::expect_used)]
@@ -162,7 +171,7 @@ pub fn get_commits_info(
 				parents: c
 					.parents()
 					.take(2)
-					.map(|p| CommitId::new(p.id()))
+					.map(|p| CommitId(p.id()))
 					.collect(),
 			}
 		})
@@ -198,13 +207,11 @@ pub fn get_commit_info(
 		author: author.to_string(),
 		time: commit_ref.time()?.seconds,
 		id: commit.id().detach().into(),
-		parents: commit_ref
-			.parents
-			.iter()
+		parents: commit
+			.parent_ids()
 			.take(2)
-			.map(|p| CommitId::from_str_unchecked(&p.to_string()))
-			.collect::<std::result::Result<Vec<_>, _>>()?
-			.into(),
+			.map(Into::into)
+			.collect(),
 	})
 }
 
