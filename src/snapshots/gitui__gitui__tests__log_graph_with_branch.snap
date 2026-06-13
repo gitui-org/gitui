@@ -1,0 +1,19 @@
+---
+source: src/gitui.rs
+assertion_line: 375
+expression: terminal.backend()
+---
+"  Status [1]  |  Log [2]  |  Files [3]  |  Stashing [4]  |  Stashes [5][TEMP_FILE] "
+" ──────────────────────────────────────────────────────────────────────────────────────── "
+"┌Commit 4/4──────────────────────────────────────────────────────────────────────────────┐"
+"│M━┓  [COMMIT] <1m ago    name                  merge C into main                         █"
+"│o ┃  [COMMIT] <1m ago    name                  commit A                                  ║"
+"│┃ o  [COMMIT] <1m ago    name                  commit C                                  ║"
+"│o━┛  [COMMIT] <1m ago    name                  initial                                   ║"
+"│                                                                                        ║"
+"│                                                                                        ║"
+"│                                                                                        ║"
+"│                                                                                        ║"
+"│                                                                                        ║"
+"└────────────────────────────────────────────────────────────────────────────────────────┘"
+"Scroll [↑↓] Mark [˽] Toggle Graph [g] Details [⏎] Branches [b] Compare [⇧C]       more [.]"
