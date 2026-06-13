@@ -4,7 +4,7 @@ pub enum Markers {
 	Commit,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chunk {
 	pub alias: Option<usize>,
 	pub parent_a: Option<usize>,

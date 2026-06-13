@@ -11,12 +11,12 @@ impl Default for GraphOids {
 }
 
 impl GraphOids {
-	///
+	/// Create an empty alias map.
 	pub fn new() -> Self {
 		Self(HashMap::new())
 	}
 
-	///
+	/// Get the alias for `id`, assigning a new one if it doesn't exist yet.
 	pub fn get_or_insert(&mut self, id: &CommitId) -> usize {
 		if let Some(&alias) = self.0.get(id) {
 			return alias;
@@ -27,7 +27,7 @@ impl GraphOids {
 		alias
 	}
 
-	///
+	/// Look up the alias for `id`, returning `None` if not found.
 	pub fn get(&self, id: &CommitId) -> Option<usize> {
 		self.0.get(id).copied()
 	}
