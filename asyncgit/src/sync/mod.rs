@@ -72,7 +72,7 @@ pub use hooks::{
 };
 pub use hunks::{reset_hunk, stage_hunk, unstage_hunk};
 pub use ignore::add_to_ignore;
-pub use logwalker::{LogWalker, LogWalkerWithoutFilter};
+pub use logwalker::{LogWalker, LogWalkerWithoutFilter, WalkEntry};
 pub use merge::{
 	abort_pending_rebase, abort_pending_state,
 	continue_pending_rebase, merge_branch, merge_commit, merge_msg,
@@ -261,13 +261,13 @@ pub mod tests {
 		r: &Repository,
 		max_count: usize,
 	) -> Vec<CommitId> {
-		let mut commit_ids = Vec::<CommitId>::new();
+		let mut entries = Vec::new();
 		LogWalker::new(r, max_count)
 			.unwrap()
-			.read(&mut commit_ids)
+			.read(&mut entries)
 			.unwrap();
 
-		commit_ids
+		entries.iter().map(|e| e.id).collect()
 	}
 
 	/// Same as `repo_init`, but the repo is a bare repo (--bare)

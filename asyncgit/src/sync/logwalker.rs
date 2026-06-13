@@ -2,10 +2,24 @@ use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
 use git2::{Commit, Oid, Repository};
 use gix::revision::Walk;
+use smallvec::SmallVec;
 use std::{
 	cmp::Ordering,
 	collections::{BinaryHeap, HashSet},
 };
+
+/// A commit id together with the ids of its TWO parents.
+///
+/// The parents come for free during a walk.
+/// Collecting here avoid a second, convulted pass.
+#[derive(Debug, Clone)]
+pub struct WalkEntry {
+	/// The commit's own unique identifier.
+	pub id: CommitId,
+
+	/// The commit's parent identifiers.
+	pub parents: SmallVec<[CommitId; 2]>,
+}
 
 struct TimeOrderedCommit<'a>(Commit<'a>);
 
@@ -70,11 +84,18 @@ impl<'a> LogWalker<'a> {
 	}
 
 	///
-	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
+	pub fn read(
+		&mut self,
+		out: &mut Vec<WalkEntry>,
+	) -> Result<usize> {
 		let mut count = 0_usize;
 
 		while let Some(c) = self.commits.pop() {
+			let mut parents = SmallVec::new();
 			for p in c.0.parents() {
+				if parents.len() < 2 {
+					parents.push(p.id().into());
+				}
 				self.visit(p);
 			}
 
@@ -87,7 +108,7 @@ impl<'a> LogWalker<'a> {
 				};
 
 			if commit_should_be_included {
-				out.push(id);
+				out.push(WalkEntry { id, parents });
 			}
 
 			count += 1;
@@ -157,11 +178,22 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 	}
 
 	///
-	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
+	pub fn read(
+		&mut self,
+		out: &mut Vec<WalkEntry>,
+	) -> Result<usize> {
 		let mut count = 0_usize;
 
 		while let Some(Ok(info)) = self.walk.next() {
-			out.push(info.id.into());
+			out.push(WalkEntry {
+				id: info.id.into(),
+				parents: info
+					.parent_ids
+					.iter()
+					.take(2)
+					.map(|id| CommitId::from(*id))
+					.collect(),
+			});
 
 			count += 1;
 
@@ -214,7 +246,7 @@ mod tests {
 		walk.read(&mut items).unwrap();
 
 		assert_eq!(items.len(), 1);
-		assert_eq!(items[0], oid2);
+		assert_eq!(items[0].id, oid2);
 
 		Ok(())
 	}
@@ -238,11 +270,12 @@ mod tests {
 		let mut walk = LogWalker::new(&repo, 100)?;
 		walk.read(&mut items).unwrap();
 
-		let info = get_commits_info(repo_path, &items, 50).unwrap();
+		let ids: Vec<CommitId> = items.iter().map(|e| e.id).collect();
+		let info = get_commits_info(repo_path, &ids, 50).unwrap();
 		dbg!(&info);
 
 		assert_eq!(items.len(), 2);
-		assert_eq!(items[0], oid2);
+		assert_eq!(items[0].id, oid2);
 
 		let mut items = Vec::new();
 		walk.read(&mut items).unwrap();
@@ -272,11 +305,12 @@ mod tests {
 		let mut items = Vec::new();
 		assert!(matches!(walk.read(&mut items), Ok(2)));
 
-		let info = get_commits_info(repo_path, &items, 50).unwrap();
+		let ids: Vec<CommitId> = items.iter().map(|e| e.id).collect();
+		let info = get_commits_info(repo_path, &ids, 50).unwrap();
 		dbg!(&info);
 
 		assert_eq!(items.len(), 2);
-		assert_eq!(items[0], oid2);
+		assert_eq!(items[0].id, oid2);
 
 		let mut items = Vec::new();
 		assert!(matches!(walk.read(&mut items), Ok(0)));
@@ -318,7 +352,7 @@ mod tests {
 		walker.read(&mut items).unwrap();
 
 		assert_eq!(items.len(), 1);
-		assert_eq!(items[0], second_commit_id);
+		assert_eq!(items[0].id, second_commit_id);
 
 		let mut items = Vec::new();
 		walker.read(&mut items).unwrap();
@@ -365,7 +399,7 @@ mod tests {
 		walker.read(&mut items).unwrap();
 
 		assert_eq!(items.len(), 1);
-		assert_eq!(items[0], second_commit_id);
+		assert_eq!(items[0].id, second_commit_id);
 
 		let log_filter = filter_commit_by_search(
 			LogFilterSearch::new(LogFilterSearchOptions {
