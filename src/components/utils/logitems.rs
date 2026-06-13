@@ -83,7 +83,7 @@ impl LogEntry {
 	}
 }
 
-///
+/// A batch of parsed log entries with an index offset.
 #[derive(Default)]
 pub struct ItemBatch {
 	index_offset: Option<usize>,
@@ -154,9 +154,9 @@ impl ItemBatch {
 
 	///
 	pub fn set_graph_rows(&mut self, rows: Vec<GraphRow>) {
-		let mut max = 0;
+		let mut max: usize = 0;
 		for (entry, row) in self.items.iter_mut().zip(rows) {
-			max = max.max(row.lane_count);
+			max = max.max(row.lane_count.into());
 			entry.graph = Some(row);
 		}
 		self.max_lane = max;
