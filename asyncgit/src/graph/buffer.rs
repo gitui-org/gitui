@@ -206,7 +206,7 @@ impl Buffer {
 			.push(Delta(std::mem::take(&mut self.pending_delta)));
 
 		let step = self.deltas.len();
-		if step % CHECKPOINT_INTERVAL == 0 {
+		if step.is_multiple_of(CHECKPOINT_INTERVAL) {
 			self.checkpoints.insert(step - 1, self.current.clone());
 		}
 	}

@@ -187,7 +187,7 @@ impl GraphWalker {
 	}
 
 	/// Number of commits already folded into the graph buffer.
-	pub fn processed_commits(&self) -> usize {
+	pub const fn processed_commits(&self) -> usize {
 		self.buffer.deltas.len()
 	}
 
