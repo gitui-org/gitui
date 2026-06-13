@@ -837,7 +837,7 @@ exit 2
 		let res = hooks_prepare_commit_msg(
 			&repo,
 			None,
-			PrepareCommitMsgSource::Commit(git2::Oid::zero()),
+			PrepareCommitMsgSource::Commit(git2::Oid::ZERO_SHA1),
 			&mut msg,
 		)
 		.unwrap();

@@ -20,7 +20,7 @@ pub struct CommitId(Oid);
 
 impl Default for CommitId {
 	fn default() -> Self {
-		Self(Oid::zero())
+		Self(Oid::ZERO_SHA1)
 	}
 }
 
@@ -146,6 +146,7 @@ pub fn get_commits_info(
 			let message = get_message(&c, Some(message_length_limit));
 			let author = get_author_of_commit(&c, &mailmap)
 				.name()
+				.ok()
 				.map_or_else(
 					|| String::from("<unknown>"),
 					String::from,
