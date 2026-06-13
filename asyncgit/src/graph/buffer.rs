@@ -148,16 +148,6 @@ impl Buffer {
 	}
 
 	fn flush_merge_commits(&mut self) {
-		// Collect available empty lanes once, before we start maybe filling them.
-		let mut empty_lanes: Vec<usize> = self
-			.current
-			.iter()
-			.enumerate()
-			.filter_map(|(index, slot)| {
-				slot.is_none().then_some(index)
-			})
-			.collect();
-
 		while let Some(alias) = self.merge_commits.pop() {
 			// Search for an occupied slot that matches the target alias.
 			// If found, extract its index and a mutable clone of the chunk.
@@ -184,14 +174,14 @@ impl Buffer {
 					marker: Markers::Commit,
 				};
 
-				if let Some(empty_index) = empty_lanes.pop() {
-					self.record_replace(empty_index, Some(new_lane));
-				} else {
-					self.record_insert(
-						self.current.len(),
-						Some(new_lane),
-					);
-				}
+				// Always append the merge's second-parent lane to
+				// the end instead of reusing an existing empty slot,
+				// so the new visual column does not collapse
+				// spatial ordering of lanes already in existence.
+				self.record_insert(
+					self.current.len(),
+					Some(new_lane),
+				);
 			}
 		}
 	}
