@@ -558,7 +558,7 @@ impl CommitList {
 
 		// commit msg
 		txt.push(Span::styled(
-			format!("{:message_width$}", &e.msg),
+			format!("{:message_width$}", e.msg),
 			style_msg,
 		));
 

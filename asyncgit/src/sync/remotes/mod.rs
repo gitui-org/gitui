@@ -165,7 +165,7 @@ pub(crate) fn get_default_remote_for_fetch_in_repo(
 	if let Some(branch) = branch {
 		let remote_name = bytes2string(branch.name_bytes()?)?;
 
-		let entry_name = format!("branch.{}.remote", &remote_name);
+		let entry_name = format!("branch.{remote_name}.remote");
 
 		if let Ok(entry) = config.get_entry(&entry_name) {
 			return bytes2string(entry.value_bytes());
@@ -216,7 +216,7 @@ pub(crate) fn get_default_remote_for_push_in_repo(
 		let remote_name = bytes2string(branch.name_bytes()?)?;
 
 		let entry_name =
-			format!("branch.{}.pushRemote", &remote_name);
+			format!("branch.{remote_name}.pushRemote");
 
 		if let Ok(entry) = config.get_entry(&entry_name) {
 			return bytes2string(entry.value_bytes());
@@ -226,7 +226,7 @@ pub(crate) fn get_default_remote_for_push_in_repo(
 			return bytes2string(entry.value_bytes());
 		}
 
-		let entry_name = format!("branch.{}.remote", &remote_name);
+		let entry_name = format!("branch.{remote_name}.remote");
 
 		if let Ok(entry) = config.get_entry(&entry_name) {
 			return bytes2string(entry.value_bytes());
