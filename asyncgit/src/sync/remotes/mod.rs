@@ -215,8 +215,7 @@ pub(crate) fn get_default_remote_for_push_in_repo(
 	if let Some(branch) = branch {
 		let remote_name = bytes2string(branch.name_bytes()?)?;
 
-		let entry_name =
-			format!("branch.{remote_name}.pushRemote");
+		let entry_name = format!("branch.{remote_name}.pushRemote");
 
 		if let Ok(entry) = config.get_entry(&entry_name) {
 			return bytes2string(entry.value_bytes());
