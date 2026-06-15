@@ -214,9 +214,9 @@ pub fn filter_commit_by_search(
 				let author = get_author_of_commit(&commit, &mailmap);
 				[author.email(), author.name()].iter().any(
 					|opt_haystack| {
-						opt_haystack.as_ref().ok().is_some_and(
-							|haystack| filter.match_text(haystack),
-						)
+						opt_haystack.as_ref().is_ok_and(|haystack| {
+							filter.match_text(haystack)
+						})
 					},
 				)
 			} else {
