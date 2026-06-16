@@ -77,12 +77,14 @@ mod spinner;
 mod string_utils;
 mod strings;
 mod tabs;
+mod terminal_io;
 mod ui;
 mod watcher;
 
 use crate::{
 	app::App,
 	args::{process_cmdline, CliArgs},
+	terminal_io::{SharedTerminalWriter, TerminalWriter},
 };
 use anyhow::{anyhow, bail, Result};
 use app::QuitState;
@@ -90,10 +92,7 @@ use asyncgit::{sync::RepoPath, AsyncGitNotification};
 use backtrace::Backtrace;
 use crossbeam_channel::{Receiver, Select};
 use crossterm::{
-	terminal::{
-		disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
-		LeaveAlternateScreen,
-	},
+	terminal::{disable_raw_mode, enable_raw_mode},
 	ExecutableCommand,
 };
 use gitui::Gitui;
@@ -102,14 +101,14 @@ use keys::KeyConfig;
 use ratatui::backend::CrosstermBackend;
 use scopeguard::defer;
 use std::{
-	io::{self, Stdout},
 	panic,
 	path::Path,
+	sync::{Arc, Mutex},
 	time::{Duration, Instant},
 };
 use ui::style::Theme;
 
-type Terminal = ratatui::Terminal<CrosstermBackend<io::Stdout>>;
+type Terminal = ratatui::Terminal<CrosstermBackend<SharedTerminalWriter>>;
 
 static TICK_INTERVAL: Duration = Duration::from_secs(5);
 static SPINNER_INTERVAL: Duration = Duration::from_millis(80);
@@ -174,6 +173,12 @@ fn main() -> Result<()> {
 	.unwrap_or_default();
 	let theme = Theme::init(&cliargs.theme);
 
+	let terminal_writer = Arc::new(Mutex::new(TerminalWriter::open(
+		cliargs.use_tty,
+	)?));
+	terminal_io::init(Arc::clone(&terminal_writer))
+		.map_err(|_| anyhow!("terminal writer already initialized"))?;
+
 	setup_terminal()?;
 	defer! {
 		shutdown_terminal();
@@ -181,8 +186,10 @@ fn main() -> Result<()> {
 
 	set_panic_handler()?;
 
-	let mut terminal =
-		start_terminal(io::stdout(), &cliargs.repo_path)?;
+	let mut terminal = start_terminal(
+		SharedTerminalWriter(Arc::clone(&terminal_writer)),
+		&cliargs.repo_path,
+	)?;
 
 	let updater = if cliargs.notify_watcher {
 		Updater::NotifyWatcher
@@ -211,6 +218,7 @@ fn main() -> Result<()> {
 					notify_watcher: args.notify_watcher,
 					key_bindings_path: args.key_bindings_path,
 					key_symbols_path: args.key_symbols_path,
+					use_tty: args.use_tty,
 				}
 			}
 			_ => break,
@@ -237,21 +245,17 @@ fn run_app(
 
 fn setup_terminal() -> Result<()> {
 	enable_raw_mode()?;
-	io::stdout().execute(EnterAlternateScreen)?;
+	terminal_io::execute(crossterm::terminal::EnterAlternateScreen)?;
 	Ok(())
 }
 
 fn shutdown_terminal() {
-	let leave_screen =
-		io::stdout().execute(LeaveAlternateScreen).map(|_f| ());
-
-	if let Err(e) = leave_screen {
+	if let Err(e) = terminal_io::execute(crossterm::terminal::LeaveAlternateScreen)
+	{
 		log::error!("leave_screen failed:\n{e}");
 	}
 
-	let leave_raw_mode = disable_raw_mode();
-
-	if let Err(e) = leave_raw_mode {
+	if let Err(e) = disable_raw_mode() {
 		log::error!("leave_raw_mode failed:\n{e}");
 	}
 }
@@ -321,7 +325,7 @@ fn select_event(
 }
 
 fn start_terminal(
-	buf: Stdout,
+	writer: SharedTerminalWriter,
 	repo_path: &RepoPath,
 ) -> Result<Terminal> {
 	let mut path = repo_path.gitpath().canonicalize()?;
@@ -335,7 +339,7 @@ fn start_terminal(
 		path = Path::new("~").join(relative_part);
 	}
 
-	let mut backend = CrosstermBackend::new(buf);
+	let mut backend = CrosstermBackend::new(writer);
 	backend.execute(crossterm::terminal::SetTitle(format!(
 		"gitui ({})",
 		path.display()

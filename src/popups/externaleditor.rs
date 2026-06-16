@@ -12,11 +12,7 @@ use anyhow::{anyhow, bail, Result};
 use asyncgit::sync::{
 	get_config_string, utils::repo_work_dir, RepoPath,
 };
-use crossterm::{
-	event::Event,
-	terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-	ExecutableCommand,
-};
+use crossterm::event::Event;
 use ratatui::{
 	layout::Rect,
 	text::{Line, Span},
@@ -25,7 +21,7 @@ use ratatui::{
 };
 use scopeguard::defer;
 use std::ffi::OsStr;
-use std::{env, io, path::Path, process::Command};
+use std::{env, path::Path, process::Command};
 
 ///
 pub struct ExternalEditorPopup {
@@ -61,9 +57,10 @@ impl ExternalEditorPopup {
 			bail!("file not found: {path:?}");
 		}
 
-		io::stdout().execute(LeaveAlternateScreen)?;
+		crate::terminal_io::execute(crossterm::terminal::LeaveAlternateScreen)?;
 		defer! {
-			io::stdout().execute(EnterAlternateScreen).expect("reset terminal");
+			crate::terminal_io::execute(crossterm::terminal::EnterAlternateScreen)
+				.expect("reset terminal");
 		}
 
 		let environment_options = ["GIT_EDITOR", "VISUAL", "EDITOR"];
