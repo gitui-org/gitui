@@ -179,7 +179,9 @@ pub fn hooks_pre_push(
 	let git_remote = repo.find_remote(remote)?;
 	let url = git_remote
 		.pushurl()
-		.or_else(|| git_remote.url())
+		.ok()
+		.flatten()
+		.or_else(|| git_remote.url().ok())
 		.ok_or_else(|| {
 			crate::error::Error::Generic(format!(
 				"remote '{remote}' has no URL configured"

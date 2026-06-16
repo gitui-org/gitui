@@ -13,7 +13,7 @@ categories = ["development-tools"]
 keywords = ["git"]
 
 [dependencies]
-git2 = ">=0.17"
+git2 = "0.21"
 gix-path = "0.11"
 log = "0.4"
 shellexpand = "3.1"
