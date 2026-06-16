@@ -8,7 +8,7 @@ use crate::{
 	options::SharedOptions,
 	queue::{InternalEvent, NeedsUpdate, Queue},
 	strings, try_or_popup,
-	ui::style::SharedTheme,
+	ui::style::{SharedTheme, Theme},
 };
 use anyhow::{bail, Ok, Result};
 use asyncgit::sync::commit::commit_message_prettify;
@@ -65,7 +65,8 @@ pub struct CommitPopup {
 	verify: bool,
 }
 
-const FIRST_LINE_LIMIT: usize = 50;
+const FIRST_LINE_WARN: usize = 50;
+const FIRST_LINE_ERROR: usize = 72;
 
 impl CommitPopup {
 	///
@@ -122,11 +123,15 @@ impl CommitPopup {
 			.map(str::len)
 			.unwrap_or_default();
 
-		if first_line > FIRST_LINE_LIMIT {
+		if first_line > FIRST_LINE_WARN {
 			let msg = strings::commit_first_line_warning(first_line);
 			let msg_length: u16 = msg.len().cast();
-			let w =
-				Paragraph::new(msg).style(self.theme.text_danger());
+			let style = if first_line > FIRST_LINE_ERROR {
+				self.theme.text_danger()
+			} else {
+				Theme::attention_block()
+			};
+			let w = Paragraph::new(msg).style(style);
 
 			let rect = {
 				let mut rect = self.input.get_area();
