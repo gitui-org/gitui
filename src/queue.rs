@@ -123,6 +123,8 @@ pub enum InternalEvent {
 	///
 	OpenExternalEditor(Option<String>),
 	///
+	OpenCommitEditor,
+	///
 	Push(String, PushType, bool, bool),
 	///
 	Pull(String),

@@ -586,10 +586,7 @@ impl Component for CommitPopup {
 						e,
 						self.key_config.keys.open_commit_editor,
 					) {
-						self.queue.push(
-							InternalEvent::OpenExternalEditor(None),
-						);
-						self.hide();
+						self.queue.push(InternalEvent::OpenCommitEditor);
 						true
 					} else if key_match(
 						e,

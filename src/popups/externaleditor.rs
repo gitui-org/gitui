@@ -14,7 +14,10 @@ use asyncgit::sync::{
 };
 use crossterm::{
 	event::Event,
-	terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+	terminal::{
+		disable_raw_mode, enable_raw_mode, is_raw_mode_enabled,
+		EnterAlternateScreen, LeaveAlternateScreen,
+	},
 	ExecutableCommand,
 };
 use ratatui::{
@@ -61,9 +64,21 @@ impl ExternalEditorPopup {
 			bail!("file not found: {path:?}");
 		}
 
+		let raw_mode_enabled = is_raw_mode_enabled()?;
+		if raw_mode_enabled {
+			disable_raw_mode()?;
+		}
+
 		io::stdout().execute(LeaveAlternateScreen)?;
 		defer! {
-			io::stdout().execute(EnterAlternateScreen).expect("reset terminal");
+			if let Err(e) = io::stdout().execute(EnterAlternateScreen) {
+				log::error!("failed to re-enter alternate screen: {e}");
+			}
+			if raw_mode_enabled {
+				if let Err(e) = enable_raw_mode() {
+					log::error!("failed to re-enable raw mode: {e}");
+				}
+			}
 		}
 
 		let environment_options = ["GIT_EDITOR", "VISUAL", "EDITOR"];
