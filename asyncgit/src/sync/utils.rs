@@ -24,20 +24,51 @@ pub struct Head {
 	pub id: CommitId,
 }
 
+fn format_repo_open_error(err: &str, path: &Path) -> String {
+	let err_lower = err.to_ascii_lowercase();
+
+	if err_lower.contains("bare") {
+		return format!(
+			"repository at '{}' appears to be bare; pass an explicit worktree with -w",
+			path.display()
+		);
+	}
+
+	if err_lower.contains("not found")
+		|| err_lower.contains("could not find")
+		|| err_lower.contains("no such file")
+		|| err_lower.contains("failed to discover")
+	{
+		return format!(
+			"could not open git repository at '{}' ({err})\n\
+			 hint: verify the path exists and is readable (sandboxing may block access)",
+			path.display()
+		);
+	}
+
+	format!(
+		"could not open git repository at '{}': {err}",
+		path.display()
+	)
+}
+
 ///
 pub fn repo_open_error(repo_path: &RepoPath) -> Option<String> {
+	let path = repo_path.gitpath();
+
 	if let Err(e) = Repository::open_ext(
-		repo_path.gitpath(),
+		path,
 		RepositoryOpenFlags::FROM_ENV,
 		Vec::<&Path>::new(),
 	) {
-		return Some(e.to_string());
+		return Some(format_repo_open_error(&e.to_string(), path));
 	}
 
-	gix::ThreadSafeRepository::discover_with_environment_overrides(
-		repo_path.gitpath(),
-	)
-	.map_or_else(|e| Some(e.to_string()), |_| None)
+	gix::ThreadSafeRepository::discover_with_environment_overrides(path)
+		.map_or_else(
+			|e| Some(format_repo_open_error(&e.to_string(), path)),
+			|_| None,
+		)
 }
 
 ///
@@ -480,6 +511,17 @@ mod tests {
 		assert!(stage_add_all(repo_path, "sub", None).is_err());
 
 		Ok(())
+	}
+
+	#[test]
+	fn format_repo_open_error_not_found() {
+		let msg = format_repo_open_error(
+			"repository not found",
+			Path::new("/i4/repo"),
+		);
+		assert!(msg.contains("could not open git repository"));
+		assert!(msg.contains("sandboxing"));
+		assert!(!msg.to_ascii_lowercase().contains("non-bare"));
 	}
 
 	#[test]
