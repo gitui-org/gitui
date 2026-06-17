@@ -387,8 +387,10 @@ impl TagListPopup {
 		let mut table_state = self.table_state.take();
 
 		let old_selection = table_state.selected().unwrap_or(0);
-		let max_selection =
-			self.tags.as_ref().map_or(0, |tags| tags.len() - 1);
+		let max_selection = self
+			.tags
+			.as_ref()
+			.map_or(0, |tags| tags.len().saturating_sub(1));
 
 		let new_selection = match scroll_type {
 			ScrollType::Up => old_selection.saturating_sub(1),
