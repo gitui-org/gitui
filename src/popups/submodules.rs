@@ -361,9 +361,12 @@ impl SubmodulesListPopup {
 				.to_string();
 
 			if module_path.len() > name_length {
-				module_path.unicode_truncate(
-					name_length.saturating_sub(THREE_DOTS_LENGTH),
-				);
+				module_path = module_path
+					.unicode_truncate(
+						name_length.saturating_sub(THREE_DOTS_LENGTH),
+					)
+					.0
+					.to_string();
 				module_path += THREE_DOTS;
 			}
 
