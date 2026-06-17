@@ -17,7 +17,8 @@ use asyncgit::{
 	sync::{
 		self,
 		branch::{
-			checkout_remote_branch, BranchDetails, LocalBranch,
+			checkout_remote_branch, is_remote_head_ref, BranchDetails,
+			LocalBranch,
 			RemoteBranch,
 		},
 		checkout_branch, get_branches_info,
@@ -317,12 +318,9 @@ impl BranchListPopup {
 			self.check_remotes();
 			self.branches =
 				get_branches_info(&self.repo.borrow(), self.local)?;
-			//remove remote branch called `HEAD`
 			if !self.local {
 				self.branches
-					.iter()
-					.position(|b| b.name.ends_with("/HEAD"))
-					.map(|idx| self.branches.remove(idx));
+					.retain(|b| !is_remote_head_ref(&b.name));
 			}
 			self.set_selection(self.selection)?;
 		}
