@@ -51,7 +51,8 @@ pub use commit_details::{
 };
 pub use commit_files::get_commit_files;
 pub use commit_filter::{
-	diff_contains_file, filter_commit_by_search, LogFilterSearch,
+	diff_contains_file, filter_commit_by_search,
+	filter_commits_exclude_merges, LogFilterSearch,
 	LogFilterSearchOptions, SearchFields, SearchOptions,
 	SharedCommitFilterFn,
 };

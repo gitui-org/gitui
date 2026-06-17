@@ -62,6 +62,10 @@ pub struct CommitList {
 
 impl CommitList {
 	///
+	pub fn set_title(&mut self, title: impl Into<Box<str>>) {
+		self.title = title.into();
+	}
+
 	pub fn new(env: &Environment, title: &str) -> Self {
 		Self {
 			repo: env.repo.clone(),

@@ -300,8 +300,12 @@ pub fn confirm_msg_force_push(
         "Confirm force push to branch '{branch_ref}' ?  This may rewrite history."
     )
 }
-pub fn log_title(_key_config: &SharedKeyConfig) -> String {
-	"Commit".to_string()
+pub fn log_title(hide_merge_commits: bool) -> String {
+	if hide_merge_commits {
+		"Commit (no merges)".to_string()
+	} else {
+		"Commit".to_string()
+	}
 }
 pub fn file_log_title(
 	file_path: &str,
@@ -1580,6 +1584,24 @@ pub mod commands {
 					.get_hint(key_config.keys.log_reword_commit),
 			),
 			"reword commit message",
+			CMD_GROUP_LOG,
+		)
+	}
+	pub fn log_toggle_hide_merges(
+		key_config: &SharedKeyConfig,
+		hide_merge_commits: bool,
+	) -> CommandText {
+		let action = if hide_merge_commits {
+			"show merge commits"
+		} else {
+			"hide merge commits"
+		};
+		CommandText::new(
+			format!(
+				"No merges [{}]",
+				key_config.get_hint(key_config.keys.log_hide_merges),
+			),
+			action,
 			CMD_GROUP_LOG,
 		)
 	}
