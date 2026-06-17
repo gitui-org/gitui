@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* self-update command `gitui update` (or `gitui -U`) to update gitui via CLI before opening TUI [[@shuppel](https://github.com/shuppel)]
+  * supports updating via multiple package managers: cargo, dnf, apt, pacman, homebrew, scoop, chocolatey
+  * automatically detects installation method by examining binary path and querying system package managers
+  * `--nightly` / `-n` flag to include pre-release versions (nightly, rc, beta) in update checks
+  * filters stable vs pre-release versions so users can choose update stability
+
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
 * open the external editor from the status diff view [[@WaterWhisperer](https://github.com/WaterWhisperer)] ([#2805](https://github.com/gitui-org/gitui/issues/2805))

@@ -78,6 +78,7 @@ mod string_utils;
 mod strings;
 mod tabs;
 mod ui;
+mod update;
 mod watcher;
 
 use crate::{
