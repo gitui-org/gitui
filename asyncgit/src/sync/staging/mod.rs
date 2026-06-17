@@ -39,8 +39,10 @@ impl NewFromOldContent {
 	}
 
 	fn add_old_line(&mut self, old_lines: &[&str]) {
-		self.lines.push(old_lines[self.old_index].to_string());
-		self.old_index += 1;
+		if self.old_index < old_lines.len() {
+			self.lines.push(old_lines[self.old_index].to_string());
+			self.old_index += 1;
+		}
 	}
 
 	fn catchup_to_hunkstart(
