@@ -175,13 +175,21 @@ pub fn get_status(
 ) -> Result<Vec<StatusItem>> {
 	scope_time!("get_status");
 
+	let git2_repo = crate::sync::repository::repo(repo_path)?;
+
+	// Bare repos without a linked worktree cannot run worktree status (see #2867).
+	if matches!(status_type, StatusType::WorkingDir | StatusType::Both)
+		&& git2_repo.is_bare()
+		&& !git2_repo.is_worktree()
+	{
+		return Ok(Vec::new());
+	}
+
 	let repo: gix::Repository = gix_repo(repo_path)?;
 
 	let show_untracked = if let Some(config) = show_untracked {
 		config
 	} else {
-		let git2_repo = crate::sync::repository::repo(repo_path)?;
-
 		// Calling `untracked_files_config_repo` ensures compatibility with `gitui` <= 0.27.
 		// `untracked_files_config_repo` defaults to `All` while both `libgit2` and `gix` default to
 		// `Normal`. According to [show-untracked-files], `normal` is the default value that `git`
@@ -366,6 +374,42 @@ mod tests {
 				path: "foo".into(),
 				status: StatusItemType::New
 			}]
+		);
+	}
+
+	#[test]
+	fn test_crosslinked_bare_repo_no_workdir_status() {
+		use crate::sync::tests::debug_cmd_print;
+		use std::fs;
+
+		let base = TempDir::new().unwrap();
+		let repo0 = base.path().join("repo0");
+		let repo1 = base.path().join("repo1");
+		fs::create_dir_all(&repo0).unwrap();
+		fs::create_dir_all(&repo1).unwrap();
+
+		let repo0_path: &RepoPath =
+			&repo0.as_os_str().to_str().unwrap().into();
+
+		debug_cmd_print(repo0_path, "git init --bare");
+		debug_cmd_print(repo0_path, "git init --separate-git-dir=../repo1");
+
+		let repo1_path: &RepoPath =
+			&repo1.as_os_str().to_str().unwrap().into();
+
+		debug_cmd_print(repo1_path, "git init --bare");
+		debug_cmd_print(repo1_path, "git init --separate-git-dir=../repo0");
+
+		let status = get_status(
+			repo0_path,
+			StatusType::WorkingDir,
+			None,
+		)
+		.unwrap();
+
+		assert!(
+			status.is_empty(),
+			"bare cross-linked repo should not report workdir files: {status:?}"
 		);
 	}
 }
