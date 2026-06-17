@@ -20,6 +20,7 @@ use ratatui::{
 	layout::{Constraint, Direction, Layout, Rect},
 	style::{Modifier, Style},
 	text::{Line, Span, Text},
+	widgets::Clear,
 	Frame,
 };
 use std::{borrow::Cow, cell::Cell};
@@ -70,6 +71,7 @@ impl DetailsComponent {
 		});
 
 		self.scroll.reset();
+		self.current_width.set(0);
 
 		if let Some(tags) = tags {
 			self.tags.extend(tags);
@@ -303,6 +305,7 @@ impl DrawableComponent for DetailsComponent {
 
 		let can_scroll = usize::from(height) < number_of_lines;
 
+		f.render_widget(Clear, chunks[1]);
 		f.render_widget(
 			dialog_paragraph(
 				&format!(
