@@ -360,6 +360,12 @@ impl App {
 				) {
 					self.options_popup.show()?;
 					NeedsUpdate::ALL
+				} else if key_match(
+					k,
+					self.key_config.keys.redraw_tui,
+				) {
+					self.requires_redraw.set(true);
+					NeedsUpdate::empty()
 				} else {
 					NeedsUpdate::empty()
 				};
