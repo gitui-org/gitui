@@ -371,8 +371,14 @@ impl CommitList {
 			ScrollType::PageUp => {
 				self.selection.saturating_sub(page_offset)
 			}
+			ScrollType::PageHalfUp => {
+				self.selection.saturating_sub(page_offset.div_ceil(2))
+			}
 			ScrollType::PageDown => {
 				self.selection.saturating_add(page_offset)
+			}
+			ScrollType::PageHalfDown => {
+				self.selection.saturating_add(page_offset.div_ceil(2))
 			}
 			ScrollType::Home => 0,
 			ScrollType::End => self.selection_max(),
@@ -848,9 +854,19 @@ impl Component for CommitList {
 					self.move_selection(ScrollType::End)?
 				} else if key_match(k, self.key_config.keys.page_up) {
 					self.move_selection(ScrollType::PageUp)?
+				} else if key_match(
+					k,
+					self.key_config.keys.page_half_up,
+				) {
+					self.move_selection(ScrollType::PageHalfUp)?
 				} else if key_match(k, self.key_config.keys.page_down)
 				{
 					self.move_selection(ScrollType::PageDown)?
+				} else if key_match(
+					k,
+					self.key_config.keys.page_half_down,
+				) {
+					self.move_selection(ScrollType::PageHalfDown)?
 				} else if key_match(
 					k,
 					self.key_config.keys.log_mark_commit,

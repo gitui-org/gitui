@@ -163,9 +163,21 @@ impl Component for SubmodulesListPopup {
 				return self
 					.move_selection(ScrollType::PageDown)
 					.map(Into::into);
+			} else if key_match(
+				e,
+				self.key_config.keys.page_half_down,
+			) {
+				return self
+					.move_selection(ScrollType::PageHalfDown)
+					.map(Into::into);
 			} else if key_match(e, self.key_config.keys.page_up) {
 				return self
 					.move_selection(ScrollType::PageUp)
+					.map(Into::into);
+			} else if key_match(e, self.key_config.keys.page_half_up)
+			{
+				return self
+					.move_selection(ScrollType::PageHalfUp)
 					.map(Into::into);
 			} else if key_match(e, self.key_config.keys.home) {
 				return self
@@ -301,9 +313,17 @@ impl SubmodulesListPopup {
 			ScrollType::PageDown => self
 				.selection
 				.saturating_add(self.current_height.get()),
+			ScrollType::PageHalfDown => {
+				self.selection.saturating_add(
+					self.current_height.get().div_ceil(2),
+				)
+			}
 			ScrollType::PageUp => self
 				.selection
 				.saturating_sub(self.current_height.get()),
+			ScrollType::PageHalfUp => self.selection.saturating_sub(
+				self.current_height.get().div_ceil(2),
+			),
 			ScrollType::Home => 0,
 			ScrollType::End => {
 				let count: u16 = self.submodules.len().try_into()?;

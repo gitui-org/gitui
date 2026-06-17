@@ -30,7 +30,9 @@ pub enum MoveSelection {
 	Home,
 	End,
 	PageDown,
+	PageHalfDown,
 	PageUp,
+	PageHalfUp,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -146,11 +148,25 @@ impl StatusTree {
 				MoveSelection::PageUp => self.selection_page_updown(
 					selection,
 					(0..=selection).rev(),
+					false,
 				),
+				MoveSelection::PageHalfUp => self
+					.selection_page_updown(
+						selection,
+						(0..=selection).rev(),
+						true,
+					),
 				MoveSelection::PageDown => self
 					.selection_page_updown(
 						selection,
 						selection..(self.tree.len()),
+						false,
+					),
+				MoveSelection::PageHalfDown => self
+					.selection_page_updown(
+						selection,
+						selection..(self.tree.len()),
+						true,
 					),
 			};
 
@@ -295,8 +311,12 @@ impl StatusTree {
 		&self,
 		current_index: usize,
 		range: impl Iterator<Item = usize>,
+		half_page: bool,
 	) -> SelectionChange {
-		let page_size = self.window_height.get().unwrap_or(0);
+		let mut page_size = self.window_height.get().unwrap_or(0);
+		if half_page {
+			page_size = page_size.div_ceil(2);
+		}
 
 		let new_index = range
 			.filter(|index| {

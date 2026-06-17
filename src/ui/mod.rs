@@ -132,10 +132,12 @@ pub fn common_nav(
 		Some(MoveSelection::Down)
 	} else if key_match(key, key_config.keys.move_up) {
 		Some(MoveSelection::Up)
-	} else if key_match(key, key_config.keys.page_up) {
-		Some(MoveSelection::PageUp)
+	} else if key_match(key, key_config.keys.page_half_up) {
+		Some(MoveSelection::PageHalfUp)
 	} else if key_match(key, key_config.keys.page_down) {
 		Some(MoveSelection::PageDown)
+	} else if key_match(key, key_config.keys.page_half_down) {
+		Some(MoveSelection::PageHalfDown)
 	} else if key_match(key, key_config.keys.move_right) {
 		Some(MoveSelection::Right)
 	} else if key_match(key, key_config.keys.move_left) {

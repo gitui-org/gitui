@@ -377,9 +377,21 @@ impl Component for DetailsComponent {
 							.into()
 					} else if key_match(
 						e,
+						self.key_config.keys.page_half_up,
+					) {
+						self.move_scroll_top(ScrollType::PageHalfUp)
+							.into()
+					} else if key_match(
+						e,
 						self.key_config.keys.page_down,
 					) {
 						self.move_scroll_top(ScrollType::PageDown)
+							.into()
+					} else if key_match(
+						e,
+						self.key_config.keys.page_half_down,
+					) {
+						self.move_scroll_top(ScrollType::PageHalfDown)
 							.into()
 					} else if key_match(e, self.key_config.keys.home)
 						|| key_match(e, self.key_config.keys.shift_up)

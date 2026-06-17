@@ -318,8 +318,16 @@ impl FileRevlogPopup {
 			ScrollType::End => max_selection,
 			ScrollType::PageUp => old_selection
 				.saturating_sub(height_in_items.saturating_sub(2)),
+			ScrollType::PageHalfUp => old_selection.saturating_sub(
+				height_in_items.saturating_sub(2).div_ceil(2),
+			),
 			ScrollType::PageDown => old_selection
 				.saturating_add(height_in_items.saturating_sub(2))
+				.min(max_selection),
+			ScrollType::PageHalfDown => old_selection
+				.saturating_add(
+					height_in_items.saturating_sub(2).div_ceil(2),
+				)
 				.min(max_selection),
 		};
 
@@ -566,9 +574,19 @@ impl Component for FileRevlogPopup {
 					self.move_selection(ScrollType::PageUp)?;
 				} else if key_match(
 					key,
+					self.key_config.keys.page_half_up,
+				) {
+					self.move_selection(ScrollType::PageHalfUp)?;
+				} else if key_match(
+					key,
 					self.key_config.keys.page_down,
 				) {
 					self.move_selection(ScrollType::PageDown)?;
+				} else if key_match(
+					key,
+					self.key_config.keys.page_half_down,
+				) {
+					self.move_selection(ScrollType::PageHalfDown)?;
 				}
 			}
 
