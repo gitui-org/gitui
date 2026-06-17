@@ -847,6 +847,16 @@ impl Component for Status {
 					self.switch_focus(Focus::Diff).map(Into::into)
 				} else if key_match(
 					k,
+					self.key_config.keys.move_left,
+				) && self.is_focus_on_diff()
+				{
+					self.switch_focus(match self.diff_target {
+						DiffTarget::Stage => Focus::Stage,
+						DiffTarget::WorkingDir => Focus::WorkDir,
+					})
+					.map(Into::into)
+				} else if key_match(
+					k,
 					self.key_config.keys.exit_popup,
 				) {
 					self.switch_focus(match self.diff_target {

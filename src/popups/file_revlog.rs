@@ -513,6 +513,12 @@ impl Component for FileRevlogPopup {
 				) && self.can_focus_diff()
 				{
 					self.diff.focus(true);
+				} else if key_match(
+					key,
+					self.key_config.keys.move_left,
+				) && self.diff.focused()
+				{
+					self.diff.focus(false);
 				} else if key_match(key, self.key_config.keys.enter) {
 					if let Some(commit_id) = self.selected_commit() {
 						self.hide_stacked(true);
