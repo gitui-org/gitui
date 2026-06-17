@@ -831,8 +831,7 @@ impl Component for DiffComponent {
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.focused() {
 			if let Event::Key(e) = ev {
-				return if key_match(e, self.key_config.keys.move_down)
-				{
+				return if self.key_config.is_nav_down(e) {
 					self.move_selection(ScrollType::Down);
 					Ok(EventState::Consumed)
 				} else if key_match(
@@ -851,7 +850,7 @@ impl Component for DiffComponent {
 				} else if key_match(e, self.key_config.keys.home) {
 					self.move_selection(ScrollType::Home);
 					Ok(EventState::Consumed)
-				} else if key_match(e, self.key_config.keys.move_up) {
+				} else if self.key_config.is_nav_up(e) {
 					self.move_selection(ScrollType::Up);
 					Ok(EventState::Consumed)
 				} else if key_match(e, self.key_config.keys.page_up) {
@@ -861,10 +860,7 @@ impl Component for DiffComponent {
 				{
 					self.move_selection(ScrollType::PageDown);
 					Ok(EventState::Consumed)
-				} else if key_match(
-					e,
-					self.key_config.keys.move_right,
-				) {
+				} else if self.key_config.is_nav_right(e) {
 					self.horizontal_scroll
 						.move_right(HorizontalScrollType::Right);
 					Ok(EventState::Consumed)

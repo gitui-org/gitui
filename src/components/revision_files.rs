@@ -496,8 +496,7 @@ impl Component for RevisionFilesComponent {
 					self.hide();
 					return Ok(EventState::Consumed);
 				}
-			} else if key_match(key, self.key_config.keys.move_right)
-			{
+			} else if self.key_config.is_nav_right(key) {
 				if is_tree_focused {
 					self.focus = Focus::File;
 					self.current_file.focus(true);

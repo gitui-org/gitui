@@ -830,42 +830,37 @@ impl DrawableComponent for CommitList {
 impl Component for CommitList {
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if let Event::Key(k) = ev {
-			let selection_changed =
-				if key_match(k, self.key_config.keys.move_up) {
-					self.move_selection(ScrollType::Up)?
-				} else if key_match(k, self.key_config.keys.move_down)
-				{
-					self.move_selection(ScrollType::Down)?
-				} else if key_match(k, self.key_config.keys.shift_up)
-					|| key_match(k, self.key_config.keys.home)
-				{
-					self.move_selection(ScrollType::Home)?
-				} else if key_match(
-					k,
-					self.key_config.keys.shift_down,
-				) || key_match(k, self.key_config.keys.end)
-				{
-					self.move_selection(ScrollType::End)?
-				} else if key_match(k, self.key_config.keys.page_up) {
-					self.move_selection(ScrollType::PageUp)?
-				} else if key_match(k, self.key_config.keys.page_down)
-				{
-					self.move_selection(ScrollType::PageDown)?
-				} else if key_match(
-					k,
-					self.key_config.keys.log_mark_commit,
-				) {
-					self.mark();
-					true
-				} else if key_match(
-					k,
-					self.key_config.keys.log_checkout_commit,
-				) {
-					self.checkout();
-					true
-				} else {
-					false
-				};
+			let selection_changed = if self.key_config.is_nav_up(k) {
+				self.move_selection(ScrollType::Up)?
+			} else if self.key_config.is_nav_down(k) {
+				self.move_selection(ScrollType::Down)?
+			} else if key_match(k, self.key_config.keys.shift_up)
+				|| key_match(k, self.key_config.keys.home)
+			{
+				self.move_selection(ScrollType::Home)?
+			} else if key_match(k, self.key_config.keys.shift_down)
+				|| key_match(k, self.key_config.keys.end)
+			{
+				self.move_selection(ScrollType::End)?
+			} else if key_match(k, self.key_config.keys.page_up) {
+				self.move_selection(ScrollType::PageUp)?
+			} else if key_match(k, self.key_config.keys.page_down) {
+				self.move_selection(ScrollType::PageDown)?
+			} else if key_match(
+				k,
+				self.key_config.keys.log_mark_commit,
+			) {
+				self.mark();
+				true
+			} else if key_match(
+				k,
+				self.key_config.keys.log_checkout_commit,
+			) {
+				self.checkout();
+				true
+			} else {
+				false
+			};
 			return Ok(selection_changed.into());
 		}
 

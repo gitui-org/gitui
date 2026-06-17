@@ -257,13 +257,9 @@ impl Component for BlameFilePopup {
 			if let Event::Key(key) = event {
 				if key_match(key, self.key_config.keys.exit_popup) {
 					self.hide_stacked(false);
-				} else if key_match(key, self.key_config.keys.move_up)
-				{
+				} else if self.key_config.is_nav_up(key) {
 					self.move_selection(ScrollType::Up);
-				} else if key_match(
-					key,
-					self.key_config.keys.move_down,
-				) {
+				} else if self.key_config.is_nav_down(key) {
 					self.move_selection(ScrollType::Down);
 				} else if key_match(
 					key,
@@ -289,10 +285,7 @@ impl Component for BlameFilePopup {
 				} else if key_match(key, self.key_config.keys.page_up)
 				{
 					self.move_selection(ScrollType::PageUp);
-				} else if key_match(
-					key,
-					self.key_config.keys.move_right,
-				) {
+				} else if self.key_config.is_nav_right(key) {
 					if let Some(commit_id) = self.selected_commit() {
 						self.hide_stacked(true);
 						self.queue.push(InternalEvent::OpenPopup(

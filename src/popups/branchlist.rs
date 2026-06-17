@@ -170,7 +170,7 @@ impl Component for BranchListPopup {
 					"rebase error:",
 					self.rebase_branch()
 				);
-			} else if key_match(e, self.key_config.keys.move_right)
+			} else if self.key_config.is_nav_right(e)
 				&& self.valid_selection()
 			{
 				self.inspect_head_of_branch();
@@ -258,11 +258,11 @@ impl BranchListPopup {
 	fn move_event(&mut self, e: &KeyEvent) -> Result<EventState> {
 		if key_match(e, self.key_config.keys.exit_popup) {
 			self.hide();
-		} else if key_match(e, self.key_config.keys.move_down) {
+		} else if self.key_config.is_nav_down(e) {
 			return self
 				.move_selection(ScrollType::Up)
 				.map(Into::into);
-		} else if key_match(e, self.key_config.keys.move_up) {
+		} else if self.key_config.is_nav_up(e) {
 			return self
 				.move_selection(ScrollType::Down)
 				.map(Into::into);

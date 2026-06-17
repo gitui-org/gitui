@@ -507,10 +507,8 @@ impl Component for FileRevlogPopup {
 					} else {
 						self.hide_stacked(false);
 					}
-				} else if key_match(
-					key,
-					self.key_config.keys.move_right,
-				) && self.can_focus_diff()
+				} else if self.key_config.is_nav_right(key)
+					&& self.can_focus_diff()
 				{
 					self.diff.focus(true);
 				} else if key_match(key, self.key_config.keys.enter) {
@@ -537,13 +535,9 @@ impl Component for FileRevlogPopup {
 							),
 						));
 					}
-				} else if key_match(key, self.key_config.keys.move_up)
-				{
+				} else if self.key_config.is_nav_up(key) {
 					self.move_selection(ScrollType::Up)?;
-				} else if key_match(
-					key,
-					self.key_config.keys.move_down,
-				) {
+				} else if self.key_config.is_nav_down(key) {
 					self.move_selection(ScrollType::Down)?;
 				} else if key_match(
 					key,

@@ -200,13 +200,9 @@ impl Component for CheckoutOptionPopup {
 			if let Event::Key(key) = &event {
 				if key_match(key, self.key_config.keys.exit_popup) {
 					self.hide();
-				} else if key_match(
-					key,
-					self.key_config.keys.move_down,
-				) {
+				} else if self.key_config.is_nav_down(key) {
 					self.change_kind(true);
-				} else if key_match(key, self.key_config.keys.move_up)
-				{
+				} else if self.key_config.is_nav_up(key) {
 					self.change_kind(false);
 				} else if key_match(key, self.key_config.keys.enter) {
 					try_or_popup!(

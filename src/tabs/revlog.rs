@@ -494,10 +494,8 @@ impl Component for Revlog {
 							Ok(EventState::Consumed)
 						},
 					);
-				} else if key_match(
-					k,
-					self.key_config.keys.move_right,
-				) && self.commit_details.is_visible()
+				} else if self.key_config.is_nav_right(k)
+					&& self.commit_details.is_visible()
 				{
 					self.inspect_commit();
 					return Ok(EventState::Consumed);

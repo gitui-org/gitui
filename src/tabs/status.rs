@@ -839,10 +839,8 @@ impl Component for Status {
 				{
 					self.switch_focus(self.focus.toggled_focus())
 						.map(Into::into)
-				} else if key_match(
-					k,
-					self.key_config.keys.move_right,
-				) && self.can_focus_diff()
+				} else if self.key_config.is_nav_right(k)
+					&& self.can_focus_diff()
 				{
 					self.switch_focus(Focus::Diff).map(Into::into)
 				} else if key_match(
@@ -854,12 +852,12 @@ impl Component for Status {
 						DiffTarget::WorkingDir => Focus::WorkDir,
 					})
 					.map(Into::into)
-				} else if key_match(k, self.key_config.keys.move_down)
+				} else if self.key_config.is_nav_down(k)
 					&& self.focus == Focus::WorkDir
 					&& !self.index.is_empty()
 				{
 					self.switch_focus(Focus::Stage).map(Into::into)
-				} else if key_match(k, self.key_config.keys.move_up)
+				} else if self.key_config.is_nav_up(k)
 					&& self.focus == Focus::Stage
 					&& !self.index_wd.is_empty()
 				{

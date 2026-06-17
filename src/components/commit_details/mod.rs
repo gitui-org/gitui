@@ -7,10 +7,7 @@ use super::{
 	Component, DrawableComponent, EventState, StatusTreeComponent,
 };
 use crate::{
-	accessors,
-	app::Environment,
-	keys::{key_match, SharedKeyConfig},
-	strings,
+	accessors, app::Environment, keys::SharedKeyConfig, strings,
 };
 use anyhow::Result;
 use asyncgit::{
@@ -208,13 +205,13 @@ impl Component for CommitDetailsComponent {
 
 		if self.focused() {
 			if let Event::Key(e) = ev {
-				return if key_match(e, self.key_config.keys.move_down)
+				return if self.key_config.is_nav_down(e)
 					&& self.details_focused()
 				{
 					self.set_details_focus(false);
 					self.file_tree.focus(true);
 					Ok(EventState::Consumed)
-				} else if key_match(e, self.key_config.keys.move_up)
+				} else if self.key_config.is_nav_up(e)
 					&& self.file_tree.focused()
 					&& !self.is_compare()
 				{
