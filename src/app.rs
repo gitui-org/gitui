@@ -437,6 +437,10 @@ impl App {
 			self.select_branch_popup.update_git(ev)?;
 		}
 
+		if let AsyncNotification::App(AsyncAppNotification::StashSaveDone) = ev {
+			self.stashmsg_popup.on_stash_save_done();
+		}
+
 		self.files_tab.update_async(ev)?;
 		self.blame_file_popup.update_async(ev)?;
 		self.revision_files_popup.update(ev)?;
