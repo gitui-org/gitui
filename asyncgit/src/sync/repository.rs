@@ -68,11 +68,26 @@ pub fn repo(repo_path: &RepoPath) -> Result<Repository> {
 	Ok(repo)
 }
 
+/// Path to pass to `gix::discover` so linked worktrees resolve `info/exclude` correctly.
+pub(crate) fn repo_discover_path(repo_path: &RepoPath) -> Result<PathBuf> {
+	if let Some(workdir) = repo_path.workdir() {
+		return Ok(workdir.to_path_buf());
+	}
+
+	let git_repo = repo(repo_path)?;
+	git_repo
+		.workdir()
+		.ok_or(crate::error::Error::NoWorkDir)
+		.map(|path| path.to_path_buf())
+}
+
 pub fn gix_repo(repo_path: &RepoPath) -> Result<gix::Repository> {
-	let mut repo: gix::Repository = gix::ThreadSafeRepository::discover_with_environment_overrides(
-		repo_path.gitpath(),
-	)
-	.map(Into::into)?;
+	let discover_path = repo_discover_path(repo_path)?;
+	let mut repo: gix::Repository =
+		gix::ThreadSafeRepository::discover_with_environment_overrides(
+			&discover_path,
+		)
+		.map(Into::into)?;
 
 	if let Some(workdir) = repo_path.workdir() {
 		repo.set_workdir(Some(workdir.into()))?;
