@@ -123,6 +123,12 @@ pub enum InternalEvent {
 	///
 	OpenExternalEditor(Option<String>),
 	///
+	OpenExternalEditorAtCommit {
+		path: String,
+		commit: CommitId,
+		from_parent: bool,
+	},
+	///
 	Push(String, PushType, bool, bool),
 	///
 	Pull(String),

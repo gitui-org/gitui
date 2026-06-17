@@ -10,7 +10,8 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use asyncgit::sync::{
-	get_config_string, utils::repo_work_dir, RepoPath,
+	file_content_at_commit, get_config_string, utils::repo_work_dir,
+	CommitId, RepoPath,
 };
 use crossterm::{
 	event::Event,
@@ -25,6 +26,7 @@ use ratatui::{
 };
 use scopeguard::defer;
 use std::ffi::OsStr;
+use std::fs;
 use std::{env, io, path::Path, process::Command};
 
 ///
@@ -48,6 +50,7 @@ impl ExternalEditorPopup {
 	pub fn open_file_in_editor(
 		repo: &RepoPath,
 		path: &Path,
+		at_commit: Option<(CommitId, bool)>,
 	) -> Result<()> {
 		let work_dir = repo_work_dir(repo)?;
 
@@ -57,9 +60,27 @@ impl ExternalEditorPopup {
 			path.into()
 		};
 
-		if !path.exists() {
+		let editor_path = if path.exists() {
+			path
+		} else if let Some((commit, from_parent)) = at_commit {
+			let content = file_content_at_commit(
+				repo,
+				commit,
+				&path,
+				from_parent,
+			)?;
+			let file_name = path
+				.file_name()
+				.map(|name| name.to_string_lossy().into_owned())
+				.unwrap_or_else(|| String::from("file"));
+			let editor_path = Path::new(&work_dir).join(".git").join(
+				format!("gitui-edit-{commit}-{file_name}"),
+			);
+			fs::write(&editor_path, content.as_bytes())?;
+			editor_path
+		} else {
 			bail!("file not found: {path:?}");
-		}
+		};
 
 		io::stdout().execute(LeaveAlternateScreen)?;
 		defer! {
@@ -107,7 +128,7 @@ impl ExternalEditorPopup {
 		let mut args: Vec<&OsStr> =
 			remainder.map(OsStr::new).collect();
 
-		args.push(path.as_os_str());
+		args.push(editor_path.as_os_str());
 
 		Command::new(command.clone())
 			.current_dir(work_dir)

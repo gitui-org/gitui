@@ -189,6 +189,7 @@ impl CommitPopup {
 		ExternalEditorPopup::open_file_in_editor(
 			&self.repo.borrow(),
 			&file_path,
+			None,
 		)?;
 
 		let mut message = String::new();

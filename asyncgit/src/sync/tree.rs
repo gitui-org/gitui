@@ -71,6 +71,40 @@ fn path_cmp(a: &Path, b: &Path) -> Ordering {
 	}
 }
 
+
+/// UTF-8 text content of `path` in `commit`, or in its first parent when `from_parent`.
+pub fn file_content_at_commit(
+	repo_path: &RepoPath,
+	commit: CommitId,
+	path: &Path,
+	from_parent: bool,
+) -> Result<String> {
+	scope_time!("file_content_at_commit");
+
+	let repo = repo(repo_path)?;
+	let commit = repo.find_commit(commit.into())?;
+	let object_id = if from_parent {
+		if commit.parent_count() == 0 {
+			return Err(Error::Generic(
+				"commit has no parent".into(),
+			));
+		}
+		commit.parent(0)?.id()
+	} else {
+		commit.id()
+	};
+	let commit = repo.find_commit(object_id)?;
+	let tree = commit.tree()?;
+	let entry = tree.get_path(path)?;
+	let blob = repo.find_blob(entry.id())?;
+
+	if blob.is_binary() {
+		return Err(Error::BinaryFile);
+	}
+
+	Ok(String::from_utf8_lossy(blob.content()).to_string())
+}
+
 /// will only work on utf8 content
 pub fn tree_file_content(
 	repo_path: &RepoPath,
