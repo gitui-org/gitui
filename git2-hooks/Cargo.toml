@@ -14,7 +14,7 @@ keywords = ["git"]
 
 [dependencies]
 git2 = "0.21"
-gix-path = "0.11"
+gix-path = "0.12"
 log = "0.4"
 shellexpand = "3.1"
 thiserror = "2.0"
