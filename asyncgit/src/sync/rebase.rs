@@ -3,7 +3,7 @@ use scopetime::scope_time;
 
 use crate::{
 	error::{Error, Result},
-	sync::repository::repo,
+	sync::{repository::repo, utils::get_head_repo},
 };
 
 use super::{CommitId, RepoPath};
@@ -63,9 +63,10 @@ pub fn conflict_free_rebase(
 
 	rebase.finish(Some(&signature))?;
 
-	last_commit.ok_or_else(|| {
-		Error::Generic(String::from("no commit rebased"))
-	})
+	// When the branch is already up-to-date the rebase loop produces zero
+	// steps.  That is a successful no-op: return the current HEAD rather
+	// than an error.
+	last_commit.map_or_else(|| get_head_repo(repo), Ok)
 }
 
 ///
@@ -252,6 +253,30 @@ mod test_conflict_free_rebase {
 		let r = test_rebase_branch_repo(repo_path, "master");
 
 		assert_eq!(parent_ids(&repo, r), vec![c3]);
+	}
+
+	#[test]
+	fn test_noop_already_uptodate() {
+		// Rebasing a branch onto a commit that is already an ancestor
+		// (i.e. nothing to replay) must succeed and return the current HEAD.
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		let _c1 =
+			write_commit_file(&repo, "test1.txt", "test", "commit1");
+
+		// Create branch "foo" at c1, then add a commit on master.
+		create_branch(repo_path, "foo").unwrap();
+		let c2 =
+			write_commit_file(&repo, "test2.txt", "test", "commit2");
+
+		// Rebase master onto foo (foo is strictly behind master, so there
+		// is nothing to replay — master already contains all of foo's history).
+		// This should be a no-op and return c2 (current HEAD).
+		let r = test_rebase_branch_repo(repo_path, "foo");
+		assert_eq!(r, c2);
 	}
 
 	#[test]
