@@ -57,4 +57,7 @@ skip-tree = [
   # * `gix-index v0.42.1`
   # * `tempfile v3.23.0`
   { name = "rustix" },
+  # 2026-06-18 `gix-hash` still needs `sha1-checked` 0.10 while `ssh-key` 0.7
+  # already needs `sha1-checked` 0.11.
+  { name = "sha1-checked" },
 ]
