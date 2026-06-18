@@ -1,12 +1,14 @@
 use anyhow::Result;
 use crossbeam_channel::{unbounded, Sender};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use notify_debouncer_mini::{new_debouncer, DebounceEventResult};
-use scopetime::scope_time;
+use notify_debouncer_mini::{
+	new_debouncer, DebounceEventResult, Debouncer,
+};
 use std::{path::Path, thread, time::Duration};
 
 pub struct RepoWatcher {
 	receiver: crossbeam_channel::Receiver<()>,
+	_watcher: Debouncer<RecommendedWatcher>,
 }
 
 impl RepoWatcher {
@@ -18,12 +20,13 @@ impl RepoWatcher {
 
 		let (tx, rx) = std::sync::mpsc::channel();
 
-		let workdir = workdir.to_string();
-
-		thread::spawn(move || {
-			let timeout = Duration::from_secs(2);
-			create_watcher(timeout, tx, &workdir);
-		});
+		let timeout = Duration::from_secs(2);
+		let mut bouncer =
+			new_debouncer(timeout, tx).expect("Watch create error");
+		bouncer
+			.watcher()
+			.watch(Path::new(workdir), RecursiveMode::Recursive)
+			.expect("Watch error");
 
 		let (out_tx, out_rx) = unbounded();
 
@@ -34,7 +37,10 @@ impl RepoWatcher {
 			}
 		});
 
-		Self { receiver: out_rx }
+		Self {
+			receiver: out_rx,
+			_watcher: bouncer,
+		}
 	}
 
 	///
@@ -62,21 +68,4 @@ impl RepoWatcher {
 			}
 		}
 	}
-}
-
-fn create_watcher(
-	timeout: Duration,
-	tx: std::sync::mpsc::Sender<DebounceEventResult>,
-	workdir: &str,
-) {
-	scope_time!("create_watcher");
-
-	let mut bouncer =
-		new_debouncer(timeout, tx).expect("Watch create error");
-	bouncer
-		.watcher()
-		.watch(Path::new(&workdir), RecursiveMode::Recursive)
-		.expect("Watch error");
-
-	std::mem::forget(bouncer);
 }
