@@ -13,10 +13,20 @@ use std::{collections::HashSet, fs::File, io::Read};
 
 const NEWLINE: char = '\n';
 
-#[derive(Default)]
 struct NewFromOldContent {
 	lines: Vec<String>,
 	old_index: usize,
+	trailing_newline: bool,
+}
+
+impl Default for NewFromOldContent {
+	fn default() -> Self {
+		Self {
+			lines: Vec::new(),
+			old_index: 0,
+			trailing_newline: true,
+		}
+	}
 }
 
 impl NewFromOldContent {
@@ -57,14 +67,11 @@ impl NewFromOldContent {
 		for line in old_lines.iter().skip(self.old_index) {
 			self.lines.push((*line).to_string());
 		}
-		let lines = self.lines.join("\n");
-		if lines.ends_with(NEWLINE) {
-			lines
-		} else {
-			let mut lines = lines;
+		let mut lines = self.lines.join("\n");
+		if self.trailing_newline && !lines.ends_with(NEWLINE) {
 			lines.push(NEWLINE);
-			lines
 		}
+		lines
 	}
 }
 
@@ -133,6 +140,18 @@ pub fn apply_selection(
 					|| hunk_line.origin_value()
 						== DiffLineType::AddEOFNL
 				{
+					let applying = (is_staged && !selected_line)
+						|| (!is_staged && selected_line);
+					new_content.trailing_newline =
+						if hunk_line.origin_value()
+							== DiffLineType::DeleteEOFNL
+						{
+							// old had newline, new doesn't; applying removal → no newline
+							!applying
+						} else {
+							// AddEOFNL: old had no newline, new does; applying addition → newline
+							applying
+						};
 					break;
 				}
 

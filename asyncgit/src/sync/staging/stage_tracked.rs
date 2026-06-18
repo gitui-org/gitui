@@ -143,6 +143,48 @@ c = 4";
 	}
 
 	#[test]
+	fn test_stage_preserves_no_trailing_newline() {
+		// Both files have no trailing newline
+		static FILE_1: &str = "line1\nline2";
+		static FILE_2: &str = "line1_changed\nline2";
+
+		let (path, repo) = repo_init().unwrap();
+		let path: &RepoPath = &path.path().to_str().unwrap().into();
+
+		write_commit_file(&repo, "test.txt", FILE_1, "c1");
+		repo_write_file(&repo, "test.txt", FILE_2).unwrap();
+
+		// Stage only the changed first line
+		stage_lines(
+			path,
+			"test.txt",
+			false,
+			&[DiffLinePosition {
+				old_lineno: Some(1),
+				new_lineno: Some(1),
+			}],
+		)
+		.unwrap();
+
+		// Read the staged blob and verify it has no trailing newline
+		let git_repo = repo(path).unwrap();
+		let mut index = git_repo.index().unwrap();
+		index.read(true).unwrap();
+		let entry = index
+			.get_path(Path::new("test.txt"), 0)
+			.expect("entry not found");
+		let blob = git_repo.find_blob(entry.id).unwrap();
+		let staged = std::str::from_utf8(blob.content()).unwrap();
+
+		assert!(
+			!staged.ends_with('\n'),
+			"staged content must not gain a trailing newline; got: {:?}",
+			staged
+		);
+		assert_eq!(staged, "line1_changed\nline2");
+	}
+
+	#[test]
 	fn test_unstage() {
 		static FILE_1: &str = r"0
 ";
