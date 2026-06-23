@@ -170,6 +170,7 @@ impl From<ShowUntrackedFilesConfig> for gix::status::UntrackedFiles {
 }
 
 /// guarantees sorting
+#[allow(clippy::too_many_lines)]
 pub fn get_status(
 	repo_path: &RepoPath,
 	status_type: StatusType,

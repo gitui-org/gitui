@@ -75,7 +75,7 @@ pub fn large_file_storage_clean_and_stage(
 	// Produce the canonical pointer text into `pointer_bytes`.
 	clean(&store, &mut file, &mut pointer_bytes, path_string, &[])?;
 
-	let mode = file_mode_for(&absolute_path)?;
+	let mode = file_mode_for(&absolute_path);
 
 	let entry =
 		create_index_entry(mode, pointer_bytes.len(), path_string)?;
@@ -91,7 +91,7 @@ fn create_index_entry(
 	path: &str,
 ) -> Result<git2::IndexEntry> {
 	/// The lower 12 bits of the `flags` field in a git index entry store the
-	/// path length (capped at this mask value). (https://git-scm.com/docs/index-format)
+	/// path length (capped at this mask value). (<https://git-scm.com/docs/index-format>)
 	const GIT_INDEX_ENTRY_NAMEMASK: u16 = 0x0FFF;
 
 	Ok(git2::IndexEntry {
@@ -106,28 +106,34 @@ fn create_index_entry(
 			Error::Generic("pointer too large".into())
 		})?,
 		id: git2::Oid::ZERO_SHA1,
-		flags: (path.len() as u16) & GIT_INDEX_ENTRY_NAMEMASK,
+		flags: u16::try_from(path.len())
+			.unwrap_or(GIT_INDEX_ENTRY_NAMEMASK)
+			& GIT_INDEX_ENTRY_NAMEMASK,
 		flags_extended: 0,
 		path: path.as_bytes().to_vec(),
 	})
 }
 
 /// Determine the git file mode for an on-disk path.
-fn file_mode_for(path: &Path) -> Result<git2::FileMode> {
+#[allow(clippy::missing_const_for_fn)] // not const everywhere
+fn file_mode_for(path: &Path) -> git2::FileMode {
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;
-		let perms = path.metadata()?.permissions().mode();
-		Ok(if perms & 0o111 != 0 {
+		let perms = match path.metadata() {
+			Ok(meta) => meta.permissions().mode(),
+			Err(_) => return git2::FileMode::Blob,
+		};
+		if perms & 0o111 != 0 {
 			git2::FileMode::BlobExecutable
 		} else {
 			git2::FileMode::Blob
-		})
+		}
 	}
 	#[cfg(not(unix))]
 	{
 		let _ = path;
-		Ok(git2::FileMode::Blob)
+		git2::FileMode::Blob
 	}
 }
 
