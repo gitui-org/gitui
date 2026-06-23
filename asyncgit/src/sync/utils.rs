@@ -100,12 +100,17 @@ pub fn stage_add_file(
 	scope_time!("stage_add_file");
 
 	let repo = repo(repo_path)?;
-
 	let mut index = repo.index()?;
 
-	index.add_path(path)?;
-	index.write()?;
+	if super::lfs::lfs_filter_for(&repo, path).is_lfs() {
+		super::lfs::large_file_storage_clean_and_stage(
+			&repo, &mut index, path,
+		)?;
+	} else {
+		index.add_path(path)?;
+	}
 
+	index.write()?;
 	Ok(())
 }
 
@@ -118,7 +123,6 @@ pub fn stage_add_all(
 	scope_time!("stage_add_all");
 
 	let repo = repo(repo_path)?;
-
 	let mut index = repo.index()?;
 
 	let stage_untracked = if let Some(config) = stage_untracked {
@@ -127,20 +131,40 @@ pub fn stage_add_all(
 		untracked_files_config_repo(&repo)?
 	};
 
+	let mut staged_files = Vec::new();
+	let mut callback =
+		|file_path: &Path, _ignored_specification: &[u8]| -> i32 {
+			staged_files.push(file_path.to_path_buf());
+			0
+		};
+
+	let search_patterns = vec![pattern];
+
+	// 1. Stage the files
 	if stage_untracked.include_untracked() {
 		index.add_all(
-			vec![pattern],
+			search_patterns,
 			IndexAddOption::DEFAULT,
-			None,
+			Some(&mut callback),
 		)?;
 	} else {
-		index.update_all(vec![pattern], None)?;
+		index.update_all(search_patterns, Some(&mut callback))?;
+	}
+
+	for file_path in &staged_files {
+		// Can't use filter because of the mutable borrow below
+		if super::lfs::needs_lfs_cleaning(&repo, &index, file_path) {
+			let _ = super::lfs::large_file_storage_clean_and_stage(&repo, &mut index, file_path)
+                .inspect_err(|e| log::warn!("Large file storage clean failed for {file_path:?}: {e}"));
+		}
 	}
 
 	index.write()?;
 
 	Ok(())
 }
+
+
 
 /// Undo last commit in repo
 pub fn undo_last_commit(repo_path: &RepoPath) -> Result<()> {
@@ -504,5 +528,40 @@ mod tests {
 		assert!(get_head(repo_path).is_ok());
 
 		Ok(())
+	}
+
+	#[test]
+	fn test_stage_add_all_lfs() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		// Configure .gitattributes to track *.dat with LFS filter.
+		std::fs::write(
+			root.join(".gitattributes"),
+			"*.dat filter=lfs\n",
+		)
+		.unwrap();
+
+		let file_path = Path::new("data.dat");
+		let raw_content = b"large binary data to clean";
+		std::fs::write(root.join(file_path), raw_content).unwrap();
+
+		stage_add_all(
+			repo_path,
+			"data.dat",
+			Some(ShowUntrackedFilesConfig::All),
+		)
+		.unwrap();
+
+		let index = repo.index().unwrap();
+		let entry = index.get_path(file_path, 0).unwrap();
+		let pointer_blob = repo.find_blob(entry.id).unwrap();
+		let pointer_text =
+			String::from_utf8(pointer_blob.content().to_vec())
+				.unwrap();
+		assert!(pointer_text
+			.starts_with("version https://git-lfs.github.com"));
 	}
 }
