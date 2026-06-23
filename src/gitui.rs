@@ -287,4 +287,66 @@ mod tests {
 			terminal.backend()
 		);
 	}
+
+	#[test]
+	fn gitui_lfs_badge() {
+		apply_common_filters!();
+
+		let (temp_dir, repo) = repo_init_suffix(Some("-insta"));
+		let path: RepoPath = temp_dir.path().to_str().unwrap().into();
+
+		// Configure LFS
+		std::fs::write(
+			temp_dir.path().join(".gitattributes"),
+			"*.dat filter=lfs\n",
+		)
+		.unwrap();
+		std::fs::write(
+			temp_dir.path().join("large_file.dat"),
+			b"large binary data",
+		)
+		.unwrap();
+
+		let mut index = repo.index().unwrap();
+		index
+			.add_path(std::path::Path::new(".gitattributes"))
+			.unwrap();
+		index
+			.add_path(std::path::Path::new("large_file.dat"))
+			.unwrap();
+		index.write().unwrap();
+
+		let cliargs = CliArgs {
+			theme: PathBuf::from("theme.ron"),
+			select_file: None,
+			repo_path: path,
+			notify_watcher: false,
+			key_bindings_path: None,
+			key_symbols_path: None,
+		};
+
+		let theme = Theme::init(&PathBuf::new());
+		let key_config = KeyConfig::default();
+
+		let mut gitui =
+			Gitui::new(cliargs, theme, &key_config, Updater::Ticker)
+				.unwrap();
+
+		let mut terminal =
+			Terminal::new(TestBackend::new(90, 12)).unwrap();
+
+		gitui.draw(&mut terminal).unwrap();
+
+		gitui.wait_for_async_git_notification(
+			AsyncGitNotification::Status,
+		);
+
+		let event =
+			AsyncNotification::Git(AsyncGitNotification::Status);
+		gitui.update_async(event);
+
+		gitui.draw(&mut terminal).unwrap();
+
+		assert_snapshot!("app_status_lfs_badge", terminal.backend());
+	}
 }
