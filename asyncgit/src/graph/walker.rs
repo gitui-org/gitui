@@ -1,7 +1,9 @@
 use super::buffer::Buffer;
 use super::chunk::{Chunk, Markers};
 use super::oids::GraphOids;
-use super::{AliasId, ConnectionType, GraphRow, LaneIndex, MAX_LANE_COLORS};
+use super::{
+	AliasId, ConnectionType, GraphRow, LaneIndex, MAX_LANE_COLORS,
+};
 use crate::sync::CommitId;
 use core::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -339,7 +341,10 @@ impl GraphWalker {
 					connection_color,
 				);
 
-				(LaneIndex::from(start_lane), LaneIndex::from(end_lane))
+				(
+					LaneIndex::from(start_lane),
+					LaneIndex::from(end_lane),
+				)
 			})
 			.collect()
 	}
@@ -579,7 +584,7 @@ impl GraphWalker {
 	}
 
 	/// Determines the correct node type for the active commit lane.
-	fn determine_commit_connection(
+	const fn determine_commit_connection(
 		is_stash: bool,
 		is_merge: bool,
 		is_branch_tip: bool,

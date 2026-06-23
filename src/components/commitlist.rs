@@ -1354,12 +1354,15 @@ mod tests {
 	#[test]
 	fn test_build_graph_spans() {
 		let row = GraphRow {
-			lane_count: 1,
-			commit_lane: 0,
+			lane_count: 1.into(),
+			commit_lane: 0.into(),
 			is_merge: false,
 			is_branch_tip: false,
 			is_stash: false,
-			lanes: vec![Some((ConnectionType::CommitNormal, 0))],
+			lanes: vec![Some((
+				ConnectionType::CommitNormal,
+				0.into(),
+			))],
 			merge_bridge: None,
 			branches: vec![],
 		};

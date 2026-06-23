@@ -42,7 +42,7 @@ impl From<usize> for LaneIndex {
 
 impl From<LaneIndex> for usize {
 	fn from(lane: LaneIndex) -> Self {
-		lane.0 as usize
+		lane.0 as Self
 	}
 }
 
