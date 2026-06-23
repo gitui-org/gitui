@@ -322,24 +322,33 @@ pub fn checkout_branch(
 	let repo = repo(repo_path)?;
 
 	let branch = repo.find_branch(branch_name, BranchType::Local)?;
-
 	let branch_ref = branch.into_reference();
+	let target_tree = branch_ref.peel_to_tree()?;
 
-	let target_treeish = branch_ref.peel_to_tree()?;
-	let target_treeish_object = target_treeish.as_object();
+	let previous_tree =
+		repo.head().and_then(|h| h.peel_to_tree()).ok();
 
 	// modify state to match branch's state
 	repo.checkout_tree(
-		target_treeish_object,
+		target_tree.as_object(),
 		Some(&mut git2::build::CheckoutBuilder::new()),
 	)?;
 
-	let branch_ref = branch_ref.name().map_err(|_| {
+	let branch_ref_name = branch_ref.name().map_err(|_| {
 		Error::Generic(String::from("branch ref not found"))
 	});
 
 	// modify HEAD to point to given branch
-	repo.set_head(branch_ref?)?;
+	repo.set_head(branch_ref_name?)?;
+
+	// Smudge LFS pointer files with real content from the local LFS store.
+	if let Err(e) = super::lfs::large_file_storage_smudge_tree(
+		&repo,
+		&target_tree,
+		previous_tree.as_ref(),
+	) {
+		log::warn!("checkout_branch: LFS smudge failed: {e}");
+	}
 
 	Ok(())
 }
@@ -357,21 +366,37 @@ pub fn checkout_commit(
 		git2::StatusOptions::new().include_ignored(false),
 	))?;
 
-	if statuses.is_empty() {
-		repo.set_head_detached(commit_hash.into())?;
-
-		if let Err(e) = repo.checkout_head(Some(
-			git2::build::CheckoutBuilder::new().force(),
-		)) {
-			repo.set_head(
-				bytes2string(cur_ref.name_bytes())?.as_str(),
-			)?;
-			return Err(Error::Git(e));
-		}
-		Ok(())
-	} else {
-		Err(Error::UncommittedChanges)
+	if !statuses.is_empty() {
+		return Err(Error::UncommittedChanges);
 	}
+
+	let commit = repo.find_commit(commit_hash.into())?;
+	let tree = commit.tree()?;
+	let previous_tree = repo
+		.head()
+		.and_then(|head_reference| head_reference.peel_to_tree())
+		.ok();
+
+	// Modify state to match commit's state
+	if let Err(error) = repo.checkout_tree(
+		tree.as_object(),
+		Some(&mut git2::build::CheckoutBuilder::new()),
+	) {
+		// Fallback to current HEAD on error
+		repo.set_head(bytes2string(cur_ref.name_bytes())?.as_str())?;
+		return Err(Error::Git(error));
+	}
+
+	// Smudge Large File Storage pointer files with real content from the local Large File Storage store.
+	if let Err(error) = super::lfs::large_file_storage_smudge_tree(
+		&repo,
+		&tree,
+		previous_tree.as_ref(),
+	) {
+		log::warn!("checkout_commit: Large File Storage smudge failed: {error}");
+	}
+
+	Ok(())
 }
 
 ///
@@ -399,21 +424,37 @@ pub fn checkout_remote_branch(
 	);
 
 	let commit = repo.find_commit(branch.top_commit.into())?;
+	let tree = commit.tree()?;
 	let mut new_branch = repo.branch(&name, &commit, false)?;
 	new_branch.set_upstream(Some(&branch.name))?;
+
+	let previous_tree =
+		repo.head().and_then(|h| h.peel_to_tree()).ok();
 
 	repo.set_head(
 		bytes2string(new_branch.into_reference().name_bytes())?
 			.as_str(),
 	)?;
 
-	if let Err(e) = repo.checkout_head(Some(
-		git2::build::CheckoutBuilder::new().force(),
-	)) {
-		// This is safe because cur_ref was just found
+	// modify state to match branch's state
+	if let Err(e) = repo.checkout_tree(
+		tree.as_object(),
+		Some(&mut git2::build::CheckoutBuilder::new()),
+	) {
+		// fallback to current HEAD on error
 		repo.set_head(bytes2string(cur_ref.name_bytes())?.as_str())?;
 		return Err(Error::Git(e));
 	}
+
+	// Smudge LFS pointer files with real content from the local LFS store.
+	if let Err(e) = super::lfs::large_file_storage_smudge_tree(
+		&repo,
+		&tree,
+		previous_tree.as_ref(),
+	) {
+		log::warn!("checkout_remote_branch: LFS smudge failed: {e}");
+	}
+
 	Ok(())
 }
 
