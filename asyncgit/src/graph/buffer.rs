@@ -1,4 +1,5 @@
 use super::chunk::{Chunk, Markers};
+use super::AliasId;
 use std::collections::BTreeMap;
 
 /// A single mutation of the lane state, recorded while processing one
@@ -39,7 +40,7 @@ pub struct Buffer {
 
 	/// Aliases of merge commits whose second parent still needs a new
 	/// lane.
-	merge_commits: Vec<usize>,
+	merge_commits: Vec<AliasId>,
 
 	/// Scratch list of the [`DeltaOp`]s recorded for processing commit
 	pending_delta: Vec<DeltaOp>,
@@ -64,7 +65,7 @@ impl Buffer {
 
 	/// Remember `alias` as a merge commit whose second parent must be
 	/// given its own lane.
-	pub fn track_merge_commit(&mut self, alias: usize) {
+	pub fn track_merge_commit(&mut self, alias: AliasId) {
 		self.merge_commits.push(alias);
 	}
 
@@ -104,7 +105,7 @@ impl Buffer {
 
 	fn find_lane_awaiting_parent(
 		&self,
-		alias: Option<usize>,
+		alias: Option<AliasId>,
 	) -> Option<usize> {
 		let alias = alias?;
 		self.current.iter().position(|slot| {
@@ -119,7 +120,7 @@ impl Buffer {
 
 	fn consume_alias_in_other_chunks(
 		&mut self,
-		alias: usize,
+		alias: AliasId,
 		skip_index: usize,
 	) {
 		for index in 0..self.current.len() {

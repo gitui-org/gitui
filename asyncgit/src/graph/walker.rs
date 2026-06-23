@@ -1,15 +1,13 @@
 use super::buffer::Buffer;
 use super::chunk::{Chunk, Markers};
 use super::oids::GraphOids;
-use super::{
-	to_lane_idx, ConnectionType, GraphRow, LaneIdx, MAX_LANE_COLORS,
-};
+use super::{AliasId, ConnectionType, GraphRow, LaneIndex, MAX_LANE_COLORS};
 use crate::sync::CommitId;
 use std::collections::{HashMap, HashSet};
 
 /// Get the lanes color index, which cycles through the ste palette.
-fn lane_color(lane: usize) -> LaneIdx {
-	to_lane_idx(lane % MAX_LANE_COLORS)
+fn lane_color(lane: usize) -> LaneIndex {
+	LaneIndex::from(lane % MAX_LANE_COLORS)
 }
 
 use bitflags::bitflags;
@@ -103,9 +101,9 @@ const fn dirs_conn(dirs: Dirs, dotted: bool) -> ConnectionType {
 /// The line with a vertical component is the chosen way with color
 /// ensuring lanes stay visually continuous
 fn overlay_cell(
-	cell: &mut Option<(ConnectionType, LaneIdx)>,
+	cell: &mut Option<(ConnectionType, LaneIndex)>,
 	add: Dirs,
-	color: LaneIdx,
+	color: LaneIndex,
 ) {
 	if let Some((conn, existing_color)) = cell {
 		if let Some(existing) = conn_dirs(*conn) {
@@ -135,7 +133,7 @@ pub struct GraphWalker {
 	pub branch_lane_map: HashMap<CommitId, usize>,
 
 	/// Maps a merge commit's alias to the alias of its second parent.
-	pub merge_parents: HashMap<usize, usize>,
+	pub merge_parents: HashMap<AliasId, AliasId>,
 }
 
 impl Default for GraphWalker {
@@ -236,7 +234,7 @@ impl GraphWalker {
 	}
 
 	fn draw_merge_bridge(
-		lanes: &mut [Option<(ConnectionType, LaneIdx)>],
+		lanes: &mut [Option<(ConnectionType, LaneIndex)>],
 		merge_bridge: Option<(usize, usize)>,
 		commit_lane: usize,
 		current: &[Option<Chunk>],
@@ -287,15 +285,15 @@ impl GraphWalker {
 	}
 
 	fn draw_branching_lanes(
-		lanes: &mut Vec<Option<(ConnectionType, LaneIdx)>>,
+		lanes: &mut Vec<Option<(ConnectionType, LaneIndex)>>,
 		branching_lanes: &[usize],
 		commit_lane: usize,
-	) -> Vec<(LaneIdx, LaneIdx)> {
+	) -> Vec<(LaneIndex, LaneIndex)> {
 		let mut branches = Vec::new();
 		for &branch_lane in branching_lanes {
 			let from = std::cmp::min(branch_lane, commit_lane);
 			let to = std::cmp::max(branch_lane, commit_lane);
-			branches.push((to_lane_idx(from), to_lane_idx(to)));
+			branches.push((LaneIndex::from(from), LaneIndex::from(to)));
 
 			if lanes.len() <= to {
 				lanes.resize(to + 1, None);
@@ -403,14 +401,14 @@ impl GraphWalker {
 		);
 
 		GraphRow {
-			lane_count: to_lane_idx(current.iter().flatten().count()),
-			commit_lane: to_lane_idx(commit_lane),
+			lane_count: LaneIndex::from(current.iter().flatten().count()),
+			commit_lane: LaneIndex::from(commit_lane),
 			is_merge,
 			is_branch_tip,
 			is_stash,
 			lanes,
 			merge_bridge: merge_bridge
-				.map(|(f, t)| (to_lane_idx(f), to_lane_idx(t))),
+				.map(|(f, t)| (LaneIndex::from(f), LaneIndex::from(t))),
 			branches,
 		}
 	}
@@ -418,9 +416,9 @@ impl GraphWalker {
 	#[allow(clippy::too_many_arguments)]
 	fn fill_lanes(
 		&self,
-		lanes: &mut [Option<(ConnectionType, LaneIdx)>],
+		lanes: &mut [Option<(ConnectionType, LaneIndex)>],
 		curr: &[Option<Chunk>],
-		alias: Option<usize>,
+		alias: Option<AliasId>,
 		head_id: Option<&CommitId>,
 		is_stash: bool,
 		is_merge: bool,
@@ -473,10 +471,10 @@ impl GraphWalker {
 	/// between its two ends, merging with whatever each cell already
 	/// shows.
 	fn draw_bridge_span(
-		lanes: &mut [Option<(ConnectionType, LaneIdx)>],
+		lanes: &mut [Option<(ConnectionType, LaneIndex)>],
 		from: usize,
 		to: usize,
-		color: LaneIdx,
+		color: LaneIndex,
 	) {
 		for lane in lanes.iter_mut().take(to).skip(from + 1) {
 			overlay_cell(lane, Dirs::LEFT | Dirs::RIGHT, color);

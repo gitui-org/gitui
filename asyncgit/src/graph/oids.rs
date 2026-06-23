@@ -1,8 +1,9 @@
+use super::AliasId;
 use crate::sync::CommitId;
 use std::collections::HashMap;
 
 /// mapping of `CommitId` to a numeric alias
-pub struct GraphOids(HashMap<CommitId, usize>);
+pub struct GraphOids(HashMap<CommitId, AliasId>);
 
 impl Default for GraphOids {
 	fn default() -> Self {
@@ -17,18 +18,18 @@ impl GraphOids {
 	}
 
 	/// Get the alias for `id`, assigning a new one if it doesn't exist yet.
-	pub fn get_or_insert(&mut self, id: &CommitId) -> usize {
+	pub fn get_or_insert(&mut self, id: &CommitId) -> AliasId {
 		if let Some(&alias) = self.0.get(id) {
 			return alias;
 		}
 
-		let alias = self.0.len();
+		let alias = AliasId::from(self.0.len());
 		self.0.insert(*id, alias);
 		alias
 	}
 
 	/// Look up the alias for `id`, returning `None` if not found.
-	pub fn get(&self, id: &CommitId) -> Option<usize> {
+	pub fn get(&self, id: &CommitId) -> Option<AliasId> {
 		self.0.get(id).copied()
 	}
 }

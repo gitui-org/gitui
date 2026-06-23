@@ -11,13 +11,39 @@ pub const MAX_LANE_COLORS: usize = 16;
 // Yes, there are repositories where this is exceeded
 // Are they very rare? Yes.
 // On most terminals can more than 256 lanes even be represneted usefully? Not really.
-pub type LaneIdx = u8;
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LaneIndex(u8);
 
-/// Convert a lane position into the compact [`LaneIdx`]
-/// representation. This way we can keep full granularity when computing,
-/// but not when storing.
-pub(crate) fn to_lane_idx(lane: usize) -> LaneIdx {
-	LaneIdx::try_from(lane).unwrap_or(LaneIdx::MAX)
+/// Numeric alias assigned to each commit in the graph.
+///
+/// The alias is a dense integer index created by [`GraphOids`](super::oids::GraphOids)
+/// that avoids storing full [`CommitId`](crate::sync::CommitId)s inside the lane state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct AliasId(usize);
+
+impl std::ops::Deref for AliasId {
+	type Target = usize;
+	fn deref(&self) -> &usize {
+		&self.0
+	}
+}
+
+impl From<usize> for AliasId {
+	fn from(v: usize) -> Self {
+		Self(v)
+	}
+}
+
+impl From<usize> for LaneIndex {
+	fn from(lane: usize) -> Self {
+		Self(u8::try_from(lane).unwrap_or(u8::MAX))
+	}
+}
+
+impl From<LaneIndex> for usize {
+	fn from(lane: LaneIndex) -> Self {
+		lane.0 as usize
+	}
 }
 
 /// The type of connection between nodes in the graph.
@@ -53,10 +79,10 @@ pub enum ConnectionType {
 #[derive(Clone, Debug, Default)]
 pub struct GraphRow {
 	/// Number of active lanes at this commit row
-	pub lane_count: LaneIdx,
+	pub lane_count: LaneIndex,
 
 	/// Which lane index this commit sits on
-	pub commit_lane: LaneIdx,
+	pub commit_lane: LaneIndex,
 
 	/// Whether this is a merge commit (two parents)
 	pub is_merge: bool,
@@ -70,13 +96,13 @@ pub struct GraphRow {
 	/// Connections emitted per lane:
 	/// None = empty space
 	/// Some((ConnectionType, `color_index`)) = draw this connector in this color
-	pub lanes: Vec<Option<(ConnectionType, LaneIdx)>>,
+	pub lanes: Vec<Option<(ConnectionType, LaneIndex)>>,
 
 	/// Horizontal merge bridge: if this commit merges rightward,
 	/// (`from_lane`, `to_lane`) — the span to draw ─ ╭ ╮ across
-	pub merge_bridge: Option<(LaneIdx, LaneIdx)>,
+	pub merge_bridge: Option<(LaneIndex, LaneIndex)>,
 
 	/// Horizontal branch bridges: if this commit spawns branches,
 	/// spans to draw ─ ╭ ╮ across
-	pub branches: Vec<(LaneIdx, LaneIdx)>,
+	pub branches: Vec<(LaneIndex, LaneIndex)>,
 }
