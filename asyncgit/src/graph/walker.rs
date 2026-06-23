@@ -17,7 +17,7 @@ bitflags! {
 	/// are merged through this representation rather than
 	/// a naive overwrite for readability.
 	#[derive(Clone, Copy, Default)]
-	struct Dirs: u8 {
+	struct Directions: u8 {
 		const UP = 0b0001;
 		const DOWN = 0b0010;
 		const LEFT = 0b0100;
@@ -25,7 +25,7 @@ bitflags! {
 	}
 }
 
-impl Dirs {
+impl Directions {
 	#[allow(clippy::missing_const_for_fn)]
 	fn merge(self, other: Self) -> Self {
 		Self::from_bits_retain(self.bits() | other.bits())
@@ -39,23 +39,23 @@ impl Dirs {
 
 /// The sub network of an existing connection glyph
 /// `None` represents commit markers, which are never drawn over.
-fn conn_dirs(conn: ConnectionType) -> Option<Dirs> {
+fn conn_dirs(conn: ConnectionType) -> Option<Directions> {
 	Some(match conn {
 		ConnectionType::Vertical | ConnectionType::VerticalDotted => {
-			Dirs::UP | Dirs::DOWN
+			Directions::UP | Directions::DOWN
 		}
-		ConnectionType::MergeBridgeMid => Dirs::LEFT | Dirs::RIGHT,
-		ConnectionType::MergeBridgeStart => Dirs::DOWN | Dirs::LEFT,
-		ConnectionType::MergeBridgeEnd => Dirs::DOWN | Dirs::RIGHT,
-		ConnectionType::BranchUp => Dirs::UP | Dirs::LEFT,
-		ConnectionType::BranchUpRight => Dirs::UP | Dirs::RIGHT,
-		ConnectionType::TeeLeft => Dirs::UP | Dirs::DOWN | Dirs::LEFT,
+		ConnectionType::MergeBridgeMid => Directions::LEFT | Directions::RIGHT,
+		ConnectionType::MergeBridgeStart => Directions::DOWN | Directions::LEFT,
+		ConnectionType::MergeBridgeEnd => Directions::DOWN | Directions::RIGHT,
+		ConnectionType::BranchUp => Directions::UP | Directions::LEFT,
+		ConnectionType::BranchUpRight => Directions::UP | Directions::RIGHT,
+		ConnectionType::TeeLeft => Directions::UP | Directions::DOWN | Directions::LEFT,
 		ConnectionType::TeeRight => {
-			Dirs::UP | Dirs::DOWN | Dirs::RIGHT
+			Directions::UP | Directions::DOWN | Directions::RIGHT
 		}
-		ConnectionType::TeeUp => Dirs::UP | Dirs::LEFT | Dirs::RIGHT,
+		ConnectionType::TeeUp => Directions::UP | Directions::LEFT | Directions::RIGHT,
 		ConnectionType::TeeDown => {
-			Dirs::DOWN | Dirs::LEFT | Dirs::RIGHT
+			Directions::DOWN | Directions::LEFT | Directions::RIGHT
 		}
 		ConnectionType::CommitNormal
 		| ConnectionType::CommitBranch
@@ -69,11 +69,11 @@ fn conn_dirs(conn: ConnectionType) -> Option<Dirs> {
 /// Vertical lines take precedence in crossed cells.
 /// Yet the horizontal bridge continues in
 /// the spacer columns either side, so we retain wholeness.
-const fn dirs_conn(dirs: Dirs, dotted: bool) -> ConnectionType {
-	let up = dirs.contains(Dirs::UP);
-	let down = dirs.contains(Dirs::DOWN);
-	let left = dirs.contains(Dirs::LEFT);
-	let right = dirs.contains(Dirs::RIGHT);
+const fn dirs_conn(dirs: Directions, dotted: bool) -> ConnectionType {
+	let up = dirs.contains(Directions::UP);
+	let down = dirs.contains(Directions::DOWN);
+	let left = dirs.contains(Directions::LEFT);
+	let right = dirs.contains(Directions::RIGHT);
 	match (up, down, left, right) {
 		(true, true, true, false) => ConnectionType::TeeLeft,
 		(true, true, false, true) => ConnectionType::TeeRight,
@@ -102,7 +102,7 @@ const fn dirs_conn(dirs: Dirs, dotted: bool) -> ConnectionType {
 /// ensuring lanes stay visually continuous
 fn overlay_cell(
 	cell: &mut Option<(ConnectionType, LaneIndex)>,
-	add: Dirs,
+	add: Directions,
 	color: LaneIndex,
 ) {
 	if let Some((conn, existing_color)) = cell {
@@ -258,15 +258,15 @@ impl GraphWalker {
 		// target lane with the precise corner/junction
 		lanes[target_lane] = None;
 		let target_dirs = {
-			let mut d = Dirs::DOWN;
+			let mut d = Directions::DOWN;
 			if continues_up {
-				d |= Dirs::UP;
+				d |= Directions::UP;
 			}
 			if target_lane > commit_lane {
-				d |= Dirs::LEFT;
+				d |= Directions::LEFT;
 			}
 			if target_lane < commit_lane {
-				d |= Dirs::RIGHT;
+				d |= Directions::RIGHT;
 			}
 			d
 		};
@@ -306,12 +306,12 @@ impl GraphWalker {
 				lane_color(branch_lane),
 			);
 			let branch_dirs = {
-				let mut d = Dirs::UP;
+				let mut d = Directions::UP;
 				if branch_lane == to {
-					d |= Dirs::LEFT;
+					d |= Directions::LEFT;
 				}
 				if branch_lane == from {
-					d |= Dirs::RIGHT;
+					d |= Directions::RIGHT;
 				}
 				d
 			};
@@ -477,7 +477,7 @@ impl GraphWalker {
 		color: LaneIndex,
 	) {
 		for lane in lanes.iter_mut().take(to).skip(from + 1) {
-			overlay_cell(lane, Dirs::LEFT | Dirs::RIGHT, color);
+			overlay_cell(lane, Directions::LEFT | Directions::RIGHT, color);
 		}
 	}
 }
