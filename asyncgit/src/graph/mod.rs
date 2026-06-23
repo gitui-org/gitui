@@ -11,7 +11,7 @@ pub const MAX_LANE_COLORS: usize = 16;
 // Yes, there are repositories where this is exceeded
 // Are they very rare? Yes.
 // On most terminals can more than 256 lanes even be represneted usefully? Not really.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LaneIndex(u8);
 
 /// Numeric alias assigned to each commit in the graph.

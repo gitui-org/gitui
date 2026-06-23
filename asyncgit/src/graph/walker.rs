@@ -3,6 +3,7 @@ use super::chunk::{Chunk, Markers};
 use super::oids::GraphOids;
 use super::{AliasId, ConnectionType, GraphRow, LaneIndex, MAX_LANE_COLORS};
 use crate::sync::CommitId;
+use core::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 /// Get the lanes color index, which cycles through the ste palette.
@@ -44,16 +45,28 @@ fn conn_dirs(conn: ConnectionType) -> Option<Directions> {
 		ConnectionType::Vertical | ConnectionType::VerticalDotted => {
 			Directions::UP | Directions::DOWN
 		}
-		ConnectionType::MergeBridgeMid => Directions::LEFT | Directions::RIGHT,
-		ConnectionType::MergeBridgeStart => Directions::DOWN | Directions::LEFT,
-		ConnectionType::MergeBridgeEnd => Directions::DOWN | Directions::RIGHT,
+		ConnectionType::MergeBridgeMid => {
+			Directions::LEFT | Directions::RIGHT
+		}
+		ConnectionType::MergeBridgeStart => {
+			Directions::DOWN | Directions::LEFT
+		}
+		ConnectionType::MergeBridgeEnd => {
+			Directions::DOWN | Directions::RIGHT
+		}
 		ConnectionType::BranchUp => Directions::UP | Directions::LEFT,
-		ConnectionType::BranchUpRight => Directions::UP | Directions::RIGHT,
-		ConnectionType::TeeLeft => Directions::UP | Directions::DOWN | Directions::LEFT,
+		ConnectionType::BranchUpRight => {
+			Directions::UP | Directions::RIGHT
+		}
+		ConnectionType::TeeLeft => {
+			Directions::UP | Directions::DOWN | Directions::LEFT
+		}
 		ConnectionType::TeeRight => {
 			Directions::UP | Directions::DOWN | Directions::RIGHT
 		}
-		ConnectionType::TeeUp => Directions::UP | Directions::LEFT | Directions::RIGHT,
+		ConnectionType::TeeUp => {
+			Directions::UP | Directions::LEFT | Directions::RIGHT
+		}
 		ConnectionType::TeeDown => {
 			Directions::DOWN | Directions::LEFT | Directions::RIGHT
 		}
@@ -152,33 +165,36 @@ impl GraphWalker {
 		}
 	}
 
-	pub fn process(&mut self, id: CommitId, parents: &[CommitId]) {
-		let alias = self.oids.get_or_insert(&id);
+	pub fn process(
+		&mut self,
+		commit_id: CommitId,
+		parents: &[CommitId],
+	) {
+		let commit_alias = self.oids.get_or_insert(&commit_id);
 
-		let mut mapped_parents =
-			parents.iter().map(|p| self.oids.get_or_insert(p));
+		let mut mapped_parents = parents
+			.iter()
+			.map(|parent_id| self.oids.get_or_insert(parent_id));
 
-		// We make the executive and saddening decision to not support octo/mega merges
-		// TUIs are simply a backwards medium for representing this complexity
+		// We explicitly cap support at 2 parents, ignoring octo/mega merges.
 		let first_parent = mapped_parents.next();
 		let second_parent = mapped_parents.next();
 
 		let chunk = Chunk {
-			alias: Some(alias),
+			alias: Some(commit_alias),
 			parent_a: first_parent,
 			parent_b: second_parent,
 			marker: Markers::Commit,
 		};
 
-		second_parent.map(|b| self.merge_parents.insert(alias, b));
+		if let Some(second) = second_parent {
+			self.merge_parents.insert(commit_alias, second);
 
-		if first_parent.is_some()
-			&& second_parent.is_some()
-			&& !self.buffer.current.iter().flatten().any(|commit| {
-				commit.parent_a == second_parent
-					&& commit.parent_b.is_none()
-			}) {
-			self.buffer.track_merge_commit(alias);
+			if first_parent.is_some()
+				&& !self.is_redundant_merge_track(second)
+			{
+				self.buffer.track_merge_commit(commit_alias);
+			}
 		}
 
 		self.buffer.update(&chunk);
@@ -192,7 +208,7 @@ impl GraphWalker {
 	pub fn compute_rows(
 		&self,
 		commit_range: &[CommitId],
-		global_start: usize,
+		global_start_index: usize,
 		branch_tips: &HashSet<CommitId>,
 		stashes: &HashSet<CommitId>,
 		head_id: Option<&CommitId>,
@@ -201,30 +217,36 @@ impl GraphWalker {
 			return Vec::new();
 		}
 
-		// decompress one row before the range (when there is one) so
-		// every row's predecessor state comes from the same replay
-		let snap_start = global_start.saturating_sub(1);
-		let end = global_start + commit_range.len() - 1;
-		let snapshots = self.buffer.decompress(snap_start, end);
-		let offset = global_start - snap_start;
+		// Decompress one row before the range to establish predecessor state
+		let snapshot_start_index =
+			global_start_index.saturating_sub(1);
+		let snapshot_end_index =
+			global_start_index + commit_range.len() - 1;
+		let snapshots = self
+			.buffer
+			.decompress(snapshot_start_index, snapshot_end_index);
+		let index_offset = global_start_index - snapshot_start_index;
 
 		commit_range
 			.iter()
 			.enumerate()
-			.map(|(index, commit_id)| {
-				let place = index + offset;
+			.map(|(range_index, commit_id)| {
+				let snapshot_index = range_index + index_offset;
 
-				let current: &[Option<Chunk>] =
-					snapshots.get(place).map_or(&[], Vec::as_slice);
-				let previous = place
+				let current_snapshot = snapshots
+					.get(snapshot_index)
+					.map(Vec::as_slice)
+					.unwrap_or_default();
+
+				let previous_snapshot = snapshot_index
 					.checked_sub(1)
-					.and_then(|i| snapshots.get(i))
+					.and_then(|index| snapshots.get(index))
 					.map(Vec::as_slice);
 
 				self.render_row(
 					commit_id,
-					current,
-					previous,
+					current_snapshot,
+					previous_snapshot,
 					branch_tips,
 					stashes,
 					head_id,
@@ -237,50 +259,48 @@ impl GraphWalker {
 		lanes: &mut [Option<(ConnectionType, LaneIndex)>],
 		merge_bridge: Option<(usize, usize)>,
 		commit_lane: usize,
-		current: &[Option<Chunk>],
-		previous: Option<&[Option<Chunk>]>,
+		current_snapshot: &[Option<Chunk>],
+		previous_snapshot: Option<&[Option<Chunk>]>,
 	) {
-		let Some((from, to)) = merge_bridge.filter(|(f, t)| f != t)
-		else {
+		let Some((source_lane, target_lane)) = merge_bridge else {
 			return;
 		};
-		let target_lane = if from == commit_lane { to } else { from };
+		if source_lane == target_lane {
+			return;
+		}
 
-		// only draw the corner continuing upward when the target
-		// lane already existed on the previous row; a brand-new
-		// lane starts at this corner
-		let continues_up = current[target_lane].is_some()
-			&& previous.is_some_and(|prev| {
-				prev.get(target_lane) == Some(&current[target_lane])
-			});
-
-		// replace the plain vertical fill_lanes drew for the
-		// target lane with the precise corner/junction
-		lanes[target_lane] = None;
-		let target_dirs = {
-			let mut d = Directions::DOWN;
-			if continues_up {
-				d |= Directions::UP;
-			}
-			if target_lane > commit_lane {
-				d |= Directions::LEFT;
-			}
-			if target_lane < commit_lane {
-				d |= Directions::RIGHT;
-			}
-			d
+		let destination_lane = if source_lane == commit_lane {
+			target_lane
+		} else {
+			source_lane
 		};
+		let connection_color = lane_color(destination_lane);
+
+		let continues_upwards = Self::lane_continues_upwards(
+			destination_lane,
+			current_snapshot,
+			previous_snapshot,
+		);
+
+		let target_directions = Self::calculate_merge_directions(
+			commit_lane,
+			destination_lane,
+			continues_upwards,
+		);
+
+		// Replace the plain vertical fill with the precise corner/junction
+		lanes[destination_lane] = None;
 		overlay_cell(
-			&mut lanes[target_lane],
-			target_dirs,
-			lane_color(target_lane),
+			&mut lanes[destination_lane],
+			target_directions,
+			connection_color,
 		);
 
 		Self::draw_bridge_span(
 			lanes,
-			from,
-			to,
-			lane_color(target_lane),
+			source_lane,
+			target_lane,
+			connection_color,
 		);
 	}
 
@@ -289,109 +309,188 @@ impl GraphWalker {
 		branching_lanes: &[usize],
 		commit_lane: usize,
 	) -> Vec<(LaneIndex, LaneIndex)> {
-		let mut branches = Vec::new();
-		for &branch_lane in branching_lanes {
-			let from = std::cmp::min(branch_lane, commit_lane);
-			let to = std::cmp::max(branch_lane, commit_lane);
-			branches.push((LaneIndex::from(from), LaneIndex::from(to)));
+		branching_lanes
+			.iter()
+			.map(|&branch_lane| {
+				let start_lane =
+					std::cmp::min(branch_lane, commit_lane);
+				let end_lane =
+					std::cmp::max(branch_lane, commit_lane);
 
-			if lanes.len() <= to {
-				lanes.resize(to + 1, None);
-			}
+				Self::ensure_lane_capacity(lanes, end_lane);
 
-			Self::draw_bridge_span(
-				lanes,
-				from,
-				to,
-				lane_color(branch_lane),
-			);
-			let branch_dirs = {
-				let mut d = Directions::UP;
-				if branch_lane == to {
-					d |= Directions::LEFT;
-				}
-				if branch_lane == from {
-					d |= Directions::RIGHT;
-				}
-				d
-			};
-			overlay_cell(
-				&mut lanes[branch_lane],
-				branch_dirs,
-				lane_color(branch_lane),
-			);
-		}
-		branches
+				let connection_color = lane_color(branch_lane);
+				Self::draw_bridge_span(
+					lanes,
+					start_lane,
+					end_lane,
+					connection_color,
+				);
+
+				let branch_directions =
+					Self::calculate_branch_directions(
+						branch_lane,
+						start_lane,
+						end_lane,
+					);
+				overlay_cell(
+					&mut lanes[branch_lane],
+					branch_directions,
+					connection_color,
+				);
+
+				(LaneIndex::from(start_lane), LaneIndex::from(end_lane))
+			})
+			.collect()
 	}
 
-	fn render_row(
+	/// Checks if tracking a merge commit would be redundant based on current buffer state.
+	fn is_redundant_merge_track(
+		&self,
+		target_parent: AliasId,
+	) -> bool {
+		self.buffer.current.iter().flatten().any(|commit| {
+			commit.parent_a == Some(target_parent)
+				&& commit.parent_b.is_none()
+		})
+	}
+
+	/// Determines if a lane should draw an upward-connecting corner.
+	fn lane_continues_upwards(
+		target_lane: usize,
+		current_snapshot: &[Option<Chunk>],
+		previous_snapshot: Option<&[Option<Chunk>]>,
+	) -> bool {
+		let exists_in_current =
+			current_snapshot.get(target_lane).is_some();
+		let matches_previous =
+			previous_snapshot.is_some_and(|previous| {
+				previous.get(target_lane)
+					== current_snapshot.get(target_lane)
+			});
+
+		exists_in_current && matches_previous
+	}
+
+	/// Uses `Ordering` to elegantly map spatial relationships to visual bitmasks.
+	fn calculate_merge_directions(
+		commit_lane: usize,
+		target_lane: usize,
+		continues_upwards: bool,
+	) -> Directions {
+		let mut directions = Directions::DOWN;
+
+		if continues_upwards {
+			directions |= Directions::UP;
+		}
+
+		match target_lane.cmp(&commit_lane) {
+			Ordering::Greater => directions |= Directions::LEFT,
+			Ordering::Less => directions |= Directions::RIGHT,
+			Ordering::Equal => {}
+		}
+
+		directions
+	}
+
+	fn calculate_branch_directions(
+		branch_lane: usize,
+		start_lane: usize,
+		end_lane: usize,
+	) -> Directions {
+		let mut directions = Directions::UP;
+
+		if branch_lane == end_lane {
+			directions |= Directions::LEFT;
+		}
+		if branch_lane == start_lane {
+			directions |= Directions::RIGHT;
+		}
+
+		directions
+	}
+
+	fn ensure_lane_capacity(
+		lanes: &mut Vec<Option<(ConnectionType, LaneIndex)>>,
+		required_index: usize,
+	) {
+		if lanes.len() <= required_index {
+			lanes.resize(required_index + 1, None);
+		}
+	}
+
+	pub fn render_row(
 		&self,
 		commit_id: &CommitId,
-		current: &[Option<Chunk>],
-		previous: Option<&[Option<Chunk>]>,
+		current_snapshot: &[Option<Chunk>],
+		previous_snapshot: Option<&[Option<Chunk>]>,
 		branch_tips: &HashSet<CommitId>,
 		stashes: &HashSet<CommitId>,
 		head_id: Option<&CommitId>,
 	) -> GraphRow {
-		let alias = self.oids.get(commit_id);
-		let commit_lane = current
-			.iter()
-			.position(|c| {
-				c.as_ref().is_some_and(|chunk| {
-					alias.is_some() && chunk.alias == alias
-				})
-			})
-			.unwrap_or(0);
+		let commit_alias = self.oids.get(commit_id);
+		let head_alias = head_id.and_then(|id| self.oids.get(id));
+		let second_parent_alias = commit_alias.and_then(|alias| {
+			self.merge_parents.get(&alias).copied()
+		});
 
-		let parent_b_alias =
-			alias.and_then(|a| self.merge_parents.get(&a).copied());
-
-		let is_merge = parent_b_alias.is_some();
+		let commit_lane =
+			Self::find_commit_lane(current_snapshot, commit_alias);
+		let is_merge = second_parent_alias.is_some();
 		let is_branch_tip = branch_tips.contains(commit_id);
 		let is_stash = stashes.contains(commit_id);
 
-		let branching_lanes: Vec<usize> = previous
-			.into_iter()
-			.flatten() // Unwrapping the optional, returning empty vec when None
-			.enumerate()
-			.filter(|(i, pc)| {
-				pc.is_some()
-					&& current.get(*i).is_none_or(Option::is_none)
-			})
-			.map(|(i, _)| i)
-			.collect();
+		let branching_lanes = Self::find_branching_lanes(
+			current_snapshot,
+			previous_snapshot,
+		);
 
-		let mut lanes = vec![None; current.len()];
+		let merge_bridge =
+			second_parent_alias.and_then(|parent_alias| {
+				Self::calculate_merge_bridge(
+					current_snapshot,
+					commit_lane,
+					parent_alias,
+				)
+			});
 
-		let merge_bridge = if is_merge && parent_b_alias.is_some() {
-			current
+		let mut lanes: Vec<Option<(ConnectionType, LaneIndex)>> =
+			current_snapshot
 				.iter()
-				.position(|c| {
-					c.as_ref().is_some_and(|chunk| {
-						chunk.parent_a == parent_b_alias
+				.enumerate()
+				.map(|(lane_index, chunk_option)| {
+					let chunk = chunk_option.as_ref()?; // Returns None early if the chunk is missing
+
+					if commit_alias.is_some()
+						&& chunk.alias == commit_alias
+					{
+						let connection =
+							Self::determine_commit_connection(
+								is_stash,
+								is_merge,
+								is_branch_tip,
+							);
+						return Some((
+							connection,
+							lane_color(lane_index),
+						));
+					}
+
+					Self::determine_passthrough_connection(
+						chunk, lane_index, head_alias,
+					)
+					.map(|connection| {
+						(connection, lane_color(lane_index))
 					})
 				})
-				.map(|t| (commit_lane.min(t), commit_lane.max(t)))
-		} else {
-			None
-		};
-
-		self.fill_lanes(
-			&mut lanes,
-			current,
-			alias,
-			head_id,
-			is_stash,
-			is_merge,
-			is_branch_tip,
-		);
+				.collect();
 
 		Self::draw_merge_bridge(
 			&mut lanes,
 			merge_bridge,
 			commit_lane,
-			current,
-			previous,
+			current_snapshot,
+			previous_snapshot,
 		);
 
 		let branches = Self::draw_branching_lanes(
@@ -400,70 +499,121 @@ impl GraphWalker {
 			commit_lane,
 		);
 
+		let active_lane_count =
+			current_snapshot.iter().flatten().count();
+
 		GraphRow {
-			lane_count: LaneIndex::from(current.iter().flatten().count()),
+			lane_count: LaneIndex::from(active_lane_count),
 			commit_lane: LaneIndex::from(commit_lane),
 			is_merge,
 			is_branch_tip,
 			is_stash,
 			lanes,
-			merge_bridge: merge_bridge
-				.map(|(f, t)| (LaneIndex::from(f), LaneIndex::from(t))),
+			merge_bridge: merge_bridge.map(|(source, target)| {
+				(LaneIndex::from(source), LaneIndex::from(target))
+			}),
 			branches,
 		}
 	}
 
-	#[allow(clippy::too_many_arguments)]
-	fn fill_lanes(
-		&self,
-		lanes: &mut [Option<(ConnectionType, LaneIndex)>],
-		curr: &[Option<Chunk>],
-		alias: Option<AliasId>,
-		head_id: Option<&CommitId>,
+	/// Locates the primary lane for the current commit.
+	fn find_commit_lane(
+		current_snapshot: &[Option<Chunk>],
+		commit_alias: Option<AliasId>,
+	) -> usize {
+		let Some(target_alias) = commit_alias else {
+			return 0;
+		};
+
+		current_snapshot
+			.iter()
+			.position(|chunk_option| {
+				chunk_option.as_ref().is_some_and(|chunk| {
+					chunk.alias == Some(target_alias)
+				})
+			})
+			.unwrap_or(0)
+	}
+
+	/// Computes the span (min, max) between the commit's lane and its second parent's lane.
+	fn calculate_merge_bridge(
+		current_snapshot: &[Option<Chunk>],
+		commit_lane: usize,
+		second_parent_alias: AliasId,
+	) -> Option<(usize, usize)> {
+		current_snapshot
+			.iter()
+			.position(|chunk_option| {
+				chunk_option.as_ref().is_some_and(|chunk| {
+					chunk.parent_a == Some(second_parent_alias)
+				})
+			})
+			.map(|target_lane| {
+				(
+					commit_lane.min(target_lane),
+					commit_lane.max(target_lane),
+				)
+			})
+	}
+
+	/// Identifies lanes that existed in the previous row but terminated before the current row.
+	fn find_branching_lanes(
+		current_snapshot: &[Option<Chunk>],
+		previous_snapshot: Option<&[Option<Chunk>]>,
+	) -> Vec<usize> {
+		let Some(previous) = previous_snapshot else {
+			return Vec::new();
+		};
+
+		previous
+			.iter()
+			.enumerate()
+			.filter(|(index, previous_chunk)| {
+				previous_chunk.is_some()
+					&& current_snapshot
+						.get(*index)
+						.is_none_or(Option::is_none)
+			})
+			.map(|(index, _)| index)
+			.collect()
+	}
+
+	/// Determines the correct node type for the active commit lane.
+	fn determine_commit_connection(
 		is_stash: bool,
 		is_merge: bool,
 		is_branch_tip: bool,
-	) {
-		for (lane_idx, chunk_item) in curr.iter().enumerate() {
-			let Some(chunk) = chunk_item.as_ref() else {
-				continue;
-			};
+	) -> ConnectionType {
+		match (is_stash, is_merge, is_branch_tip) {
+			(true, _, _) => ConnectionType::CommitStash,
+			(_, true, _) => ConnectionType::CommitMerge,
+			(_, _, true) => ConnectionType::CommitBranch,
+			_ => ConnectionType::CommitNormal,
+		}
+	}
 
-			if alias.is_some() && chunk.alias == alias {
-				let conn_type =
-					match (is_stash, is_merge, is_branch_tip) {
-						(true, _, _) => ConnectionType::CommitStash,
-						(_, true, _) => ConnectionType::CommitMerge,
-						(_, _, true) => ConnectionType::CommitBranch,
-						_ => ConnectionType::CommitNormal,
-					};
+	/// Determines the correct vertical line style for non-commit passthrough lanes.
+	fn determine_passthrough_connection(
+		chunk: &Chunk,
+		lane_index: usize,
+		head_alias: Option<AliasId>,
+	) -> Option<ConnectionType> {
+		let is_orphan =
+			chunk.parent_a.is_none() && chunk.parent_b.is_none();
 
-				lanes[lane_idx] =
-					Some((conn_type, lane_color(lane_idx)));
-			} else {
-				let target_oid =
-					head_id.and_then(|h| self.oids.get(h));
+		if is_orphan {
+			return None;
+		}
 
-				let is_dotted = lane_idx == 0
-					&& target_oid.is_some()
-					&& (chunk.parent_a == target_oid
-						|| chunk.parent_b == target_oid);
+		let is_dotted = lane_index == 0
+			&& head_alias.is_some()
+			&& (chunk.parent_a == head_alias
+				|| chunk.parent_b == head_alias);
 
-				let is_orphan = chunk.parent_a.is_none()
-					&& chunk.parent_b.is_none();
-
-				if is_orphan {
-					continue;
-				}
-
-				let conn = if is_dotted {
-					ConnectionType::VerticalDotted
-				} else {
-					ConnectionType::Vertical
-				};
-
-				lanes[lane_idx] = Some((conn, lane_color(lane_idx)));
-			}
+		if is_dotted {
+			Some(ConnectionType::VerticalDotted)
+		} else {
+			Some(ConnectionType::Vertical)
 		}
 	}
 
@@ -477,7 +627,11 @@ impl GraphWalker {
 		color: LaneIndex,
 	) {
 		for lane in lanes.iter_mut().take(to).skip(from + 1) {
-			overlay_cell(lane, Directions::LEFT | Directions::RIGHT, color);
+			overlay_cell(
+				lane,
+				Directions::LEFT | Directions::RIGHT,
+				color,
+			);
 		}
 	}
 }
