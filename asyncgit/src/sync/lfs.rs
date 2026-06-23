@@ -90,6 +90,10 @@ fn create_index_entry(
 	size: usize,
 	path: &str,
 ) -> Result<git2::IndexEntry> {
+	/// The lower 12 bits of the `flags` field in a git index entry store the
+	/// path length (capped at this mask value). (https://git-scm.com/docs/index-format)
+	const GIT_INDEX_ENTRY_NAMEMASK: u16 = 0x0FFF;
+
 	Ok(git2::IndexEntry {
 		ctime: git2::IndexTime::new(0, 0),
 		mtime: git2::IndexTime::new(0, 0),
@@ -101,8 +105,8 @@ fn create_index_entry(
 		file_size: u32::try_from(size).map_err(|_| {
 			Error::Generic("pointer too large".into())
 		})?,
-		id: git2::Oid::zero(),
-		flags: 0,
+		id: git2::Oid::ZERO_SHA1,
+		flags: (path.len() as u16) & GIT_INDEX_ENTRY_NAMEMASK,
 		flags_extended: 0,
 		path: path.as_bytes().to_vec(),
 	})
