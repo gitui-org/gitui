@@ -17,6 +17,7 @@ pub mod diff;
 mod hooks;
 mod hunks;
 mod ignore;
+pub(crate) mod lfs;
 mod logwalker;
 mod merge;
 mod patches;
