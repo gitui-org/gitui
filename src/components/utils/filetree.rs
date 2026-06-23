@@ -268,6 +268,7 @@ mod tests {
 			.map(|a| StatusItem {
 				path: String::from(*a),
 				status: StatusItemType::Modified,
+				is_lfs: false,
 			})
 			.collect::<Vec<_>>()
 	}

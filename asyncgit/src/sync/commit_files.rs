@@ -71,14 +71,17 @@ pub fn get_commit_files(
 		.deltas()
 		.map(|delta| {
 			let status = StatusItemType::from(delta.status());
+			let path = delta
+				.new_file()
+				.path()
+				.map(|p| p.to_str().unwrap_or("").to_string())
+				.unwrap_or_default();
+			let is_lfs = super::lfs::lfs_filter_for(&repo, std::path::Path::new(&path)).is_lfs();
 
 			StatusItem {
-				path: delta
-					.new_file()
-					.path()
-					.map(|p| p.to_str().unwrap_or("").to_string())
-					.unwrap_or_default(),
+				path,
 				status,
+				is_lfs,
 			}
 		})
 		.collect::<Vec<_>>();
