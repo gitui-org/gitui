@@ -387,6 +387,8 @@ pub fn checkout_commit(
 		return Err(Error::Git(error));
 	}
 
+	repo.set_head_detached(commit.id())?;
+
 	// Smudge Large File Storage pointer files with real content from the local Large File Storage store.
 	if let Err(error) = super::lfs::large_file_storage_smudge_tree(
 		&repo,

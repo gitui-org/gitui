@@ -164,8 +164,6 @@ pub fn stage_add_all(
 	Ok(())
 }
 
-
-
 /// Undo last commit in repo
 pub fn undo_last_commit(repo_path: &RepoPath) -> Result<()> {
 	let repo = repo(repo_path)?;
@@ -555,6 +553,10 @@ mod tests {
 		)
 		.unwrap();
 
+		// Re-open the repo to get a fresh index; stage_add_all uses
+		// its own Repository handle, so the original `repo`'s cached
+		// index is stale.
+		let repo = Repository::open(root).unwrap();
 		let index = repo.index().unwrap();
 		let entry = index.get_path(file_path, 0).unwrap();
 		let pointer_blob = repo.find_blob(entry.id).unwrap();

@@ -214,9 +214,17 @@ pub fn get_status(
 
 				if let Some(status) = status {
 					let path = item.rela_path().to_string();
-					let is_lfs = super::lfs::lfs_filter_for(&git2_repo, Path::new(&path)).is_lfs();
+					let is_lfs = super::lfs::lfs_filter_for(
+						&git2_repo,
+						Path::new(&path),
+					)
+					.is_lfs();
 
-					res.push(StatusItem { path, status, is_lfs });
+					res.push(StatusItem {
+						path,
+						status,
+						is_lfs,
+					});
 				}
 			}
 		}
@@ -243,9 +251,17 @@ pub fn get_status(
 				 -> Result<gix::diff::index::Action> {
 					let path = change_ref.fields().0.to_string();
 					let status = change_ref.into();
-					let is_lfs = super::lfs::lfs_filter_for(&git2_repo, Path::new(&path)).is_lfs();
+					let is_lfs = super::lfs::lfs_filter_for(
+						&git2_repo,
+						Path::new(&path),
+					)
+					.is_lfs();
 
-					res.push(StatusItem { path, status, is_lfs });
+					res.push(StatusItem {
+						path,
+						status,
+						is_lfs,
+					});
 
 					Ok(gix::diff::index::Action::Continue(()))
 				};
@@ -276,8 +292,16 @@ pub fn get_status(
 				};
 
 				if let Some(status) = status {
-					let is_lfs = super::lfs::lfs_filter_for(&git2_repo, Path::new(&path)).is_lfs();
-					res.push(StatusItem { path, status, is_lfs });
+					let is_lfs = super::lfs::lfs_filter_for(
+						&git2_repo,
+						Path::new(&path),
+					)
+					.is_lfs();
+					res.push(StatusItem {
+						path,
+						status,
+						is_lfs,
+					});
 				}
 			}
 		}
@@ -395,12 +419,16 @@ mod tests {
 			.write_all(b"large binary data")
 			.unwrap();
 
-		let status =
-			get_status(repo_path, StatusType::WorkingDir, Some(ShowUntrackedFilesConfig::All))
-				.unwrap();
+		let status = get_status(
+			repo_path,
+			StatusType::WorkingDir,
+			Some(ShowUntrackedFilesConfig::All),
+		)
+		.unwrap();
 
 		// We expect .gitattributes and large.dat to be in status
-		let lfs_item = status.iter().find(|s| s.path == "large.dat").unwrap();
+		let lfs_item =
+			status.iter().find(|s| s.path == "large.dat").unwrap();
 		assert!(lfs_item.is_lfs);
 		assert_eq!(lfs_item.status, StatusItemType::New);
 	}

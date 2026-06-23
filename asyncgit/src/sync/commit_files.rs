@@ -76,7 +76,11 @@ pub fn get_commit_files(
 				.path()
 				.map(|p| p.to_str().unwrap_or("").to_string())
 				.unwrap_or_default();
-			let is_lfs = super::lfs::lfs_filter_for(&repo, std::path::Path::new(&path)).is_lfs();
+			let is_lfs = super::lfs::lfs_filter_for(
+				&repo,
+				std::path::Path::new(&path),
+			)
+			.is_lfs();
 
 			StatusItem {
 				path,
