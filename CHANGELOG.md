@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* support hardware-backed SSH commit signing — FIDO2, PIV/PKCS#11, and ssh-agent keys — by delegating to `ssh-keygen` [[@swork9](https://github.com/swork9)] ([#2982](https://github.com/gitui-org/gitui/pull/2982))
+
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
 * open the external editor from the status diff view [[@WaterWhisperer](https://github.com/WaterWhisperer)] ([#2805](https://github.com/gitui-org/gitui/issues/2805))
