@@ -329,7 +329,9 @@ pub struct SSHSign {
 }
 
 enum SSHSignMode {
-	InMemory { secret_key: Box<PrivateKey> },
+	InMemory {
+		secret_key: Box<PrivateKey>,
+	},
 	/// Hardware (`FIDO2`/`U2F`, PIV/PKCS#11) or agent-backed key, signed by delegating to `ssh-keygen`.
 	Keygen,
 }
