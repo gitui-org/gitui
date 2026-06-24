@@ -76,6 +76,11 @@ impl ChangesComponent {
 		self.files.is_file_selected()
 	}
 
+	///
+	pub const fn set_flat(&mut self, flat: bool) {
+		self.files.set_flat(flat);
+	}
+
 	fn index_add_remove(&self) -> Result<bool> {
 		if let Some(tree_item) = self.selection() {
 			if self.is_working_dir {
@@ -200,6 +205,16 @@ impl Component for ChangesComponent {
 		self.files.commands(out, force_all);
 
 		let some_selection = self.selection().is_some();
+		let is_tree = self.options.borrow().status_tree();
+
+		out.push(CommandInfo::new(
+			strings::commands::toggle_tree_view(
+				&self.key_config,
+				is_tree,
+			),
+			true,
+			some_selection && self.focused(),
+		));
 
 		if self.is_working_dir {
 			out.push(CommandInfo::new(
@@ -246,6 +261,19 @@ impl Component for ChangesComponent {
 		if self.focused() {
 			if let Event::Key(e) = ev {
 				return if key_match(
+					e,
+					self.key_config.keys.status_toggle_tree,
+				) {
+					let is_tree =
+						self.options.borrow().status_tree();
+					self.options
+						.borrow_mut()
+						.set_status_tree(!is_tree);
+					self.queue.push(InternalEvent::Update(
+						NeedsUpdate::ALL,
+					));
+					Ok(EventState::Consumed)
+				} else if key_match(
 					e,
 					self.key_config.keys.stage_unstage_item,
 				) {

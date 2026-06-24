@@ -37,6 +37,7 @@ pub struct StatusTreeComponent {
 	scroll_top: Cell<usize>,
 	visible: bool,
 	revision: Option<CommitId>,
+	flat: bool,
 }
 
 impl StatusTreeComponent {
@@ -55,6 +56,7 @@ impl StatusTreeComponent {
 			pending: true,
 			visible: false,
 			revision: None,
+			flat: true,
 		}
 	}
 
@@ -68,7 +70,7 @@ impl StatusTreeComponent {
 
 		let new_hash = hash(list);
 		if self.current_hash != new_hash {
-			self.tree.update(list)?;
+			self.tree.update(list, self.flat)?;
 			self.current_hash = new_hash;
 		}
 
@@ -112,10 +114,18 @@ impl StatusTreeComponent {
 	}
 
 	///
+	pub const fn set_flat(&mut self, flat: bool) {
+		if self.flat != flat {
+			self.current_hash = 0;
+		}
+		self.flat = flat;
+	}
+
+	///
 	pub fn clear(&mut self) -> Result<()> {
 		self.current_hash = 0;
 		self.pending = true;
-		self.tree.update(&[])
+		self.tree.update(&[], self.flat)
 	}
 
 	///
@@ -149,16 +159,16 @@ impl StatusTreeComponent {
 		}
 	}
 
-	fn item_to_text<'b>(
+	fn item_to_text(
+		&self,
 		string: &str,
 		indent: usize,
 		visible: bool,
 		file_item_kind: &FileTreeItemKind,
 		width: u16,
 		selected: bool,
-		theme: &'b SharedTheme,
-	) -> Option<Span<'b>> {
-		let indent_str = if indent == 0 {
+	) -> Option<Span<'_>> {
+		let indent_str = if indent == 0 || self.flat {
 			String::new()
 		} else {
 			format!("{:w$}", " ", w = indent * 2)
@@ -172,6 +182,29 @@ impl StatusTreeComponent {
 			FileTreeItemKind::File(status_item) => {
 				let status_char =
 					Self::item_status_char(status_item.status);
+
+				if self.flat {
+					let txt = if selected {
+						format!(
+							"{} {:pad$}",
+							status_char,
+							status_item.path,
+							pad = width as usize
+						)
+					} else {
+						format!(
+							"{status_char} {p}",
+							p = status_item.path
+						)
+					};
+
+					return Some(Span::styled(
+						Cow::from(txt),
+						self.theme
+							.item(status_item.status, selected),
+					));
+				}
+
 				let file = Path::new(&status_item.path)
 					.file_name()
 					.and_then(std::ffi::OsStr::to_str)
@@ -179,11 +212,11 @@ impl StatusTreeComponent {
 
 				let txt = if selected {
 					format!(
-						"{} {}{:w$}",
+						"{} {}{:pad$}",
 						status_char,
 						indent_str,
 						file,
-						w = width as usize
+						pad = width as usize
 					)
 				} else {
 					format!("{status_char} {indent_str}{file}")
@@ -191,11 +224,15 @@ impl StatusTreeComponent {
 
 				Some(Span::styled(
 					Cow::from(txt),
-					theme.item(status_item.status, selected),
+					self.theme
+						.item(status_item.status, selected),
 				))
 			}
 
 			FileTreeItemKind::Path(path_collapsed) => {
+				if self.flat {
+					return None;
+				}
 				let collapse_char =
 					if path_collapsed.0 { '▸' } else { '▾' };
 
@@ -213,7 +250,7 @@ impl StatusTreeComponent {
 
 				Some(Span::styled(
 					Cow::from(txt),
-					theme.text(true, selected),
+					self.theme.text(true, selected),
 				))
 			}
 		}
@@ -229,6 +266,24 @@ impl StatusTreeComponent {
 		let mut selection_offset_visible: usize = 0;
 		let mut vec_draw_text_info: Vec<TextDrawInfo> = vec![];
 		let tree_items = self.tree.tree.items();
+
+		if self.flat {
+			for item in tree_items {
+				if let FileTreeItemKind::File(_) = &item.kind {
+					vec_draw_text_info.push(TextDrawInfo {
+						name: item.info.full_path.clone(),
+						indent: 0,
+						visible: item.info.visible,
+						item_kind: &item.kind,
+					});
+				}
+			}
+			return (
+				vec_draw_text_info,
+				selection_offset,
+				selection_offset_visible,
+			);
+		}
 
 		for (index, item) in tree_items.iter().enumerate() {
 			if should_skip_over > 0 {
@@ -382,14 +437,13 @@ impl DrawableComponent for StatusTreeComponent {
 				.iter()
 				.enumerate()
 				.filter_map(|(index, draw_text_info)| {
-					Self::item_to_text(
+					self.item_to_text(
 						&draw_text_info.name,
 						draw_text_info.indent as usize,
 						draw_text_info.visible,
 						draw_text_info.item_kind,
 						r.width,
 						self.show_selection && select == index,
-						&self.theme,
 					)
 				})
 				.skip(self.scroll_top.get());

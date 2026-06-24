@@ -21,6 +21,7 @@ struct OptionsData {
 	pub tab: usize,
 	pub diff: DiffOptions,
 	pub status_show_untracked: Option<ShowUntrackedFilesConfig>,
+	pub status_tree: Option<bool>,
 	pub commit_msgs: Vec<String>,
 }
 
@@ -77,6 +78,15 @@ impl Options {
 		value: Option<ShowUntrackedFilesConfig>,
 	) {
 		self.data.status_show_untracked = value;
+		self.save();
+	}
+
+	pub fn status_tree(&self) -> bool {
+		self.data.status_tree.unwrap_or(true)
+	}
+
+	pub fn set_status_tree(&mut self, value: bool) {
+		self.data.status_tree = Some(value);
 		self.save();
 	}
 
