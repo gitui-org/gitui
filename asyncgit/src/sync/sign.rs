@@ -207,6 +207,7 @@ const fn is_security_key(alg: &ssh_key::Algorithm) -> bool {
 	)
 }
 
+/// Whether signing a commit here will block on a security-key touch.
 pub fn signing_requires_user_presence(repo_path: &RepoPath) -> bool {
 	let Ok(repo) = repo(repo_path) else {
 		return false;
