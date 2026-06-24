@@ -423,6 +423,14 @@ impl App {
 	) -> Result<()> {
 		log::trace!("update_async: {ev:?}");
 
+		if ev
+			== AsyncNotification::App(
+				AsyncAppNotification::PerformPendingCommit,
+			) {
+			self.commit_popup.perform_pending_commit()?;
+			self.msg_popup.hide();
+		}
+
 		if let AsyncNotification::Git(ev) = ev {
 			self.status_tab.update_git(ev)?;
 			self.stashing_tab.update_git(ev)?;
