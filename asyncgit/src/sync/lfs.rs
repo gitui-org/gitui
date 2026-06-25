@@ -144,45 +144,23 @@ fn file_mode_for(path: &Path) -> git2::FileMode {
 	}
 }
 
-pub fn needs_lfs_cleaning(
+/// Smudge every LFS pointer file in the working tree against the current
+/// `HEAD` tree.
+pub fn large_file_storage_smudge_head(
 	repository: &Repository,
-	index: &git2::Index,
-	file_path: &Path,
-) -> bool {
-	if !lfs_filter_for(repository, file_path).is_lfs() {
-		return false;
+) -> Result<()> {
+	let head_tree = repository.head()?.peel_to_tree()?;
+	large_file_storage_smudge_tree(repository, &head_tree, None)
+}
+
+/// Smudge LFS pointer files in the working tree against `HEAD`, logging a
+/// warning tagged with `operation` on failure instead of propagating it.
+pub fn record_smudge(repository: &Repository, operation: &str) {
+	// Operations that rewrite the working tree from git history (reset, stash
+	// apply/pop, rebase, revert) leave LFS files as pointer text, so cover that here.
+	if let Err(e) = large_file_storage_smudge_head(repository) {
+		log::warn!("{operation}: LFS smudge failed: {e}");
 	}
-
-	let Some(index_entry) = index.get_path(file_path, 0) else {
-		return false;
-	};
-
-	// Use the ODB to read just the object header. This avoids loading
-	// potentially huge blobs entirely into memory just to check their size.
-	let Ok(odb) = repository.odb() else {
-		return false;
-	};
-	let Ok((size, _)) = odb.read_header(index_entry.id) else {
-		return false;
-	};
-
-	if size >= git_lfs_pointer::MAX_POINTER_SIZE {
-		// It's too big to be a pointer, so it must be raw data that needs cleaning
-		return true;
-	}
-
-	let Ok(file_blob) = repository.find_blob(index_entry.id) else {
-		return false;
-	};
-
-	let content = file_blob.content();
-
-	// 3. Check if it's already a valid pointer
-	let is_valid_pointer =
-		git_lfs_pointer::Pointer::parse(content).is_ok();
-
-	// If it's NOT a valid pointer, it's raw data that needs cleaning
-	!is_valid_pointer
 }
 
 /// Walk `tree` and smudge every LFS pointer file in the working tree.
@@ -193,6 +171,13 @@ pub fn large_file_storage_smudge_tree(
 	target_tree: &git2::Tree,
 	previous_tree: Option<&git2::Tree>,
 ) -> Result<()> {
+	if lfs_skip_smudge() {
+		log::debug!(
+			"lfs smudge: skipped (GIT_LFS_SKIP_SMUDGE is set)"
+		);
+		return Ok(());
+	}
+
 	let working_directory =
 		repository.workdir().ok_or(Error::NoWorkDir)?;
 	let store = lfs_store(repository);
