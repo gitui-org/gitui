@@ -144,25 +144,6 @@ fn file_mode_for(path: &Path) -> git2::FileMode {
 	}
 }
 
-/// Smudge every LFS pointer file in the working tree against the current
-/// `HEAD` tree.
-pub fn large_file_storage_smudge_head(
-	repository: &Repository,
-) -> Result<()> {
-	let head_tree = repository.head()?.peel_to_tree()?;
-	large_file_storage_smudge_tree(repository, &head_tree, None)
-}
-
-/// Smudge LFS pointer files in the working tree against `HEAD`, logging a
-/// warning tagged with `operation` on failure instead of propagating it.
-pub fn record_smudge(repository: &Repository, operation: &str) {
-	// Operations that rewrite the working tree from git history (reset, stash
-	// apply/pop, rebase, revert) leave LFS files as pointer text, so cover that here.
-	if let Err(e) = large_file_storage_smudge_head(repository) {
-		log::warn!("{operation}: LFS smudge failed: {e}");
-	}
-}
-
 /// Walk `tree` and smudge every LFS pointer file in the working tree.
 ///
 /// Returns `Ok(())` even when individual files cannot be smudged, so a partial LFS store only warns.
