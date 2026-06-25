@@ -131,16 +131,34 @@ pub fn stage_add_all(
 		untracked_files_config_repo(&repo)?
 	};
 
-	let mut staged_files = Vec::new();
-	let mut callback =
-		|file_path: &Path, _ignored_specification: &[u8]| -> i32 {
-			staged_files.push(file_path.to_path_buf());
-			0
-		};
+	// LFS-tracked files are diverted out of `add_all`/`update_all` here so
+	// their raw content is never written to the ODB. Adding them directly
+	// would write the full blob to `.git/objects` only for the LFS pointer to
+	// replace it.
+	let mut lfs_files = Vec::new();
+	let mut callback = |file_path: &Path,
+	                    _ignored_specification: &[u8]|
+	 -> i32 {
+		// Only divert existing working-tree files.
+		let is_existing_file = repo
+			.workdir()
+			.is_some_and(|workdir| workdir.join(file_path).is_file());
+
+		if is_existing_file
+			&& super::lfs::lfs_filter_for(&repo, file_path).is_lfs()
+		{
+			lfs_files.push(file_path.to_path_buf());
+
+			// Skip; staged later.
+			return 1;
+		}
+
+		0
+	};
 
 	let search_patterns = vec![pattern];
 
-	// 1. Stage the files
+	// Stage the non-LFS files (LFS files are collected by the callback).
 	if stage_untracked.include_untracked() {
 		index.add_all(
 			search_patterns,
@@ -151,11 +169,15 @@ pub fn stage_add_all(
 		index.update_all(search_patterns, Some(&mut callback))?;
 	}
 
-	for file_path in &staged_files {
-		// Can't use filter because of the mutable borrow below
-		if super::lfs::needs_lfs_cleaning(&repo, &index, file_path) {
-			let _ = super::lfs::large_file_storage_clean_and_stage(&repo, &mut index, file_path)
-                .inspect_err(|e| log::warn!("Large file storage clean failed for {file_path:?}: {e}"));
+	// The callback's borrows of `repo` and `lfs_files` end here , so the collected paths can now be staged.
+	for file_path in &lfs_files {
+		if let Err(e) = super::lfs::large_file_storage_clean_and_stage(
+			&repo, &mut index, file_path,
+		) {
+			log::warn!(
+				"Large file storage clean failed for {file_path:?}: \
+				 {e}; leaving previous index entry unchanged"
+			);
 		}
 	}
 
