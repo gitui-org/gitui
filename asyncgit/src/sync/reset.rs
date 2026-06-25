@@ -52,6 +52,15 @@ pub fn reset_repo(
 
 	repo.reset(c.as_object(), kind, None)?;
 
+	// Only a hard reset rewrites the working tree from the target commit and
+	// leaves LFS files as pointer text; soft/mixed resets leave it untouched.
+	if matches!(kind, ResetType::Hard) {
+		super::lfs::large_file_storage_smudge_head_logged(
+			&repo,
+			"reset_repo",
+		);
+	}
+
 	Ok(())
 }
 
