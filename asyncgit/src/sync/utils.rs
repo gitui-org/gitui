@@ -7,7 +7,7 @@ use crate::{
 	error::{Error, Result},
 	sync::config::untracked_files_config_repo,
 };
-use git2::{IndexAddOption, Repository, RepositoryOpenFlags};
+use git2::{Index, IndexAddOption, Repository, RepositoryOpenFlags};
 use scopetime::scope_time;
 use std::{
 	fs::File,
@@ -102,10 +102,8 @@ pub fn stage_add_file(
 	let repo = repo(repo_path)?;
 	let mut index = repo.index()?;
 
-	if super::lfs::lfs_filter_for(&repo, path).is_lfs() {
-		super::lfs::large_file_storage_clean_and_stage(
-			&repo, &mut index, path,
-		)?;
+	if super::lfs::filter_for(&repo, path).is_lfs() {
+		super::lfs::clean_and_stage(&repo, &mut index, path)?;
 	} else {
 		index.add_path(path)?;
 	}
@@ -115,75 +113,113 @@ pub fn stage_add_file(
 }
 
 /// like `stage_add_file` but uses a pattern to match/glob multiple files/folders
-pub fn stage_add_all(
-	repo_path: &RepoPath,
-	pattern: &str,
-	stage_untracked: Option<ShowUntrackedFilesConfig>,
+pub fn stage_add_all_files(
+	repository_path: &RepoPath,
+	search_pattern: &str,
+	optional_untracked_configuration: Option<
+		ShowUntrackedFilesConfig,
+	>,
 ) -> Result<()> {
-	scope_time!("stage_add_all");
+	scope_time!("stage_add_all_files");
 
-	let repo = repo(repo_path)?;
-	let mut index = repo.index()?;
+	let repository = repo(repository_path)?;
+	let mut git_index = repository.index()?;
 
-	let stage_untracked = if let Some(config) = stage_untracked {
-		config
-	} else {
-		untracked_files_config_repo(&repo)?
-	};
+	let untracked_configuration = optional_untracked_configuration
+		.map_or_else(
+			|| untracked_files_config_repo(&repository),
+			Ok,
+		)?;
 
-	// LFS-tracked files are diverted out of `add_all`/`update_all` here so
-	// their raw content is never written to the ODB. Adding them directly
-	// would write the full blob to `.git/objects` only for the LFS pointer to
-	// replace it.
-	let mut lfs_files = Vec::new();
-	let mut callback = |file_path: &Path,
-	                    _ignored_specification: &[u8]|
-	 -> i32 {
-		// Only divert existing working-tree files.
-		let is_existing_file = repo
-			.workdir()
-			.is_some_and(|workdir| workdir.join(file_path).is_file());
+	let large_storage_files =
+		stage_standard_files_and_collect_large_files(
+			&repository,
+			&mut git_index,
+			search_pattern,
+			untracked_configuration.include_untracked(),
+		)?;
 
-		if is_existing_file
-			&& super::lfs::lfs_filter_for(&repo, file_path).is_lfs()
-		{
-			lfs_files.push(file_path.to_path_buf());
+	stage_large_storage_files(
+		&repository,
+		&mut git_index,
+		&large_storage_files,
+	);
 
-			// Skip; staged later.
-			return 1;
-		}
+	git_index.write()?;
 
-		0
-	};
+	Ok(())
+}
 
-	let search_patterns = vec![pattern];
+/// Stages normal files directly into the git index and diverts large storage files for special handling.
+fn stage_standard_files_and_collect_large_files(
+	repository: &Repository,
+	git_index: &mut Index,
+	search_pattern: &str,
+	include_untracked_files: bool,
+) -> Result<Vec<PathBuf>> {
+	let mut large_storage_files = Vec::new();
 
-	// Stage the non-LFS files (LFS files are collected by the callback).
-	if stage_untracked.include_untracked() {
-		index.add_all(
+	let mut divert_large_files_callback =
+		|file_path: &Path, _: &[u8]| -> i32 {
+			let is_large_storage_file =
+				is_existing_large_storage_file(repository, file_path);
+
+			if is_large_storage_file {
+				large_storage_files.push(file_path.to_path_buf());
+			}
+
+			// Cast boolean
+			i32::from(is_large_storage_file)
+		};
+
+	// Just to satisfy the bounds
+	let search_patterns = [search_pattern];
+
+	if include_untracked_files {
+		git_index.add_all(
 			search_patterns,
 			IndexAddOption::DEFAULT,
-			Some(&mut callback),
+			Some(&mut divert_large_files_callback),
 		)?;
 	} else {
-		index.update_all(search_patterns, Some(&mut callback))?;
+		git_index.update_all(
+			search_patterns,
+			Some(&mut divert_large_files_callback),
+		)?;
 	}
 
-	// The callback's borrows of `repo` and `lfs_files` end here , so the collected paths can now be staged.
-	for file_path in &lfs_files {
-		if let Err(e) = super::lfs::large_file_storage_clean_and_stage(
-			&repo, &mut index, file_path,
+	Ok(large_storage_files)
+}
+
+/// Determines if a path points to an existing file in the working directory that is tracked via Large File Storage.
+fn is_existing_large_storage_file(
+	repository: &Repository,
+	file_path: &Path,
+) -> bool {
+	let is_existing_file = repository
+		.workdir()
+		.is_some_and(|directory| directory.join(file_path).is_file());
+
+	is_existing_file
+		&& super::lfs::filter_for(repository, file_path).is_lfs()
+}
+
+/// Cleans and stages collected Large File Storage files, logging warnings on failure.
+fn stage_large_storage_files(
+	repository: &Repository,
+	git_index: &mut Index,
+	large_storage_files: &[PathBuf],
+) {
+	for file_path in large_storage_files {
+		if let Err(error) = super::lfs::clean_and_stage(
+			repository, git_index, file_path,
 		) {
 			log::warn!(
 				"Large file storage clean failed for {file_path:?}: \
-				 {e}; leaving previous index entry unchanged"
+                 {error}; leaving previous index entry unchanged"
 			);
 		}
 	}
-
-	index.write()?;
-
-	Ok(())
 }
 
 /// Undo last commit in repo
@@ -382,7 +418,7 @@ mod tests {
 
 		assert_eq!(status_count(StatusType::WorkingDir), 3);
 
-		stage_add_all(repo_path, "a/d", None).unwrap();
+		stage_add_all_files(repo_path, "a/d", None).unwrap();
 
 		assert_eq!(status_count(StatusType::WorkingDir), 1);
 		assert_eq!(status_count(StatusType::Stage), 2);
@@ -450,7 +486,7 @@ mod tests {
 
 		assert_eq!(get_statuses(repo_path), (0, 0));
 
-		stage_add_all(repo_path, "*", None).unwrap();
+		stage_add_all_files(repo_path, "*", None).unwrap();
 
 		assert_eq!(get_statuses(repo_path), (0, 0));
 
@@ -521,7 +557,7 @@ mod tests {
 		assert_eq!(status_count(StatusType::WorkingDir), 1);
 
 		//expect to fail
-		assert!(stage_add_all(repo_path, "sub", None).is_err());
+		assert!(stage_add_all_files(repo_path, "sub", None).is_err());
 
 		Ok(())
 	}
@@ -568,7 +604,7 @@ mod tests {
 		let raw_content = b"large binary data to clean";
 		std::fs::write(root.join(file_path), raw_content).unwrap();
 
-		stage_add_all(
+		stage_add_all_files(
 			repo_path,
 			"data.dat",
 			Some(ShowUntrackedFilesConfig::All),
