@@ -51,7 +51,7 @@ fn lfs_skip_smudge() -> bool {
 /// This delegates to libgit2's attribute lookup and returns an [`LfsFilter`]
 /// variant so downstream code can pattern-match instead of inspecting strings
 /// or booleans.
-pub fn lfs_filter_for(repo: &Repository, path: &Path) -> LfsFilter {
+pub fn filter_for(repo: &Repository, path: &Path) -> LfsFilter {
 	match repo.get_attr(path, "filter", git2::AttrCheckFlags::empty())
 	{
 		Ok(Some("lfs")) => LfsFilter::Lfs,
@@ -63,7 +63,7 @@ pub fn lfs_filter_for(repo: &Repository, path: &Path) -> LfsFilter {
 ///
 /// The real bytes are written to `.git/lfs/objects/`; keeping the  index entry holding
 /// just the small pointer text.
-pub fn large_file_storage_clean_and_stage(
+pub fn clean_and_stage(
 	repository: &Repository,
 	index: &mut git2::Index,
 	file_path: &Path,
@@ -147,7 +147,7 @@ fn file_mode_for(path: &Path) -> git2::FileMode {
 /// Walk `tree` and smudge every LFS pointer file in the working tree.
 ///
 /// Returns `Ok(())` even when individual files cannot be smudged, so a partial LFS store only warns.
-pub fn large_file_storage_smudge_tree(
+pub fn smudge_tree(
 	repository: &Repository,
 	target_tree: &git2::Tree,
 	previous_tree: Option<&git2::Tree>,
@@ -198,7 +198,7 @@ pub fn large_file_storage_smudge_tree(
 	for file_path in changed_file_paths {
 		// Staging will clean content into the local LFS store
 		// Checkout will smudge pointer files into their OG content
-		if lfs_filter_for(repository, file_path).is_lfs() {
+		if filter_for(repository, file_path).is_lfs() {
 			let full_path = working_directory.join(file_path);
 			let outcome =
 				smudge_file(&store, full_path.as_path(), file_path);
@@ -208,6 +208,25 @@ pub fn large_file_storage_smudge_tree(
 	}
 
 	Ok(())
+}
+
+/// Smudge LFS pointer files in the working tree against `HEAD`, logging a
+/// warning tagged with `operation` on failure instead of propagating it.
+pub fn record_smudge(repository: &Repository, operation: &str) {
+	// Operations that rewrite the working tree from git history (reset, stash
+	// apply/pop, rebase, revert) leave LFS files as pointer text, so cover that here.
+	let head_tree =
+		match repository.head().and_then(|h| h.peel_to_tree()) {
+			Ok(tree) => tree,
+			Err(e) => {
+				log::warn!("{operation}: LFS smudge failed to resolve HEAD: {e}");
+				return;
+			}
+		};
+
+	if let Err(e) = smudge_tree(repository, &head_tree, None) {
+		log::warn!("{operation}: LFS smudge failed: {e}");
+	}
 }
 
 fn log_smudge_outcome(
@@ -259,11 +278,8 @@ fn smudge_tree_entries(
 			}
 			// Use a match guard to gracefully filter out non-LFS blobs immediately
 			Some(git2::ObjectType::Blob)
-				if lfs_filter_for(
-					repository,
-					entry_path.as_path(),
-				)
-				.is_lfs() =>
+				if filter_for(repository, entry_path.as_path())
+					.is_lfs() =>
 			{
 				let full_path = working_directory.join(&entry_path);
 				let outcome = smudge_file(

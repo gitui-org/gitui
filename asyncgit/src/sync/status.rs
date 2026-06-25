@@ -215,7 +215,7 @@ pub fn get_status(
 
 				if let Some(status) = status {
 					let path = item.rela_path().to_string();
-					let is_lfs = super::lfs::lfs_filter_for(
+					let is_lfs = super::lfs::filter_for(
 						&git2_repo,
 						Path::new(&path),
 					)
@@ -252,7 +252,7 @@ pub fn get_status(
 				 -> Result<gix::diff::index::Action> {
 					let path = change_ref.fields().0.to_string();
 					let status = change_ref.into();
-					let is_lfs = super::lfs::lfs_filter_for(
+					let is_lfs = super::lfs::filter_for(
 						&git2_repo,
 						Path::new(&path),
 					)
@@ -293,7 +293,7 @@ pub fn get_status(
 				};
 
 				if let Some(status) = status {
-					let is_lfs = super::lfs::lfs_filter_for(
+					let is_lfs = super::lfs::filter_for(
 						&git2_repo,
 						Path::new(&path),
 					)

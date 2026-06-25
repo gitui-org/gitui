@@ -35,6 +35,9 @@ pub fn reset_workdir(repo_path: &RepoPath, path: &str) -> Result<()> {
 		.path(path);
 
 	repo.checkout_index(None, Some(&mut checkout_opts))?;
+
+	super::lfs::record_smudge(&repo, "reset_workdir");
+
 	Ok(())
 }
 
@@ -55,10 +58,7 @@ pub fn reset_repo(
 	// Only a hard reset rewrites the working tree from the target commit and
 	// leaves LFS files as pointer text; soft/mixed resets leave it untouched.
 	if matches!(kind, ResetType::Hard) {
-		super::lfs::large_file_storage_smudge_head_logged(
-			&repo,
-			"reset_repo",
-		);
+		super::lfs::record_smudge(&repo, "reset_repo");
 	}
 
 	Ok(())
@@ -74,7 +74,7 @@ mod tests {
 		tests::{
 			debug_cmd_print, get_statuses, repo_init, repo_init_empty,
 		},
-		utils::{stage_add_all, stage_add_file},
+		utils::{stage_add_all_files, stage_add_file},
 		RepoPath,
 	};
 	use std::{
@@ -197,7 +197,7 @@ mod tests {
 				.write_all(b"file3")?;
 		}
 
-		stage_add_all(repo_path, "*", None).unwrap();
+		stage_add_all_files(repo_path, "*", None).unwrap();
 		commit(repo_path, "msg").unwrap();
 
 		{

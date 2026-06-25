@@ -342,7 +342,7 @@ pub fn checkout_branch(
 	repo.set_head(branch_ref_name?)?;
 
 	// Smudge LFS pointer files with real content from the local LFS store.
-	if let Err(e) = super::lfs::large_file_storage_smudge_tree(
+	if let Err(e) = super::lfs::smudge_tree(
 		&repo,
 		&target_tree,
 		previous_tree.as_ref(),
@@ -390,11 +390,9 @@ pub fn checkout_commit(
 	repo.set_head_detached(commit.id())?;
 
 	// Smudge Large File Storage pointer files with real content from the local Large File Storage store.
-	if let Err(error) = super::lfs::large_file_storage_smudge_tree(
-		&repo,
-		&tree,
-		previous_tree.as_ref(),
-	) {
+	if let Err(error) =
+		super::lfs::smudge_tree(&repo, &tree, previous_tree.as_ref())
+	{
 		log::warn!("checkout_commit: Large File Storage smudge failed: {error}");
 	}
 
@@ -449,11 +447,9 @@ pub fn checkout_remote_branch(
 	}
 
 	// Smudge LFS pointer files with real content from the local LFS store.
-	if let Err(e) = super::lfs::large_file_storage_smudge_tree(
-		&repo,
-		&tree,
-		previous_tree.as_ref(),
-	) {
+	if let Err(e) =
+		super::lfs::smudge_tree(&repo, &tree, previous_tree.as_ref())
+	{
 		log::warn!("checkout_remote_branch: LFS smudge failed: {e}");
 	}
 
