@@ -39,6 +39,13 @@ pub fn lfs_store(repo: &Repository) -> Store {
 	Store::new(repo.path().join("lfs"))
 }
 
+/// Whether smudging should be skipped, honoring the `GIT_LFS_SKIP_SMUDGE`
+/// environment variable, usually seen in CI
+fn lfs_skip_smudge() -> bool {
+	std::env::var_os("GIT_LFS_SKIP_SMUDGE")
+		.is_some_and(|value| !value.is_empty() && value != "0")
+}
+
 /// Resolve the LFS filter attribute for `path` (relative to the repo root).
 ///
 /// This delegates to libgit2's attribute lookup and returns an [`LfsFilter`]
