@@ -2,36 +2,11 @@ use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
 use git2::{Commit, Oid, Repository};
 use gix::revision::Walk;
-use std::{
-	cmp::Ordering,
-	collections::{BinaryHeap, HashSet},
-};
-
-struct TimeOrderedCommit<'a>(Commit<'a>);
-
-impl Eq for TimeOrderedCommit<'_> {}
-
-impl PartialEq for TimeOrderedCommit<'_> {
-	fn eq(&self, other: &Self) -> bool {
-		self.0.time().eq(&other.0.time())
-	}
-}
-
-impl PartialOrd for TimeOrderedCommit<'_> {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl Ord for TimeOrderedCommit<'_> {
-	fn cmp(&self, other: &Self) -> Ordering {
-		self.0.time().cmp(&other.0.time())
-	}
-}
+use std::collections::HashSet;
 
 ///
 pub struct LogWalker<'a> {
-	commits: BinaryHeap<TimeOrderedCommit<'a>>,
+	commits: Vec<Commit<'a>>,
 	visited: HashSet<Oid>,
 	limit: usize,
 	repo: &'a Repository,
@@ -43,8 +18,8 @@ impl<'a> LogWalker<'a> {
 	pub fn new(repo: &'a Repository, limit: usize) -> Result<Self> {
 		let c = repo.head()?.peel_to_commit()?;
 
-		let mut commits = BinaryHeap::with_capacity(10);
-		commits.push(TimeOrderedCommit(c));
+		let mut commits = Vec::with_capacity(10);
+		commits.push(c);
 
 		Ok(Self {
 			commits,
@@ -74,11 +49,11 @@ impl<'a> LogWalker<'a> {
 		let mut count = 0_usize;
 
 		while let Some(c) = self.commits.pop() {
-			for p in c.0.parents() {
+			for p in c.parents() {
 				self.visit(p);
 			}
 
-			let id: CommitId = c.0.id().into();
+			let id: CommitId = c.id().into();
 			let commit_should_be_included =
 				if let Some(ref filter) = self.filter {
 					filter(self.repo, &id)?
@@ -102,7 +77,7 @@ impl<'a> LogWalker<'a> {
 	//
 	fn visit(&mut self, c: Commit<'a>) {
 		if self.visited.insert(c.id()) {
-			self.commits.push(TimeOrderedCommit(c));
+			self.commits.push(c);
 		}
 	}
 }
@@ -137,10 +112,7 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 
 		let tips = [commit.id];
 
-		let platform = repo
-			.rev_walk(tips)
-			.sorting(gix::revision::walk::Sorting::ByCommitTime(gix::traverse::commit::simple::CommitTimeOrder::NewestFirst))
-			.use_commit_graph(false);
+		let platform = repo.rev_walk(tips);
 
 		let walk = platform.all()?;
 
