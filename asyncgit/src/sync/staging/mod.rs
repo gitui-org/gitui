@@ -39,8 +39,10 @@ impl NewFromOldContent {
 	}
 
 	fn add_old_line(&mut self, old_lines: &[&str]) {
-		self.lines.push(old_lines[self.old_index].to_string());
-		self.old_index += 1;
+		if let Some(line) = old_lines.get(self.old_index) {
+			self.lines.push((*line).to_string());
+			self.old_index += 1;
+		}
 	}
 
 	fn catchup_to_hunkstart(
@@ -48,7 +50,9 @@ impl NewFromOldContent {
 		hunk_start: usize,
 		old_lines: &[&str],
 	) {
-		while hunk_start > self.old_index + 1 {
+		while hunk_start > self.old_index + 1
+			&& self.old_index < old_lines.len()
+		{
 			self.add_old_line(old_lines);
 		}
 	}
@@ -181,4 +185,36 @@ pub fn load_file(
 	file.read_to_string(&mut res)?;
 
 	Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::NewFromOldContent;
+
+	// Regression for #2953: indexing old_lines past its length used to panic
+	// in add_old_line / catchup_to_hunkstart when a hunk_start pointed past
+	// the end of the working copy. The bounds-checked helpers must stop
+	// catching up at end-of-buffer instead of panicking.
+	#[test]
+	fn catchup_to_hunkstart_past_end_does_not_panic() {
+		let old_lines = ["a", "b", "c"];
+		let mut content = NewFromOldContent::default();
+
+		content.catchup_to_hunkstart(99, &old_lines);
+
+		assert_eq!(content.old_index, old_lines.len());
+		assert_eq!(content.lines, vec!["a", "b", "c"]);
+	}
+
+	#[test]
+	fn add_old_line_at_end_is_noop() {
+		let old_lines = ["only-line"];
+		let mut content = NewFromOldContent::default();
+		content.add_old_line(&old_lines);
+		assert_eq!(content.old_index, 1);
+
+		content.add_old_line(&old_lines);
+		assert_eq!(content.old_index, 1);
+		assert_eq!(content.lines, vec!["only-line"]);
+	}
 }

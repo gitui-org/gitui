@@ -274,6 +274,8 @@ pub mod tests {
 	pub fn repo_init_bare() -> Result<(TempDir, Repository)> {
 		init_log();
 
+		sandbox_config_files();
+
 		let tmp_repo_dir = TempDir::new()?;
 		let bare_repo = Repository::init_bare(tmp_repo_dir.path())?;
 		Ok((tmp_repo_dir, bare_repo))

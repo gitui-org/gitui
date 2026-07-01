@@ -1,6 +1,6 @@
 //! Git Api for Commits
 use super::{CommitId, RepoPath};
-use crate::sync::sign::{SignBuilder, SignError};
+use crate::sync::sign::{create_signed_commit, SignBuilder};
 use crate::{
 	error::{Error, Result},
 	sync::{repository::repo, utils::get_head_repo},
@@ -99,58 +99,47 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 
 	let parents = parents.iter().collect::<Vec<_>>();
 
-	let commit_id = if config
-		.get_bool("commit.gpgsign")
-		.unwrap_or(false)
-	{
-		let buffer = repo.commit_create_buffer(
-			&signature,
-			&signature,
-			msg,
-			&tree,
-			parents.as_slice(),
-		)?;
-
-		let commit = std::str::from_utf8(&buffer).map_err(|_e| {
-			SignError::Shellout("utf8 conversion error".to_string())
-		})?;
-
-		let signer = SignBuilder::from_gitconfig(&repo, &config)?;
-		let (signature, signature_field) = signer.sign(&buffer)?;
-		let commit_id = repo.commit_signed(
-			commit,
-			&signature,
-			signature_field.as_deref(),
-		)?;
-
-		// manually advance to the new commit ID
-		// repo.commit does that on its own, repo.commit_signed does not
-		// if there is no head, read default branch or default to "master"
-		if let Ok(mut head) = repo.head() {
-			head.set_target(commit_id, msg)?;
-		} else {
-			let default_branch_name = config
-				.get_str("init.defaultBranch")
-				.unwrap_or("master");
-			repo.reference(
-				&format!("refs/heads/{default_branch_name}"),
-				commit_id,
-				true,
+	let commit_id =
+		if config.get_bool("commit.gpgsign").unwrap_or(false) {
+			let signer = SignBuilder::from_gitconfig(&repo, &config)?;
+			let commit_id = create_signed_commit(
+				&repo,
+				signer.as_ref(),
+				&signature,
+				&signature,
 				msg,
+				&tree,
+				parents.as_slice(),
 			)?;
-		}
 
-		commit_id
-	} else {
-		repo.commit(
-			Some("HEAD"),
-			&signature,
-			&signature,
-			msg,
-			&tree,
-			parents.as_slice(),
-		)?
-	};
+			// manually advance to the new commit ID
+			// repo.commit does that on its own, repo.commit_signed does not
+			// if there is no head, read default branch or default to "master"
+			if let Ok(mut head) = repo.head() {
+				head.set_target(commit_id, msg)?;
+			} else {
+				let default_branch_name = config
+					.get_str("init.defaultBranch")
+					.unwrap_or("master");
+				repo.reference(
+					&format!("refs/heads/{default_branch_name}"),
+					commit_id,
+					true,
+					msg,
+				)?;
+			}
+
+			commit_id
+		} else {
+			repo.commit(
+				Some("HEAD"),
+				&signature,
+				&signature,
+				msg,
+				&tree,
+				parents.as_slice(),
+			)?
+		};
 
 	Ok(commit_id.into())
 }
