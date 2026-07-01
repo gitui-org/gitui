@@ -315,6 +315,9 @@ impl Sign for SSHSign {
 			.arg("-f")
 			.arg(&self.signing_key_path);
 
+		// `-U` (use agent) makes ssh-keygen error instead of prompting for a
+		// passphrase, but third-party signers (e.g. 1Password's op-ssh-sign)
+		// reject the flag, so only pass it to ssh-keygen itself.
 		if &self.program == "ssh-keygen" {
 			cmd.arg("-U");
 		}
