@@ -53,6 +53,15 @@ jobs:
         run: |
           cargo build
 
+      # gpgsm: needed by the x509 signing e2e test (unix-only)
+      - name: Install commit-signing tools (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y gpgsm
+
+      - name: Install commit-signing tools (macos)
+        if: matrix.os == 'macos-latest'
+        run: brew install gnupg
+
       - name: Run tests
         run: make test
 
@@ -128,6 +137,9 @@ jobs:
       - name: Setup MUSL
         run: |
           sudo apt-get -qq install musl-tools
+      # gpgsm: needed by the x509 signing e2e test
+      - name: Install commit-signing tools
+        run: sudo apt-get -qq install gpgsm
       - name: Build Debug
         run: |
           make build-linux-musl-debug
