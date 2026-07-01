@@ -239,7 +239,7 @@ impl Sign for GPGSign {
 		if !output.status.success() {
 			return Err(SignError::Shellout(format!(
 				"failed to sign data, program '{}' exited non-zero: {}",
-				&self.program,
+				self.program,
 				std::str::from_utf8(&output.stderr)
 					.unwrap_or("[error could not be read from stderr]")
 			)));
@@ -250,7 +250,7 @@ impl Sign for GPGSign {
 
 		if !stderr.contains("\n[GNUPG:] SIG_CREATED ") {
 			return Err(SignError::Shellout(
-				format!("failed to sign data, program '{}' failed, SIG_CREATED not seen in stderr", &self.program),
+				format!("failed to sign data, program '{}' failed, SIG_CREATED not seen in stderr", self.program),
 			));
 		}
 

@@ -70,7 +70,7 @@ pub(crate) fn signature_allow_undefined_name(
 				config.get_entry("user.name"),
 				config.get_entry("user.email"),
 			) {
-				if let Some(email) = email_entry.value() {
+				if let Ok(email) = email_entry.value() {
 					return Signature::now("unknown", email);
 				}
 			};
