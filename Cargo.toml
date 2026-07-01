@@ -48,10 +48,14 @@ notify = "8"
 notify-debouncer-mini = "0.7"
 once_cell = "1"
 parking_lot_core = "0.9"
-ratatui = { version = "0.30", default-features = false, features = [
-  "crossterm",
-  "serde",
-] }
+ratatui = {
+  version = "0.30",
+  default-features = false,
+  features = [
+    "crossterm",
+    "serde",
+  ]
+}
 ratatui-textarea = "0.8"
 rayon-core = "1.13"
 ron = "0.12"
@@ -61,13 +65,17 @@ serde = "1.0"
 shellexpand = "3.1"
 simplelog = { version = "0.12", default-features = false }
 struct-patch = "0.10"
-syntect = { version = "5.3", default-features = false, features = [
-  "default-syntaxes",
-  "default-themes",
-  "html",
-  "parsing",
-  "plist-load",
-] }
+syntect = {
+  version = "5.3",
+  default-features = false,
+  features = [
+    "default-syntaxes",
+    "default-themes",
+    "html",
+    "parsing",
+    "plist-load",
+  ]
+}
 two-face = { version = "0.4.4", default-features = false }
 unicode-segmentation = "1.12"
 unicode-truncate = "2.0"

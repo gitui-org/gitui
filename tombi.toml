@@ -1,0 +1,5 @@
+# Keep dependency inline tables on a single line. Multi-line inline tables are
+# TOML 1.1 syntax that Cargo on our MSRV (rust 1.88) rejects with
+# "invalid inline table", so tombi must not expand them.
+[format.rules]
+line-width = 220
