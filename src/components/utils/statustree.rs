@@ -437,7 +437,7 @@ impl StatusTree {
 			if matches!(item_kind, FileTreeItemKind::Path(PathCollapsed(collapsed)) if collapsed)
 			{
 				// we encountered an inner path that is still collapsed
-				inner_collapsed = Some(format!("{}/", &item_path));
+				inner_collapsed = Some(format!("{item_path}/"));
 			}
 
 			if prefix
