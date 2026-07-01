@@ -78,6 +78,38 @@ pub trait Sign {
 	fn signing_key(&self) -> String;
 }
 
+/// Build a signed commit object and return its [`git2::Oid`].
+///
+/// Creates the commit buffer, signs it with `signer` and writes the
+/// signed commit. It does not move any reference, the caller is
+/// responsible for advancing the relevant head or branch to the
+/// returned id.
+pub fn create_signed_commit(
+	repo: &git2::Repository,
+	signer: &dyn Sign,
+	author: &git2::Signature<'_>,
+	committer: &git2::Signature<'_>,
+	message: &str,
+	tree: &git2::Tree<'_>,
+	parents: &[&git2::Commit<'_>],
+) -> crate::error::Result<git2::Oid> {
+	let buffer = repo.commit_create_buffer(
+		author, committer, message, tree, parents,
+	)?;
+
+	let contents = std::str::from_utf8(&buffer).map_err(|_| {
+		SignError::Shellout("utf8 conversion error".to_string())
+	})?;
+
+	let (signature, signature_field) = signer.sign(&buffer)?;
+
+	Ok(repo.commit_signed(
+		contents,
+		&signature,
+		signature_field.as_deref(),
+	)?)
+}
+
 /// A builder to facilitate the creation of a signing method ([`Sign`]) by examining the git configuration.
 pub struct SignBuilder;
 
