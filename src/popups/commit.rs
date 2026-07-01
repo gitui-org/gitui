@@ -9,6 +9,7 @@ use crate::{
 	queue::{InternalEvent, NeedsUpdate, Queue},
 	strings, try_or_popup,
 	ui::style::SharedTheme,
+	AsyncAppNotification,
 };
 use anyhow::{bail, Ok, Result};
 use asyncgit::sync::commit::commit_message_prettify;
@@ -20,6 +21,7 @@ use asyncgit::{
 	},
 	StatusItem, StatusItemType,
 };
+use crossbeam_channel::Sender;
 use crossterm::event::Event;
 use easy_cast::Cast;
 use ratatui::{
@@ -37,11 +39,6 @@ use std::{
 };
 
 use super::ExternalEditorPopup;
-
-enum CommitResult {
-	CommitDone,
-	Aborted,
-}
 
 enum Mode {
 	Normal,
@@ -63,6 +60,8 @@ pub struct CommitPopup {
 	commit_msg_history_idx: usize,
 	options: SharedOptions,
 	verify: bool,
+	sender_app: Sender<AsyncAppNotification>,
+	pending_commit: Option<String>,
 }
 
 const FIRST_LINE_LIMIT: usize = 50;
@@ -89,6 +88,8 @@ impl CommitPopup {
 			commit_msg_history_idx: 0,
 			options: env.options.clone(),
 			verify: true,
+			sender_app: env.sender_app.clone(),
+			pending_commit: None,
 		}
 	}
 
@@ -208,29 +209,10 @@ impl CommitPopup {
 
 	fn commit(&mut self) -> Result<()> {
 		let msg = self.input.get_text().to_string();
-
-		if matches!(
-			self.commit_with_msg(msg)?,
-			CommitResult::CommitDone
-		) {
-			self.options
-				.borrow_mut()
-				.add_commit_msg(self.input.get_text());
-			self.commit_msg_history_idx = 0;
-
-			self.hide();
-			self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
-			self.queue.push(InternalEvent::StatusLastFileMoved);
-			self.input.clear();
-		}
-
-		Ok(())
+		self.commit_with_msg(msg)
 	}
 
-	fn commit_with_msg(
-		&mut self,
-		msg: String,
-	) -> Result<CommitResult> {
+	fn commit_with_msg(&mut self, msg: String) -> Result<()> {
 		// on exit verify should always be on
 		let verify = self.verify;
 		self.verify = true;
@@ -244,7 +226,7 @@ impl CommitPopup {
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("pre-commit hook error:\n{e}"),
 				));
-				return Ok(CommitResult::Aborted);
+				return Ok(());
 			}
 		}
 
@@ -260,10 +242,43 @@ impl CommitPopup {
 				self.queue.push(InternalEvent::ShowErrorMsg(
 					format!("commit-msg hook error:\n{e}"),
 				));
-				return Ok(CommitResult::Aborted);
+				return Ok(());
 			}
 		}
-		self.do_commit(&msg)?;
+
+		// signing with a security key blocks for a physical touch; show a
+		// hint and defer the blocking commit to the next frame so it paints.
+		if sync::sign::signing_requires_user_presence(
+			&self.repo.borrow(),
+		) {
+			self.pending_commit = Some(msg);
+			self.queue.push(InternalEvent::ShowInfoMsg(
+				"Touch your security key to sign the commit..."
+					.to_string(),
+			));
+			self.sender_app
+				.send(AsyncAppNotification::PerformPendingCommit)
+				.expect("could not send commit notification");
+			return Ok(());
+		}
+
+		self.finish_commit(&msg)
+	}
+
+	/// Run the deferred commit once the touch hint has been shown.
+	pub fn perform_pending_commit(&mut self) -> Result<()> {
+		if let Some(msg) = self.pending_commit.take() {
+			try_or_popup!(
+				self,
+				"commit error:",
+				self.finish_commit(&msg)
+			);
+		}
+		Ok(())
+	}
+
+	fn finish_commit(&mut self, msg: &str) -> Result<()> {
+		self.do_commit(msg)?;
 
 		if let HookResult::NotOk(e) =
 			sync::hooks_post_commit(&self.repo.borrow())?
@@ -274,7 +289,17 @@ impl CommitPopup {
 			)));
 		}
 
-		Ok(CommitResult::CommitDone)
+		self.options
+			.borrow_mut()
+			.add_commit_msg(self.input.get_text());
+		self.commit_msg_history_idx = 0;
+
+		self.hide();
+		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		self.queue.push(InternalEvent::StatusLastFileMoved);
+		self.input.clear();
+
+		Ok(())
 	}
 
 	fn do_commit(&self, msg: &str) -> Result<()> {

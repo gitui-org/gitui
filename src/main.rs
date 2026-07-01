@@ -134,6 +134,8 @@ pub enum SyntaxHighlightProgress {
 pub enum AsyncAppNotification {
 	///
 	SyntaxHighlighting(SyntaxHighlightProgress),
+	/// run a commit whose signing was deferred to show a hint first
+	PerformPendingCommit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
