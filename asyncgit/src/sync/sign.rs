@@ -347,8 +347,7 @@ impl Sign for SSHSign {
 			}
 			return Err(SignError::Shellout(format!(
 				"failed to sign data, program '{}' exited non-zero: {}",
-				&self.program,
-				error_msg
+				self.program, error_msg
 			)));
 		}
 
