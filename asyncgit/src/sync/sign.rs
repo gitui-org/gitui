@@ -379,6 +379,8 @@ mod tests {
 	use super::*;
 	use crate::error::Result;
 	use crate::sync::tests::repo_init_empty;
+	#[cfg(target_os = "linux")]
+	use serial_test::serial;
 
 	#[test]
 	fn test_invalid_signing_format() -> Result<()> {
@@ -528,6 +530,231 @@ mod tests {
 		// gpg.program and therefore takes precedence
 		assert_eq!("GPG_X509_PROGRAM_TEST", sign.program());
 
+		Ok(())
+	}
+
+	/// End-to-end x509 signing: set up a throwaway `gpgsm` identity, sign a
+	/// real commit through [`SignBuilder`]/[`create_signed_commit`] and verify
+	/// the embedded CMS signature with `gpgsm --verify`.
+	///
+	/// Linux-only and serial because it drives `gpg-agent` via a process-wide
+	/// `GNUPGHOME`. Asserts that `gpgsm`/`openssl` are installed.
+	#[cfg(target_os = "linux")]
+	#[test]
+	#[serial]
+	fn test_x509_sign_and_verify_e2e() -> Result<()> {
+		use std::os::unix::fs::PermissionsExt;
+		use std::process::Command;
+
+		// note: openssl wants `version`, not `--version`
+		fn tool_available(bin: &str, version_arg: &str) -> bool {
+			Command::new(bin)
+				.arg(version_arg)
+				.stdout(std::process::Stdio::null())
+				.stderr(std::process::Stdio::null())
+				.status()
+				.map(|s| s.success())
+				.unwrap_or(false)
+		}
+
+		assert!(
+			tool_available("gpgsm", "--version"),
+			"gpgsm is required for the x509 e2e test"
+		);
+		assert!(
+			tool_available("openssl", "version"),
+			"openssl is required for the x509 e2e test"
+		);
+
+		let email = "gitui-x509-test@example.com";
+		let gnupg = tempfile::tempdir()?;
+		let home = gnupg.path();
+		std::fs::set_permissions(
+			home,
+			std::fs::Permissions::from_mode(0o700),
+		)?;
+
+		// fake pinentry: answers every prompt with OK, i.e. an empty passphrase
+		// and an automatic "yes" to the root-trust question, so gpgsm never
+		// blocks on a tty.
+		let pinentry = home.join("fake-pinentry.sh");
+		std::fs::write(
+			&pinentry,
+			"#!/bin/sh\necho \"OK ready\"\nwhile read -r cmd; do\n  echo OK\n  [ \"$cmd\" = BYE ] && exit 0\ndone\n",
+		)?;
+		std::fs::set_permissions(
+			&pinentry,
+			std::fs::Permissions::from_mode(0o700),
+		)?;
+		std::fs::write(
+			home.join("gpg-agent.conf"),
+			format!(
+				"allow-loopback-pinentry\npinentry-program {}\n",
+				pinentry.display()
+			),
+		)?;
+
+		// GPGSign spawns `gpgsm` without an env override, so it has to find our
+		// throwaway keyring through the process environment.
+		std::env::set_var("GNUPGHOME", home);
+
+		let run = |program: &str, args: &[&str]| {
+			let out = Command::new(program)
+				.args(args)
+				.env("GNUPGHOME", home)
+				.output()
+				.unwrap_or_else(|e| {
+					panic!("failed to run {program}: {e}")
+				});
+			assert!(
+				out.status.success(),
+				"{program} {args:?} failed: {}",
+				String::from_utf8_lossy(&out.stderr)
+			);
+			out
+		};
+
+		// self-signed x509 cert + key, bundled as PKCS#12 for gpgsm.
+		let key = home.join("key.pem");
+		let cert = home.join("cert.pem");
+		let p12 = home.join("bundle.p12");
+		run(
+			"openssl",
+			&[
+				"req",
+				"-x509",
+				"-newkey",
+				"rsa:2048",
+				"-nodes",
+				"-keyout",
+				key.to_str().unwrap(),
+				"-out",
+				cert.to_str().unwrap(),
+				"-days",
+				"3650",
+				"-subj",
+				&format!("/CN=gitui test/emailAddress={email}"),
+			],
+		);
+		run(
+			"openssl",
+			&[
+				"pkcs12",
+				"-export",
+				"-inkey",
+				key.to_str().unwrap(),
+				"-in",
+				cert.to_str().unwrap(),
+				"-out",
+				p12.to_str().unwrap(),
+				"-passout",
+				"pass:",
+				// OpenSSL 3 defaults to PBES2/AES which gpgsm can't
+				// decrypt; force the legacy PKCS#12 3DES PBE it reads.
+				"-keypbe",
+				"PBE-SHA1-3DES",
+				"-certpbe",
+				"PBE-SHA1-3DES",
+				"-macalg",
+				"sha1",
+			],
+		);
+		run(
+			"gpgsm",
+			&[
+				"--batch",
+				"--pinentry-mode",
+				"loopback",
+				"--passphrase",
+				"",
+				"--import",
+				p12.to_str().unwrap(),
+			],
+		);
+
+		// gpgsm refuses to sign with an untrusted root, so mark our
+		// self-signed cert trusted by writing its fingerprint into
+		// trustlist.txt ("S" relaxes the otherwise-strict CA checks).
+		let listing = run(
+			"gpgsm",
+			&["--batch", "--with-colons", "--list-secret-keys"],
+		);
+		let listing = String::from_utf8_lossy(&listing.stdout);
+		let fingerprint = listing
+			.lines()
+			.filter_map(|line| line.strip_prefix("fpr:"))
+			.find_map(|rest| {
+				rest.split(':').find(|field| {
+					field.len() == 40
+						&& field
+							.bytes()
+							.all(|b| b.is_ascii_hexdigit())
+				})
+			})
+			.expect("could not determine cert fingerprint");
+		std::fs::write(
+			home.join("trustlist.txt"),
+			format!("{fingerprint} S\n"),
+		)?;
+		// reload gpg-agent so it picks up the new trustlist
+		run("gpgconf", &["--kill", "gpg-agent"]);
+
+		// configure the repo for x509 signing and build the signer.
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "x509")?;
+			config.set_str("user.signingKey", email)?;
+		}
+		let signer =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+		assert_eq!("gpgsm", signer.program());
+
+		// sign an initial commit through the production code path.
+		let sig = git2::Signature::now("gitui test", email)?;
+		let tree = {
+			let mut index = repo.index()?;
+			let tree_id = index.write_tree()?;
+			repo.find_tree(tree_id)?
+		};
+		let commit_id = create_signed_commit(
+			&repo,
+			&*signer,
+			&sig,
+			&sig,
+			"x509 signed commit",
+			&tree,
+			&[],
+		)?;
+
+		// the commit must carry a CMS signature that gpgsm accepts.
+		let (signature, signed_data) =
+			repo.extract_signature(&commit_id, None)?;
+		let signature = std::str::from_utf8(&signature).unwrap();
+		assert!(
+			signature.contains("BEGIN SIGNED MESSAGE"),
+			"expected an armored CMS signature, got: {signature}"
+		);
+
+		let sig_file = home.join("commit.sig");
+		let data_file = home.join("commit.data");
+		std::fs::write(&sig_file, signature)?;
+		std::fs::write(&data_file, &*signed_data)?;
+		let verify = run(
+			"gpgsm",
+			&[
+				"--verify",
+				sig_file.to_str().unwrap(),
+				data_file.to_str().unwrap(),
+			],
+		);
+		let verify_err = String::from_utf8_lossy(&verify.stderr);
+		assert!(
+			verify_err.contains("Good signature"),
+			"gpgsm did not accept the signature: {verify_err}"
+		);
+
+		std::env::remove_var("GNUPGHOME");
 		Ok(())
 	}
 }
