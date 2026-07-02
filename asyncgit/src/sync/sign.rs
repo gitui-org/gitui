@@ -830,4 +830,125 @@ mod tests {
 		std::env::remove_var("GNUPGHOME");
 		Ok(())
 	}
+
+	/// e2e openpgp signing: generate a throwaway `gpg` key, sign a real
+	/// commit and verify it. Serial + unix-only: uses a process-wide `GNUPGHOME`.
+	#[cfg(unix)]
+	#[test]
+	#[serial]
+	fn test_openpgp_sign_and_verify_e2e() -> Result<()> {
+		use std::os::unix::fs::PermissionsExt;
+		use std::process::Command;
+
+		fn tool_available(bin: &str) -> bool {
+			Command::new(bin)
+				.arg("--version")
+				.stdout(std::process::Stdio::null())
+				.stderr(std::process::Stdio::null())
+				.status()
+				.map(|s| s.success())
+				.unwrap_or(false)
+		}
+
+		assert!(
+			tool_available("gpg"),
+			"gpg is required for the openpgp e2e test"
+		);
+
+		let email = "gitui-openpgp-test@example.com";
+		let gnupg = tempfile::tempdir()?;
+		let home = gnupg.path();
+		std::fs::set_permissions(
+			home,
+			std::fs::Permissions::from_mode(0o700),
+		)?;
+
+		// GPGSign inherits env, so point the child gpg at our keyring.
+		std::env::set_var("GNUPGHOME", home);
+
+		let run = |program: &str, args: &[&str]| {
+			let out = Command::new(program)
+				.args(args)
+				.env("GNUPGHOME", home)
+				.output()
+				.unwrap_or_else(|e| {
+					panic!("failed to run {program}: {e}")
+				});
+			assert!(
+				out.status.success(),
+				"{program} {args:?} failed: {}",
+				String::from_utf8_lossy(&out.stderr)
+			);
+			out
+		};
+
+		// unattended keygen: %no-protection => no passphrase, so no pinentry
+		// and no agent trust dance are needed (unlike the x509/gpgsm path).
+		let params = home.join("keyparams");
+		std::fs::write(
+			&params,
+			format!(
+				"%no-protection\nKey-Type: RSA\nKey-Length: 2048\nSubkey-Type: RSA\nSubkey-Length: 2048\nName-Real: gitui test\nName-Email: {email}\nExpire-Date: 0\n%commit\n"
+			),
+		)?;
+		run(
+			"gpg",
+			&["--batch", "--gen-key", params.to_str().unwrap()],
+		);
+
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "openpgp")?;
+			config.set_str("user.signingKey", email)?;
+		}
+		let signer =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+		assert_eq!("gpg", signer.program());
+
+		let sig = git2::Signature::now("gitui test", email)?;
+		let tree = {
+			let mut index = repo.index()?;
+			let tree_id = index.write_tree()?;
+			repo.find_tree(tree_id)?
+		};
+		let commit_id = create_signed_commit(
+			&repo,
+			&*signer,
+			&sig,
+			&sig,
+			"openpgp signed commit",
+			&tree,
+			&[],
+		)?;
+
+		let (signature, signed_data) =
+			repo.extract_signature(&commit_id, None)?;
+		let signature = std::str::from_utf8(&signature).unwrap();
+		assert!(
+			signature.contains("BEGIN PGP SIGNATURE"),
+			"expected an armored OpenPGP signature, got: {signature}"
+		);
+
+		let sig_file = home.join("commit.sig");
+		let data_file = home.join("commit.data");
+		std::fs::write(&sig_file, signature)?;
+		std::fs::write(&data_file, &*signed_data)?;
+		let verify = run(
+			"gpg",
+			&[
+				"--verify",
+				sig_file.to_str().unwrap(),
+				data_file.to_str().unwrap(),
+			],
+		);
+		let verify_err = String::from_utf8_lossy(&verify.stderr);
+		assert!(
+			verify_err.contains("Good signature"),
+			"gpg did not accept the signature: {verify_err}"
+		);
+
+		std::env::remove_var("GNUPGHOME");
+		Ok(())
+	}
 }
