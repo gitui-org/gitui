@@ -1,14 +1,22 @@
-use super::chunk::{Chunk, Markers};
-use super::AliasId;
+use super::chunk::LaneSlot;
+use super::CommitAlias;
 use std::collections::BTreeMap;
 
 /// A single mutation of the lane state, recorded while processing one
 /// commit.
 #[derive(Clone, Debug)]
 pub enum DeltaOp {
-	Insert { index: usize, item: Option<Chunk> },
-	Remove { index: usize },
-	Replace { index: usize, new: Option<Chunk> },
+	Insert {
+		index: usize,
+		item: Option<LaneSlot>,
+	},
+	Remove {
+		index: usize,
+	},
+	Replace {
+		index: usize,
+		new: Option<LaneSlot>,
+	},
 }
 
 /// All lane-state mutations caused by processing a single commit.
@@ -22,25 +30,25 @@ const CHECKPOINT_INTERVAL: usize = 100;
 /// Delta-compressed history of the graph's lane state.
 ///
 /// While walking the log top-down, every commit mutates the set of
-/// active lanes (a `Vec<Option<Chunk>>`, one slot per lane). So, storign a
+/// active lanes (a `Vec<Option<LaneSlot>>`, one slot per lane). So, storign a
 /// full copy of that state for each commit is a waste. This
 /// buffer preserves ONLY the latest state PLUS the list of [`Delta`]s that
 /// produced it.
 /// Use [`Buffer::decompress`] to get the complete version.
 pub struct Buffer {
 	/// Lane state after the most recently processed commit.
-	pub current: Vec<Option<Chunk>>,
+	pub current: Vec<Option<LaneSlot>>,
 
 	/// One [`Delta`] per processed commit, in the order of the walk.
 	pub deltas: Vec<Delta>,
 
 	/// Full lane-state snapshots taken every `CHECKPOINT_INTERVAL`
 	/// commits, keyed by delta index, for reducing decompression cost.
-	pub checkpoints: BTreeMap<usize, Vec<Option<Chunk>>>,
+	pub checkpoints: BTreeMap<usize, Vec<Option<LaneSlot>>>,
 
 	/// Aliases of merge commits whose second parent still needs a new
 	/// lane.
-	merge_commits: Vec<AliasId>,
+	merge_commits: Vec<CommitAlias>,
 
 	/// Scratch list of the [`DeltaOp`]s recorded for processing commit
 	pending_delta: Vec<DeltaOp>,
@@ -65,16 +73,16 @@ impl Buffer {
 
 	/// Remember `alias` as a merge commit whose second parent must be
 	/// given its own lane.
-	pub fn track_merge_commit(&mut self, alias: AliasId) {
+	pub fn track_merge_commit(&mut self, alias: CommitAlias) {
 		self.merge_commits.push(alias);
 	}
 
-	pub fn update(&mut self, new_chunk: &Chunk) {
+	pub fn update(&mut self, new_chunk: &LaneSlot) {
 		// Phase 1: place the new chunk into the lane array.
 		let placement_index = self.place_chunk(new_chunk);
 
 		// Phase 2: consume the alias in all other live chunks.
-		if let Some(alias) = new_chunk.alias {
+		if let Some(alias) = new_chunk.alias() {
 			self.consume_alias_in_other_chunks(
 				alias,
 				placement_index,
@@ -88,10 +96,11 @@ impl Buffer {
 		self.commit_delta();
 	}
 
-	fn place_chunk(&mut self, new_chunk: &Chunk) -> usize {
-		// Prefer a lane whose current occupant is waiting for this chunk as parent_a.
+	fn place_chunk(&mut self, new_chunk: &LaneSlot) -> usize {
+		// Prefer a lane whose current occupant awaits this chunk's
+		// commit as its primary parent.
 		let target = self
-			.find_lane_awaiting_parent(new_chunk.alias)
+			.find_lane_awaiting_parent(new_chunk.alias())
 			.or_else(|| self.first_empty_lane())
 			.unwrap_or(self.current.len());
 
@@ -105,12 +114,14 @@ impl Buffer {
 
 	fn find_lane_awaiting_parent(
 		&self,
-		alias: Option<AliasId>,
+		alias: Option<CommitAlias>,
 	) -> Option<usize> {
-		let alias = alias?;
-		self.current.iter().position(|slot| {
-			slot.as_ref()
-				.is_some_and(|chunk| chunk.parent_a == Some(alias))
+		alias.and_then(|alias| {
+			self.current.iter().position(|slot| {
+				slot.as_ref().is_some_and(|chunk| {
+					chunk.awaits() == Some(alias)
+				})
+			})
 		})
 	}
 
@@ -120,43 +131,52 @@ impl Buffer {
 
 	fn consume_alias_in_other_chunks(
 		&mut self,
-		alias: AliasId,
+		alias: CommitAlias,
 		skip_index: usize,
 	) {
-		for index in 0..self.current.len() {
-			let mut chunk = match self.current[index].clone() {
+		let current = self.current.clone();
+		for (index, slot) in current.into_iter().enumerate() {
+			let chunk = match slot {
 				Some(chunk) if index != skip_index => chunk,
 				_ => continue,
 			};
 
-			let changed_a = chunk.parent_a == Some(alias);
-			let changed_b = chunk.parent_b == Some(alias);
-
-			if changed_a || changed_b {
-				if changed_a {
-					chunk.parent_a = None;
+			let new = match chunk {
+				// The awaited parent was JUST placed. Close the lane.
+				// The pending second parent is dropped with it.
+				LaneSlot::Flowing { parent, .. }
+				| LaneSlot::FlowingMerge { parent, .. }
+				| LaneSlot::Reserved { parent }
+					if parent.get() == alias =>
+				{
+					None
 				}
-				if changed_b {
-					chunk.parent_b = None;
-				}
+				// The second parent was just placed
+				// bridge resolves and the lane flows
+				LaneSlot::FlowingMerge {
+					alias: merge_alias,
+					parent,
+					second,
+				} if second.get() == alias => Some(LaneSlot::Flowing {
+					alias: merge_alias,
+					parent,
+				}),
+				_ => continue,
+			};
 
-				self.record_replace(
-					index,
-					chunk.parent_a.is_some().then_some(chunk),
-				);
-			}
+			self.record_replace(index, new);
 		}
 	}
 
 	fn flush_merge_commits(&mut self) {
 		while let Some(alias) = self.merge_commits.pop() {
 			// Search for an occupied slot that matches the target alias.
-			// If found, extract its index and a mutable clone of the chunk.
-			let Some((index, mut chunk)) =
+			// If found, extract its index and a clone of the chunk.
+			let Some((index, chunk)) =
 				self.current.iter().enumerate().find_map(
 					|(index, slot)| {
 						let chunk = slot.as_ref()?;
-						(chunk.alias == Some(alias))
+						(chunk.alias() == Some(alias))
 							.then(|| (index, chunk.clone()))
 					},
 				)
@@ -164,26 +184,33 @@ impl Buffer {
 				continue;
 			};
 
-			let detached_parent = chunk.parent_b.take();
-			self.record_replace(index, Some(chunk));
+			// Only a merge still owing its second parent needs a
+			// lane split off; anything else is a no-op.
+			let LaneSlot::FlowingMerge {
+				alias: merge_alias,
+				parent,
+				second,
+			} = chunk
+			else {
+				continue;
+			};
 
-			if let Some(parent) = detached_parent {
-				let new_lane = Chunk {
-					alias: None,
-					parent_a: Some(parent),
-					parent_b: None,
-					marker: Markers::Commit,
-				};
+			self.record_replace(
+				index,
+				Some(LaneSlot::Flowing {
+					alias: merge_alias,
+					parent,
+				}),
+			);
 
-				// Always append the merge's second-parent lane to
-				// the end instead of reusing an existing empty slot,
-				// so the new visual column does not collapse
-				// spatial ordering of lanes already in existence.
-				self.record_insert(
-					self.current.len(),
-					Some(new_lane),
-				);
-			}
+			// Always append the merge's second-parent lane to
+			// the end instead of reusing an existing empty slot,
+			// so the new visual column does not collapse
+			// spatial ordering of lanes already in existence.
+			self.record_insert(
+				self.current.len(),
+				Some(LaneSlot::Reserved { parent: second }),
+			);
 		}
 	}
 
@@ -202,7 +229,11 @@ impl Buffer {
 		}
 	}
 
-	fn record_replace(&mut self, index: usize, new: Option<Chunk>) {
+	fn record_replace(
+		&mut self,
+		index: usize,
+		new: Option<LaneSlot>,
+	) {
 		self.pending_delta.push(DeltaOp::Replace {
 			index,
 			new: new.clone(),
@@ -210,7 +241,11 @@ impl Buffer {
 		self.current[index] = new;
 	}
 
-	fn record_insert(&mut self, index: usize, item: Option<Chunk>) {
+	fn record_insert(
+		&mut self,
+		index: usize,
+		item: Option<LaneSlot>,
+	) {
 		self.pending_delta.push(DeltaOp::Insert {
 			index,
 			item: item.clone(),
@@ -227,7 +262,7 @@ impl Buffer {
 		&self,
 		start: usize,
 		end: usize,
-	) -> Vec<Vec<Option<Chunk>>> {
+	) -> Vec<Vec<Option<LaneSlot>>> {
 		let (current_index, mut state) =
 			self.checkpoints.range(..=start).next_back().map_or_else(
 				|| (None, Vec::new()),
@@ -261,7 +296,7 @@ impl Buffer {
 	}
 
 	fn apply_delta_to_state(
-		state: &mut Vec<Option<Chunk>>,
+		state: &mut Vec<Option<LaneSlot>>,
 		delta: &Delta,
 	) {
 		for op in &delta.0 {
