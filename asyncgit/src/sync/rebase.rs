@@ -63,6 +63,8 @@ pub fn conflict_free_rebase(
 
 	rebase.finish(Some(&signature))?;
 
+	crate::sync::lfs::record_smudge(repo, "rebase");
+
 	last_commit.ok_or_else(|| {
 		Error::Generic(String::from("no commit rebased"))
 	})
@@ -103,6 +105,8 @@ pub fn rebase(
 
 	rebase.finish(Some(&signature))?;
 
+	crate::sync::lfs::record_smudge(repo, "rebase");
+
 	Ok(RebaseState::Finished)
 }
 
@@ -139,6 +143,8 @@ pub fn continue_rebase(
 	}
 
 	rebase.finish(Some(&signature))?;
+
+	crate::sync::lfs::record_smudge(repo, "continue_rebase");
 
 	Ok(RebaseState::Finished)
 }

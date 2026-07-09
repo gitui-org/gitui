@@ -17,6 +17,7 @@ pub mod diff;
 mod hooks;
 mod hunks;
 mod ignore;
+pub(crate) mod lfs;
 mod logwalker;
 mod merge;
 mod patches;
@@ -106,7 +107,7 @@ pub use tags::{
 pub use tree::{tree_file_content, tree_files, TreeFile};
 pub use utils::{
 	get_head, get_head_tuple, repo_dir, repo_open_error,
-	stage_add_all, stage_add_file, stage_addremoved, Head,
+	stage_add_all_files, stage_add_file, stage_addremoved, Head,
 };
 
 pub use git2::ResetType;

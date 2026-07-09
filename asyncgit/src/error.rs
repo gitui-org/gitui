@@ -180,6 +180,18 @@ pub enum Error {
 	///
 	#[error("reword error: config commit.gpgsign=true detected.\ngpg signing is not supported for rewording commits with staged changes\ntry unstaging or stashing your changes")]
 	SignRewordLastCommitStaged,
+
+	///
+	#[error("LFS clean error: {0}")]
+	LfsClean(#[from] git_lfs_filter::CleanError),
+
+	///
+	#[error("LFS smudge error: {0}")]
+	LfsSmudge(#[from] git_lfs_filter::SmudgeError),
+
+	///
+	#[error("tempfile persist error: {0}")]
+	Persist(#[from] tempfile::PersistError),
 }
 
 ///

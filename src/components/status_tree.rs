@@ -177,17 +177,21 @@ impl StatusTreeComponent {
 					.and_then(std::ffi::OsStr::to_str)
 					.expect("invalid path.");
 
-				let txt = if selected {
-					format!(
-						"{} {}{:w$}",
-						status_char,
-						indent_str,
-						file,
-						w = width as usize
-					)
-				} else {
-					format!("{status_char} {indent_str}{file}")
-				};
+				let lfs_suffix =
+					if status_item.is_lfs { " [LFS]" } else { "" };
+				let display_name = format!("{file}{lfs_suffix}");
+				let txt =
+					if selected {
+						format!(
+							"{} {}{:w$}",
+							status_char,
+							indent_str,
+							display_name,
+							w = width as usize
+						)
+					} else {
+						format!("{status_char} {indent_str}{display_name}")
+					};
 
 				Some(Span::styled(
 					Cow::from(txt),
@@ -597,6 +601,7 @@ mod tests {
 			.map(|a| StatusItem {
 				path: String::from(*a),
 				status: StatusItemType::Modified,
+				is_lfs: false,
 			})
 			.collect::<Vec<_>>()
 	}

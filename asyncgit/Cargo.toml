@@ -17,6 +17,10 @@ crossbeam-channel = "0.5"
 dirs = "6.0"
 easy-cast = "0.5"
 fuzzy-matcher = "0.3"
+git-lfs = "0.7.0"
+git-lfs-filter = "0.7.0"
+git-lfs-pointer = "0.7.0"
+git-lfs-store = "0.7.0"
 git2 = { version = "0.21", features = ["https"] }
 git2-hooks = { path = "../git2-hooks", version = "0.7" }
 gix = { version = "0.78.0", default-features = false, features = ["mailmap", "max-performance", "revision", "status"] }
@@ -30,6 +34,7 @@ rayon-core = "1.13"
 scopetime = { path = "../scopetime", version = "0.1" }
 serde = { version = "1.0", features = ["derive"] }
 ssh-key = { version = "0.6.7", features = ["crypto", "encryption"] }
+tempfile = "3"
 thiserror = "2.0"
 unicode-truncate = "2.0"
 url = "2.5"
