@@ -19,16 +19,28 @@ pub struct LaneIndex(u8);
 /// The alias is a dense integer index created by [`GraphOids`](super::oids::GraphOids)
 /// that avoids storing full [`CommitId`](crate::sync::CommitId)s inside the lane state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct AliasId(usize);
+pub struct CommitAlias(usize);
 
-impl std::ops::Deref for AliasId {
+/// An alias for a commit that had not yet been walked when the value
+/// was minted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnwalkedAlias(CommitAlias);
+
+impl UnwalkedAlias {
+	/// The underlying alias, for comparisons against walked commits.
+	pub const fn get(self) -> CommitAlias {
+		self.0
+	}
+}
+
+impl std::ops::Deref for CommitAlias {
 	type Target = usize;
 	fn deref(&self) -> &usize {
 		&self.0
 	}
 }
 
-impl From<usize> for AliasId {
+impl From<usize> for CommitAlias {
 	fn from(v: usize) -> Self {
 		Self(v)
 	}
