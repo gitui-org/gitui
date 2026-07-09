@@ -33,6 +33,7 @@ use ratatui::{
 	Frame,
 };
 use std::{
+	collections::HashSet,
 	rc::Rc,
 	sync::{
 		atomic::{AtomicBool, Ordering},
@@ -59,7 +60,7 @@ enum LogSearch {
 	Results(LogSearchResult),
 }
 
-///
+/// Top-level revlog tab that ties together the commit list, details, and search.
 pub struct Revlog {
 	repo: RepoPathRef,
 	commit_details: CommitDetailsComponent,
@@ -134,6 +135,12 @@ impl Revlog {
 			self.list
 				.refresh_extend_data(self.git_log.extract_items()?);
 
+			if self.list.is_graph_visible()
+				&& !self.list.is_graph_ready()
+			{
+				self.update_graph_rows();
+			}
+
 			self.git_tags.request(Duration::from_secs(3), false)?;
 
 			if self.commit_details.is_visible() {
@@ -148,6 +155,47 @@ impl Revlog {
 		}
 
 		Ok(())
+	}
+
+	/// Computes graph rows for the current commit window. Rows
+	/// don't depend on the selection
+	/// so its is skipped while
+	/// [`CommitList::is_graph_ready`] holds the bag.
+	fn update_graph_rows(&mut self) {
+		let (slice, global_start) = self.list.get_loaded_slice();
+		if slice.is_empty() {
+			return;
+		}
+
+		let head_id = self.list.local_branches().iter().find_map(
+			|(id, branches)| {
+				let has_head = branches.iter().any(|branch| {
+					branch.local_details().is_some_and(|b| b.is_head)
+				});
+				has_head.then_some(*id)
+			},
+		);
+
+		let branch_tips: HashSet<_> = self
+			.list
+			.local_branches()
+			.keys()
+			.chain(self.list.remote_branches().keys())
+			.copied()
+			.collect();
+
+		// TODO: include stashes (heh)
+		let stashes = HashSet::new();
+
+		if let Some(rows) = self.git_log.get_graph_rows(
+			&slice,
+			global_start,
+			&branch_tips,
+			&stashes,
+			head_id.as_ref(),
+		) {
+			self.list.set_graph_rows(rows);
+		}
 	}
 
 	///

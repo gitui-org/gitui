@@ -70,7 +70,10 @@ impl<'a> LogWalker<'a> {
 	}
 
 	///
-	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
+	pub fn read(
+		&mut self,
+		out: &mut Vec<CommitId>,
+	) -> Result<usize> {
 		let mut count = 0_usize;
 
 		while let Some(c) = self.commits.pop() {
@@ -157,7 +160,10 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 	}
 
 	///
-	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
+	pub fn read(
+		&mut self,
+		out: &mut Vec<CommitId>,
+	) -> Result<usize> {
 		let mut count = 0_usize;
 
 		while let Some(Ok(info)) = self.walk.next() {
@@ -238,7 +244,8 @@ mod tests {
 		let mut walk = LogWalker::new(&repo, 100)?;
 		walk.read(&mut items).unwrap();
 
-		let info = get_commits_info(repo_path, &items, 50).unwrap();
+		let ids: Vec<CommitId> = items.clone();
+		let info = get_commits_info(repo_path, &ids, 50).unwrap();
 		dbg!(&info);
 
 		assert_eq!(items.len(), 2);
@@ -272,7 +279,8 @@ mod tests {
 		let mut items = Vec::new();
 		assert!(matches!(walk.read(&mut items), Ok(2)));
 
-		let info = get_commits_info(repo_path, &items, 50).unwrap();
+		let ids: Vec<CommitId> = items.clone();
+		let info = get_commits_info(repo_path, &ids, 50).unwrap();
 		dbg!(&info);
 
 		assert_eq!(items.len(), 2);

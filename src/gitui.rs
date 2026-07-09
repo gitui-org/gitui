@@ -226,7 +226,7 @@ mod tests {
 			// Linux Temp Folder
 			settings.add_filter(r" */tmp/\.tmp\S+-insta/", "[TEMP_FILE]");
 			// Commit ids that follow a vertical bar
-			settings.add_filter(r"│[a-z0-9]{7} ", "│[AAAAA] ");
+			settings.add_filter(r"│[^a-f0-9]*[a-f0-9]{7} ", "│[AAAAA] ");
 			let _bound = settings.bind_to_scope();
 		}
 	}

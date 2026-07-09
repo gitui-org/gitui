@@ -22,7 +22,7 @@ use std::{borrow::Cow, cell::Cell, path::Path};
 
 //TODO: use new `filetreelist` crate
 
-///
+/// Renders the working-tree status as a tree.
 #[allow(clippy::struct_excessive_bools)]
 pub struct StatusTreeComponent {
 	title: String,

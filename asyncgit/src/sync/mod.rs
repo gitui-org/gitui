@@ -261,13 +261,13 @@ pub mod tests {
 		r: &Repository,
 		max_count: usize,
 	) -> Vec<CommitId> {
-		let mut commit_ids = Vec::<CommitId>::new();
+		let mut entries = Vec::new();
 		LogWalker::new(r, max_count)
 			.unwrap()
-			.read(&mut commit_ids)
+			.read(&mut entries)
 			.unwrap();
 
-		commit_ids
+		entries
 	}
 
 	/// Same as `repo_init`, but the repo is a bare repo (--bare)

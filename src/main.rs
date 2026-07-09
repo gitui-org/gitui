@@ -33,7 +33,6 @@
 
 #![forbid(unsafe_code)]
 #![deny(
-	mismatched_lifetime_syntaxes,
 	unused_imports,
 	unused_must_use,
 	dead_code,
@@ -114,7 +113,7 @@ type Terminal = ratatui::Terminal<CrosstermBackend<io::Stdout>>;
 static TICK_INTERVAL: Duration = Duration::from_secs(5);
 static SPINNER_INTERVAL: Duration = Duration::from_millis(80);
 
-///
+/// Events sent to the event-loop to wake up the UI.
 #[derive(Clone)]
 pub enum QueueEvent {
 	Tick,

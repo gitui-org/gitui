@@ -1,3 +1,11 @@
+use super::utils::graphrow::{
+	SYM_BRANCH_UP, SYM_BRANCH_UP_RIGHT, SYM_COMMIT,
+	SYM_COMMIT_BRANCH, SYM_COMMIT_MERGE, SYM_COMMIT_STASH,
+	SYM_COMMIT_UNCOMMITTED, SYM_HORIZONTAL, SYM_MERGE_BRIDGE_END,
+	SYM_MERGE_BRIDGE_MID, SYM_MERGE_BRIDGE_START, SYM_SPACE,
+	SYM_TEE_DOWN, SYM_TEE_LEFT, SYM_TEE_RIGHT, SYM_TEE_UP,
+	SYM_VERTICAL, SYM_VERTICAL_DOTTED,
+};
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
 	app::Environment,
@@ -13,9 +21,12 @@ use crate::{
 	ui::{calc_scroll_top, draw_scrollbar, Orientation},
 };
 use anyhow::Result;
-use asyncgit::sync::{
-	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
-	RepoPathRef, Tags,
+use asyncgit::{
+	graph::{ConnectionType, GraphRow},
+	sync::{
+		self, checkout_commit, BranchDetails, BranchInfo, CommitId,
+		RepoPathRef, Tags,
+	},
 };
 use chrono::{DateTime, Local};
 use crossterm::event::Event;
@@ -23,20 +34,30 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use ratatui::{
 	layout::{Alignment, Rect},
-	style::Style,
+	style::{Color, Style},
 	text::{Line, Span},
 	widgets::{Block, Borders, Paragraph},
 	Frame,
 };
+use std::borrow::Cow;
+use std::collections::HashSet;
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
-	time::Instant,
+	cell::Cell, cmp, collections::BTreeMap, rc::Rc, time::Instant,
 };
 
 const ELEMENTS_PER_LINE: usize = 9;
 const SLICE_SIZE: usize = 1200;
 
-///
+const GRAPH_COLORS: &[Color] = &[
+	Color::Blue,
+	Color::Yellow,
+	Color::Magenta,
+	Color::Cyan,
+	Color::Green,
+	Color::Red,
+];
+
+/// Renders the commit log with a side-bar graph.
 pub struct CommitList {
 	repo: RepoPathRef,
 	title: Box<str>,
@@ -58,6 +79,8 @@ pub struct CommitList {
 	theme: SharedTheme,
 	queue: Queue,
 	key_config: SharedKeyConfig,
+	show_graph: bool,
+	graph_col_width: Cell<usize>,
 }
 
 impl CommitList {
@@ -81,7 +104,31 @@ impl CommitList {
 			queue: env.queue.clone(),
 			key_config: env.key_config.clone(),
 			title: title.into(),
+			show_graph: true,
+			graph_col_width: Cell::new(0),
 		}
+	}
+
+	/// Whether the commit graph column is currently visible.
+	pub const fn is_graph_visible(&self) -> bool {
+		self.show_graph
+	}
+
+	/// Whether the loaded window already has up-to-date graph rows.
+	pub const fn is_graph_ready(&self) -> bool {
+		self.items.graph_ready
+	}
+
+	///
+	pub fn get_loaded_slice(&self) -> (Vec<CommitId>, usize) {
+		let offset = self.items.index_offset();
+		let ids = self.items.iter().map(|e| e.id).collect();
+		(ids, offset)
+	}
+
+	///
+	pub fn set_graph_rows(&mut self, rows: Vec<GraphRow>) {
+		self.items.set_graph_rows(rows);
 	}
 
 	///
@@ -176,6 +223,20 @@ impl CommitList {
 	}
 
 	///
+	pub const fn local_branches(
+		&self,
+	) -> &std::collections::BTreeMap<CommitId, Vec<BranchInfo>> {
+		&self.local_branches
+	}
+
+	///
+	pub const fn remote_branches(
+		&self,
+	) -> &std::collections::BTreeMap<CommitId, Vec<BranchInfo>> {
+		&self.remote_branches
+	}
+
+	///
 	pub fn set_local_branches(
 		&mut self,
 		local_branches: Vec<BranchInfo>,
@@ -188,6 +249,9 @@ impl CommitList {
 				.or_default()
 				.push(local_branch);
 		}
+
+		// branch tips and head are baked into graph rows
+		self.items.graph_ready = false;
 	}
 
 	///
@@ -203,6 +267,9 @@ impl CommitList {
 				.or_default()
 				.push(remote_branch);
 		}
+
+		// branch tips are baked into graph rows
+		self.items.graph_ready = false;
 	}
 
 	///
@@ -439,6 +506,111 @@ impl CommitList {
 		}
 	}
 
+	fn build_graph_spans<'a>(
+		row: &'a GraphRow,
+		graph_col_width: usize,
+		empty_lanes: &std::collections::HashSet<usize>,
+	) -> Vec<Span<'a>> {
+		let mut spans = Vec::new();
+
+		for (lane_index, conn) in row.lanes.iter().enumerate() {
+			if empty_lanes.contains(&lane_index) {
+				continue;
+			}
+			let (sym, graph_color) = match conn {
+				None => (SYM_SPACE, Color::Reset),
+				Some((conn_type, color_idx)) => {
+					let color = GRAPH_COLORS[usize::from(*color_idx)
+						% GRAPH_COLORS.len()];
+					let sym = match conn_type {
+						ConnectionType::Vertical => SYM_VERTICAL,
+						ConnectionType::VerticalDotted => {
+							SYM_VERTICAL_DOTTED
+						}
+						ConnectionType::TeeLeft => SYM_TEE_LEFT,
+						ConnectionType::TeeRight => SYM_TEE_RIGHT,
+						ConnectionType::TeeUp => SYM_TEE_UP,
+						ConnectionType::TeeDown => SYM_TEE_DOWN,
+						ConnectionType::BranchUpRight => {
+							SYM_BRANCH_UP_RIGHT
+						}
+						ConnectionType::CommitNormal => SYM_COMMIT,
+						ConnectionType::CommitBranch => {
+							SYM_COMMIT_BRANCH
+						}
+						ConnectionType::CommitMerge => {
+							SYM_COMMIT_MERGE
+						}
+						ConnectionType::CommitStash => {
+							SYM_COMMIT_STASH
+						}
+						ConnectionType::CommitUncommitted => {
+							SYM_COMMIT_UNCOMMITTED
+						}
+						ConnectionType::MergeBridgeStart => {
+							SYM_MERGE_BRIDGE_START
+						}
+						ConnectionType::MergeBridgeMid => {
+							SYM_MERGE_BRIDGE_MID
+						}
+						ConnectionType::MergeBridgeEnd => {
+							SYM_MERGE_BRIDGE_END
+						}
+						ConnectionType::BranchUp => SYM_BRANCH_UP,
+					};
+					(sym, color)
+				}
+			};
+			spans.push(Span::styled(
+				sym,
+				Style::default().fg(graph_color),
+			));
+
+			// Spacer
+			let mut is_bridge_lane = false;
+			let mut spacer_color = graph_color;
+
+			let commit_lane = usize::from(row.commit_lane);
+
+			let edges = row
+				.merge_bridge
+				.into_iter()
+				.chain(row.branches.iter().copied());
+
+			for (st, fin) in edges {
+				let (start, finish) =
+					(usize::from(st), usize::from(fin));
+
+				if (start..finish).contains(&lane_index) {
+					is_bridge_lane = true;
+					let target_lane = if commit_lane == start {
+						finish
+					} else {
+						start
+					};
+					spacer_color = GRAPH_COLORS
+						[target_lane % GRAPH_COLORS.len()];
+				}
+			}
+
+			if is_bridge_lane {
+				spans.push(Span::styled(
+					SYM_HORIZONTAL,
+					Style::default().fg(spacer_color),
+				));
+				continue;
+			}
+			spans.push(Span::raw(SYM_SPACE));
+		}
+
+		let current_width = spans.len();
+		for _ in current_width..graph_col_width {
+			spans.push(Span::raw(SYM_SPACE));
+		}
+
+		spans
+	}
+
 	#[allow(clippy::too_many_arguments)]
 	fn get_entry_to_add<'a>(
 		&self,
@@ -451,17 +623,21 @@ impl CommitList {
 		width: usize,
 		now: DateTime<Local>,
 		marked: Option<bool>,
+		empty_lanes: &std::collections::HashSet<usize>,
 	) -> Line<'a> {
 		let mut txt: Vec<Span> = Vec::with_capacity(
 			ELEMENTS_PER_LINE + if marked.is_some() { 2 } else { 0 },
 		);
 
+		if self.show_graph {
+			self.add_graph_spans(e, &mut txt, empty_lanes);
+		}
+
 		let normal = !self.items.highlighting()
 			|| (self.items.highlighting() && e.highlighted);
 
-		let splitter_txt = Cow::from(symbol::EMPTY_SPACE);
 		let splitter = Span::styled(
-			splitter_txt,
+			Cow::from(symbol::EMPTY_SPACE),
 			if normal {
 				theme.text(true, selected)
 			} else {
@@ -482,40 +658,80 @@ impl CommitList {
 			txt.push(splitter.clone());
 		}
 
-		let style_hash = if normal {
-			theme.commit_hash(selected)
+		Self::add_entry_details(
+			e,
+			&mut txt,
+			selected,
+			normal,
+			theme,
+			width,
+			now,
+			tags,
+			local_branches,
+			remote_branches,
+			&splitter,
+		);
+
+		Line::from(txt)
+	}
+
+	fn add_graph_spans<'a>(
+		&self,
+		e: &'a LogEntry,
+		txt: &mut Vec<Span<'a>>,
+		empty_lanes: &std::collections::HashSet<usize>,
+	) {
+		if let Some(ref row) = e.graph {
+			txt.extend(Self::build_graph_spans(
+				row,
+				self.graph_col_width.get(),
+				empty_lanes,
+			));
 		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_time = if normal {
-			theme.commit_time(selected)
+			txt.push(Span::raw(
+				" ".repeat(self.graph_col_width.get()),
+			));
+		}
+		txt.push(Span::raw(" "));
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	fn add_entry_details<'a>(
+		e: &'a LogEntry,
+		txt: &mut Vec<Span<'a>>,
+		selected: bool,
+		normal: bool,
+		theme: &Theme,
+		width: usize,
+		now: DateTime<Local>,
+		tags: Option<String>,
+		local_branches: Option<String>,
+		remote_branches: Option<String>,
+		splitter: &Span<'a>,
+	) {
+		let (
+			style_hash,
+			style_time,
+			style_author,
+			style_tags,
+			style_branches,
+			style_msg,
+		) = if normal {
+			(
+				theme.commit_hash(selected),
+				theme.commit_time(selected),
+				theme.commit_author(selected),
+				theme.tags(selected),
+				theme.branch(selected, true),
+				theme.text(true, selected),
+			)
 		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_author = if normal {
-			theme.commit_author(selected)
-		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_tags = if normal {
-			theme.tags(selected)
-		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_branches = if normal {
-			theme.branch(selected, true)
-		} else {
-			theme.commit_unhighlighted()
-		};
-		let style_msg = if normal {
-			theme.text(true, selected)
-		} else {
-			theme.commit_unhighlighted()
+			let s = theme.commit_unhighlighted();
+			(s, s, s, s, s, s)
 		};
 
 		// commit hash
 		txt.push(Span::styled(Cow::from(&*e.hash_short), style_hash));
-
 		txt.push(splitter.clone());
 
 		// commit timestamp
@@ -523,7 +739,6 @@ impl CommitList {
 			Cow::from(e.time_to_string(now)),
 			style_time,
 		));
-
 		txt.push(splitter.clone());
 
 		let author_width =
@@ -532,7 +747,6 @@ impl CommitList {
 
 		// commit author
 		txt.push(Span::styled(author, style_author));
-
 		txt.push(splitter.clone());
 
 		// commit tags
@@ -550,7 +764,7 @@ impl CommitList {
 			txt.push(Span::styled(remote_branches, style_branches));
 		}
 
-		txt.push(splitter);
+		txt.push(splitter.clone());
 
 		let message_width = width.saturating_sub(
 			txt.iter().map(|span| span.content.len()).sum(),
@@ -561,65 +775,118 @@ impl CommitList {
 			format!("{:message_width$}", e.msg),
 			style_msg,
 		));
-
-		Line::from(txt)
 	}
 
 	fn get_text(&self, height: usize, width: usize) -> Vec<Line<'_>> {
 		let selection = self.relative_selection();
-
-		let mut txt: Vec<Line> = Vec::with_capacity(height);
-
 		let now = Local::now();
-
 		let any_marked = !self.marked.is_empty();
 
-		for (idx, e) in self
-			.items
+		if self.show_graph {
+			let view = self
+				.items
+				.iter()
+				.skip(self.scroll_top.get())
+				.take(height);
+
+			let max_lane = view
+				.clone()
+				.filter_map(|e| e.graph.as_ref())
+				.map(|row| row.lanes.len())
+				.max()
+				.unwrap_or(0);
+
+			let empty_lanes: std::collections::HashSet<usize> = (0..max_lane)
+            .filter(|&index| {
+                view.clone().filter_map(|entry| entry.graph.as_ref()).all(|row| {
+                    row.lanes.get(index).is_none_or(|conn| {
+                        matches!(conn, None | Some((ConnectionType::MergeBridgeMid, _)))
+                    })
+                })
+            })
+            .collect();
+
+			self.graph_col_width.set(
+				((max_lane.saturating_sub(empty_lanes.len())) * 2)
+					.max(2),
+			);
+
+			self.collect_entries(
+				height,
+				width,
+				selection,
+				now,
+				any_marked,
+				&empty_lanes,
+			)
+		} else {
+			self.graph_col_width.set(0);
+			self.collect_entries(
+				height,
+				width,
+				selection,
+				now,
+				any_marked,
+				&HashSet::new(),
+			)
+		}
+	}
+
+	fn collect_entries(
+		&self,
+		height: usize,
+		width: usize,
+		selection: usize,
+		now: DateTime<Local>,
+		any_marked: bool,
+		empty_lanes: &HashSet<usize>,
+	) -> Vec<Line<'_>> {
+		self.items
 			.iter()
 			.skip(self.scroll_top.get())
 			.take(height)
 			.enumerate()
-		{
-			let tags =
-				self.tags.as_ref().and_then(|t| t.get(&e.id)).map(
-					|tags| {
+			.map(|(index, entry)| {
+				let tags = self
+					.tags
+					.as_ref()
+					.and_then(|t| t.get(&entry.id))
+					.map(|tags| {
 						tags.iter()
-							.map(|t| format!("<{}>", t.name))
+							.map(|tag| format!("<{}>", tag.name))
 							.join(" ")
-					},
-				);
+					});
 
-			let local_branches =
-				self.local_branches.get(&e.id).map(|local_branch| {
-					local_branch
-						.iter()
-						.map(|local_branch| {
-							format!("{{{0}}}", local_branch.name)
-						})
-						.join(" ")
-				});
+				let local_branches = self
+					.local_branches
+					.get(&entry.id)
+					.map(|local_branch| {
+						local_branch
+							.iter()
+							.map(|branch| {
+								format!("{{{}}}", branch.name)
+							})
+							.join(" ")
+					});
 
-			let marked = if any_marked {
-				self.is_marked(&e.id)
-			} else {
-				None
-			};
+				let marked = any_marked
+					.then(|| self.is_marked(&entry.id))
+					.flatten();
 
-			txt.push(self.get_entry_to_add(
-				e,
-				idx + self.scroll_top.get() == selection,
-				tags,
-				local_branches,
-				self.remote_branches_string(e),
-				&self.theme,
-				width,
-				now,
-				marked,
-			));
-		}
-
-		txt
+				self.get_entry_to_add(
+					entry,
+					index + self.scroll_top.get() == selection,
+					tags,
+					local_branches,
+					self.remote_branches_string(entry),
+					&self.theme,
+					width,
+					now,
+					marked,
+					empty_lanes,
+				)
+			})
+			.collect()
 	}
 
 	fn remote_branches_string(&self, e: &LogEntry) -> Option<String> {
@@ -863,6 +1130,12 @@ impl Component for CommitList {
 				) {
 					self.checkout();
 					true
+				} else if key_match(
+					k,
+					self.key_config.keys.log_toggle_graph,
+				) {
+					self.show_graph = !self.show_graph;
+					true
 				} else {
 					false
 				};
@@ -887,6 +1160,11 @@ impl Component for CommitList {
 				&self.key_config,
 				self.selected_entry_marked(),
 			),
+			true,
+			true,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::log_toggle_graph(&self.key_config),
 			true,
 			true,
 		));
@@ -922,6 +1200,8 @@ mod tests {
 					std::path::PathBuf::default(),
 				)),
 				queue: Queue::default(),
+				show_graph: true,
+				graph_col_width: Cell::new(0),
 			}
 		}
 	}
@@ -956,6 +1236,7 @@ mod tests {
 			time: 0,
 			author: String::default(),
 			id: CommitId::default(),
+			parents: Vec::default().into(),
 		};
 		// This just creates a sequence of fake ordered ids
 		// 0000000000000000000000000000000000000000
@@ -1068,5 +1349,31 @@ mod tests {
 				"0000000000000000000000000000000000000005"
 			)))
 		);
+	}
+
+	#[test]
+	fn test_build_graph_spans() {
+		let row = GraphRow {
+			lane_count: 1.into(),
+			commit_lane: 0.into(),
+			is_merge: false,
+			is_branch_tip: false,
+			is_stash: false,
+			lanes: vec![Some((
+				ConnectionType::CommitNormal,
+				0.into(),
+			))],
+			merge_bridge: None,
+			branches: vec![],
+		};
+		let spans = CommitList::build_graph_spans(
+			&row,
+			1,
+			&std::collections::HashSet::new(),
+		);
+
+		assert_eq!(spans.len(), 2);
+		assert_eq!(spans[0].content, Cow::from(SYM_COMMIT));
+		assert_eq!(spans[1].content, Cow::from(SYM_SPACE));
 	}
 }
