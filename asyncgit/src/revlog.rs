@@ -3,7 +3,7 @@ use crate::{
 	graph::{GraphRow, GraphWalker},
 	sync::{
 		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
-		RepoPath, SharedCommitFilterFn, WalkEntry,
+		RepoPath, SharedCommitFilterFn,
 	},
 	AsyncGitNotification, Error,
 };
@@ -47,9 +47,10 @@ pub struct AsyncLog {
 	filter: Option<SharedCommitFilterFn>,
 	partial_extract: AtomicBool,
 	repo: RepoPath,
-	/// All walk entries collected by the background thread, in walk order.
-	/// The graph walker reads these lazily, only as far as the viewport requires.
-	walk_entries: Arc<Mutex<Vec<WalkEntry>>>,
+	/// All commit ids collected by the background thread, in walk order.
+	/// The graph walker reads these lazily, only as far as the viewport
+	/// requires, looking up each commit's parents on demand.
+	walk_entries: Arc<Mutex<Vec<CommitId>>>,
 	graph_walker: Arc<Mutex<GraphWalker>>,
 }
 
@@ -83,8 +84,8 @@ impl AsyncLog {
 
 	/// Computes graph rows for `commit_slice` starting at `global_start`.
 	///
-	/// Driven lazily. Processes only as many
-	/// [`WalkEntry`]s as the viewport requires.
+	/// Driven lazily. Processes only as many walked commits as the
+	/// viewport requires, resolving their parents on demand.
 	///
 	/// Returns `None` when the background walk hasn't reached
 	/// `global_start + commit_slice.len()` yet.
@@ -111,8 +112,18 @@ impl AsyncLog {
 			// we know it is yet to have seen
 			let processed =
 				walker.processed_commits().min(needed_end);
-			for entry in &entries[processed..needed_end] {
-				walker.process(entry.id, &entry.parents);
+
+			// The graph only needs topology for the commits it is
+			// about to fold in, so parents are looked up here on
+			// demand instead of being carried along the whole walk.
+			if processed < needed_end {
+				let mut repo = gix_repo(&self.repo).ok()?;
+				repo.object_cache_size_if_unset(2_usize.pow(14));
+
+				for id in &entries[processed..needed_end] {
+					let parents = Self::parents_of(&repo, *id).ok()?;
+					walker.process(*id, &parents);
+				}
 			}
 		}
 
@@ -123,6 +134,22 @@ impl AsyncLog {
 			stashes,
 			head_id,
 		))
+	}
+
+	/// Looks up a commit's (up to two) parents on demand.
+	///
+	/// The graph caps support at two parents, ignoring octopus
+	/// merges, so anything beyond the first two is dropped here.
+	fn parents_of(
+		repo: &gix::Repository,
+		id: CommitId,
+	) -> Result<Vec<CommitId>> {
+		Ok(repo
+			.find_commit(id)?
+			.parent_ids()
+			.take(2)
+			.map(Into::into)
+			.collect())
 	}
 
 	///
@@ -252,7 +279,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
-		arc_walk_entries: &Arc<Mutex<Vec<WalkEntry>>>,
+		arc_walk_entries: &Arc<Mutex<Vec<CommitId>>>,
 		filter: Option<SharedCommitFilterFn>,
 	) -> Result<()> {
 		filter.map_or_else(
@@ -309,7 +336,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
-		arc_walk_entries: &Arc<Mutex<Vec<WalkEntry>>>,
+		arc_walk_entries: &Arc<Mutex<Vec<CommitId>>>,
 	) -> Result<()> {
 		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walker =
@@ -332,15 +359,15 @@ impl AsyncLog {
 	/// to `arc_current` and (when given) moving the full entries into
 	/// `walk_entries` for the graph.
 	fn walk_loop(
-		mut read: impl FnMut(&mut Vec<WalkEntry>) -> Result<usize>,
+		mut read: impl FnMut(&mut Vec<CommitId>) -> Result<usize>,
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
-		walk_entries: Option<&Mutex<Vec<WalkEntry>>>,
+		walk_entries: Option<&Mutex<Vec<CommitId>>>,
 	) -> Result<()> {
 		let start_time = Instant::now();
 
-		let mut entries: Vec<WalkEntry> =
+		let mut entries: Vec<CommitId> =
 			Vec::with_capacity(LIMIT_COUNT);
 
 		loop {
@@ -348,7 +375,7 @@ impl AsyncLog {
 
 			{
 				let mut current = arc_current.lock()?;
-				current.commits.extend(entries.iter().map(|e| e.id));
+				current.commits.extend(entries.iter().copied());
 				current.duration = start_time.elapsed();
 			}
 
