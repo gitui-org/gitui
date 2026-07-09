@@ -1,8 +1,9 @@
 use super::buffer::Buffer;
-use super::chunk::{Chunk, Markers};
+use super::chunk::LaneSlot;
 use super::oids::GraphOids;
 use super::{
-	AliasId, ConnectionType, GraphRow, LaneIndex, MAX_LANE_COLORS,
+	CommitAlias, ConnectionType, GraphRow, LaneIndex, UnwalkedAlias,
+	MAX_LANE_COLORS,
 };
 use crate::sync::CommitId;
 use core::cmp::Ordering;
@@ -145,10 +146,14 @@ fn overlay_cell(
 pub struct GraphWalker {
 	pub buffer: Buffer,
 	pub oids: GraphOids,
-	pub branch_lane_map: HashMap<CommitId, usize>,
 
 	/// Maps a merge commit's alias to the alias of its second parent.
-	pub merge_parents: HashMap<AliasId, AliasId>,
+	pub merge_parents: HashMap<CommitAlias, CommitAlias>,
+
+	/// Aliases of commits already folded into the buffer; consulted
+	/// by [`Self::drawable_parent`], which refuses to mint an
+	/// [`UnwalkedAlias`] for any of them.
+	processed: HashSet<CommitAlias>,
 }
 
 impl Default for GraphWalker {
@@ -162,9 +167,20 @@ impl GraphWalker {
 		Self {
 			buffer: Buffer::new(),
 			oids: GraphOids::new(),
-			branch_lane_map: HashMap::new(),
 			merge_parents: HashMap::new(),
+			processed: HashSet::new(),
 		}
+	}
+
+	/// Mint the drawable alias for a parent commit, or `None` if the
+	/// walk already passed it.
+	fn drawable_parent(
+		&mut self,
+		id: &CommitId,
+	) -> Option<UnwalkedAlias> {
+		let alias = self.oids.get_or_insert(id);
+		(!self.processed.contains(&alias))
+			.then_some(UnwalkedAlias(alias))
 	}
 
 	pub fn process(
@@ -174,31 +190,42 @@ impl GraphWalker {
 	) {
 		let commit_alias = self.oids.get_or_insert(&commit_id);
 
-		let mut mapped_parents = parents
+		let mut drawable_parents = parents
 			.iter()
-			.map(|parent_id| self.oids.get_or_insert(parent_id));
+			.filter_map(|parent_id| self.drawable_parent(parent_id));
 
 		// We explicitly cap support at 2 parents, ignoring octo/mega merges.
-		let first_parent = mapped_parents.next();
-		let second_parent = mapped_parents.next();
+		let first_parent = drawable_parents.next();
+		let second_parent = drawable_parents.next();
 
-		let chunk = Chunk {
-			alias: Some(commit_alias),
-			parent_a: first_parent,
-			parent_b: second_parent,
-			marker: Markers::Commit,
+		let chunk = match (first_parent, second_parent) {
+			(Some(parent), Some(second)) => LaneSlot::FlowingMerge {
+				alias: commit_alias,
+				parent,
+				second,
+			},
+			(Some(parent), None) => LaneSlot::Flowing {
+				alias: commit_alias,
+				parent,
+			},
+			// `second_parent` is only ever `Some` once
+			// `first_parent` has already been consumed from the
+			// identical iterator, so a merge always has both parents.
+			(None, _) => LaneSlot::Settled {
+				alias: commit_alias,
+			},
 		};
 
-		if let Some(second) = second_parent {
+		if let LaneSlot::FlowingMerge { second, .. } = &chunk {
+			let second = second.get();
 			self.merge_parents.insert(commit_alias, second);
 
-			if first_parent.is_some()
-				&& !self.is_redundant_merge_track(second)
-			{
+			if !self.is_redundant_merge_track(second) {
 				self.buffer.track_merge_commit(commit_alias);
 			}
 		}
 
+		self.processed.insert(commit_alias);
 		self.buffer.update(&chunk);
 	}
 
@@ -261,8 +288,8 @@ impl GraphWalker {
 		lanes: &mut [Option<(ConnectionType, LaneIndex)>],
 		merge_bridge: Option<(usize, usize)>,
 		commit_lane: usize,
-		current_snapshot: &[Option<Chunk>],
-		previous_snapshot: Option<&[Option<Chunk>]>,
+		current_snapshot: &[Option<LaneSlot>],
+		previous_snapshot: Option<&[Option<LaneSlot>]>,
 	) {
 		let Some((source_lane, target_lane)) = merge_bridge else {
 			return;
@@ -349,22 +376,28 @@ impl GraphWalker {
 			.collect()
 	}
 
-	/// Checks if tracking a merge commit would be redundant based on current buffer state.
+	/// Checks if tracking a merge commit would be redundant based on
+	/// current buffer state: some lane already flows to the target
+	/// parent without owing a second parent of its own.
 	fn is_redundant_merge_track(
 		&self,
-		target_parent: AliasId,
+		target_parent: CommitAlias,
 	) -> bool {
-		self.buffer.current.iter().flatten().any(|commit| {
-			commit.parent_a == Some(target_parent)
-				&& commit.parent_b.is_none()
+		self.buffer.current.iter().flatten().any(|slot| {
+			matches!(
+				slot,
+				LaneSlot::Flowing { parent, .. }
+				| LaneSlot::Reserved { parent }
+					if parent.get() == target_parent
+			)
 		})
 	}
 
 	/// Determines if a lane should draw an upward-connecting corner.
 	fn lane_continues_upwards(
 		target_lane: usize,
-		current_snapshot: &[Option<Chunk>],
-		previous_snapshot: Option<&[Option<Chunk>]>,
+		current_snapshot: &[Option<LaneSlot>],
+		previous_snapshot: Option<&[Option<LaneSlot>]>,
 	) -> bool {
 		let exists_in_current =
 			current_snapshot.get(target_lane).is_some();
@@ -427,8 +460,8 @@ impl GraphWalker {
 	pub fn render_row(
 		&self,
 		commit_id: &CommitId,
-		current_snapshot: &[Option<Chunk>],
-		previous_snapshot: Option<&[Option<Chunk>]>,
+		current_snapshot: &[Option<LaneSlot>],
+		previous_snapshot: Option<&[Option<LaneSlot>]>,
 		branch_tips: &HashSet<CommitId>,
 		stashes: &HashSet<CommitId>,
 		head_id: Option<&CommitId>,
@@ -467,7 +500,7 @@ impl GraphWalker {
 					let chunk = chunk_option.as_ref()?; // Returns None early if the chunk is missing
 
 					if commit_alias.is_some()
-						&& chunk.alias == commit_alias
+						&& chunk.alias() == commit_alias
 					{
 						let connection =
 							Self::determine_commit_connection(
@@ -523,8 +556,8 @@ impl GraphWalker {
 
 	/// Locates the primary lane for the current commit.
 	fn find_commit_lane(
-		current_snapshot: &[Option<Chunk>],
-		commit_alias: Option<AliasId>,
+		current_snapshot: &[Option<LaneSlot>],
+		commit_alias: Option<CommitAlias>,
 	) -> usize {
 		let Some(target_alias) = commit_alias else {
 			return 0;
@@ -534,7 +567,7 @@ impl GraphWalker {
 			.iter()
 			.position(|chunk_option| {
 				chunk_option.as_ref().is_some_and(|chunk| {
-					chunk.alias == Some(target_alias)
+					chunk.alias() == Some(target_alias)
 				})
 			})
 			.unwrap_or(0)
@@ -542,15 +575,15 @@ impl GraphWalker {
 
 	/// Computes the span (min, max) between the commit's lane and its second parent's lane.
 	fn calculate_merge_bridge(
-		current_snapshot: &[Option<Chunk>],
+		current_snapshot: &[Option<LaneSlot>],
 		commit_lane: usize,
-		second_parent_alias: AliasId,
+		second_parent_alias: CommitAlias,
 	) -> Option<(usize, usize)> {
 		current_snapshot
 			.iter()
 			.position(|chunk_option| {
 				chunk_option.as_ref().is_some_and(|chunk| {
-					chunk.parent_a == Some(second_parent_alias)
+					chunk.awaits() == Some(second_parent_alias)
 				})
 			})
 			.map(|target_lane| {
@@ -563,8 +596,8 @@ impl GraphWalker {
 
 	/// Identifies lanes that existed in the previous row but terminated before the current row.
 	fn find_branching_lanes(
-		current_snapshot: &[Option<Chunk>],
-		previous_snapshot: Option<&[Option<Chunk>]>,
+		current_snapshot: &[Option<LaneSlot>],
+		previous_snapshot: Option<&[Option<LaneSlot>]>,
 	) -> Vec<usize> {
 		let Some(previous) = previous_snapshot else {
 			return Vec::new();
@@ -599,21 +632,19 @@ impl GraphWalker {
 
 	/// Determines the correct vertical line style for non-commit passthrough lanes.
 	fn determine_passthrough_connection(
-		chunk: &Chunk,
+		chunk: &LaneSlot,
 		lane_index: usize,
-		head_alias: Option<AliasId>,
+		head_alias: Option<CommitAlias>,
 	) -> Option<ConnectionType> {
-		let is_orphan =
-			chunk.parent_a.is_none() && chunk.parent_b.is_none();
-
-		if is_orphan {
+		// A settled lane draws nothing below its commit.
+		if matches!(chunk, LaneSlot::Settled { .. }) {
 			return None;
 		}
 
 		let is_dotted = lane_index == 0
 			&& head_alias.is_some()
-			&& (chunk.parent_a == head_alias
-				|| chunk.parent_b == head_alias);
+			&& (chunk.awaits() == head_alias
+				|| chunk.second() == head_alias);
 
 		if is_dotted {
 			Some(ConnectionType::VerticalDotted)
@@ -812,6 +843,39 @@ mod tests {
 				"o━━━━━┛",
 			]
 		);
+	}
+
+	#[test]
+	fn skewed_parent_before_child_leaves_no_phantom_lane() {
+		//1 to 2 must be dropped instead of
+		// opening a lane that waits for 2 until the end of the walk.
+		let rows = render(&[(2, &[3]), (1, &[2, 3]), (3, &[])]);
+		assert_eq!(rows, vec!["o", "┃ o", "o━┛"]);
+	}
+
+	#[test]
+	fn complete_walk_settles_all_lanes() {
+		// Both parents of 1 appear before it in the walk (clock
+		// skew). After a complete walk no lane may still wait on a
+		// parent, creating the evil phantom lines
+		let history: &[(usize, &[usize])] =
+			&[(2, &[4]), (3, &[4]), (1, &[2, 3]), (4, &[])];
+
+		assert_eq!(render(history), vec!["o", "┃ o", "┃ ┃ o", "o━┛"]);
+
+		let mut walker = GraphWalker::new();
+		for (commit, parents) in history {
+			let parents: Vec<CommitId> =
+				parents.iter().map(|p| id(*p)).collect();
+			walker.process(id(*commit), &parents);
+		}
+
+		for slot in walker.buffer.current.iter().flatten() {
+			assert!(
+				matches!(slot, LaneSlot::Settled { .. }),
+				"lane still waiting on a parent after a complete walk: {slot:?}"
+			);
+		}
 	}
 
 	#[test]
