@@ -1,8 +1,10 @@
 use super::{get_commits_info, CommitId, RepoPath};
 use crate::{
 	error::Result,
-	sync::{gix_repo, repository::repo},
+	sync::repository::repo,
 };
+#[cfg(not(target_env = "ohos"))]
+use crate::sync::gix_repo;
 use scopetime::scope_time;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -49,6 +51,7 @@ pub struct TagWithMetadata {
 static MAX_MESSAGE_WIDTH: usize = 100;
 
 /// returns `Tags` type filled with all tags found in repo
+#[cfg(not(target_env = "ohos"))]
 pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 	scope_time!("get_tags");
 
@@ -80,6 +83,48 @@ pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
 			};
 
 			adder(commit.into(), Tag { name, annotation });
+		}
+	}
+
+	Ok(res)
+}
+
+/// git2-based tag listing for OpenHarmony targets.
+/// On OHOS, gix-odb's slot map for pack indices can overflow
+/// (InsufficientSlots), so we fall back to git2.
+#[cfg(target_env = "ohos")]
+pub fn get_tags(repo_path: &RepoPath) -> Result<Tags> {
+	scope_time!("get_tags");
+
+	let mut res = Tags::new();
+	let mut adder = |key, value: Tag| {
+		if let Some(key) = res.get_mut(&key) {
+			key.push(value);
+		} else {
+			res.insert(key, vec![value]);
+		}
+	};
+
+	let repo = repo(repo_path)?;
+	let tag_names = repo.tag_names(None)?;
+
+	for name in tag_names.iter().flatten() {
+		let reference = match repo.find_reference(
+			&format!("refs/tags/{name}"),
+		) {
+			Ok(r) => r,
+			Err(_) => continue,
+		};
+
+		let target = reference.target();
+		let tag = reference.peel_to_tag();
+
+		if let (Some(commit_id), Ok(tag)) = (target, tag) {
+			let name = tag.name().unwrap_or(name).to_string();
+			let annotation = tag.message().map(|s| s.to_string());
+			adder(commit_id.into(), Tag { name, annotation });
+		} else if let Some(commit_id) = target {
+			adder(commit_id.into(), Tag::new(name));
 		}
 	}
 

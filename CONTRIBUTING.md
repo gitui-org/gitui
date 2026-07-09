@@ -22,5 +22,39 @@ good first issue, you can take a look at [issues labelled with
 too much context so that people not familiar with the codebase yet can still
 make a contribution.
 
+## Cross-compiling for OpenHarmony
+
+GitUI can be built for OpenHarmony (target `aarch64-unknown-linux-ohos`). This requires the OpenHarmony SDK native toolchain.
+
+Download the SDK command-line tools from [HarmonyOS Developer](https://developer.huawei.com/consumer/cn/download/command-line-tools-for-hmos). After installation, the default SDK path is typically:
+
+- Linux: `~/command-line-tools/sdk/default/openharmony`
+- macOS: `~/Library/command-line-tools/sdk/default/openharmony`
+
+First, install the `aarch64-unknown-linux-ohos` Rust target:
+
+```sh
+rustup target add aarch64-unknown-linux-ohos
+```
+
+Set the following environment variables (adjust paths to your OHOS SDK location):
+
+```sh
+export OHOS_SDK=/path/to/ohos-sdk
+export CC_aarch64_unknown_linux_ohos="$OHOS_SDK/native/llvm/bin/clang"
+export CXX_aarch64_unknown_linux_ohos="$OHOS_SDK/native/llvm/bin/clang++"
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER="$OHOS_SDK/native/llvm/bin/clang"
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_AR="$OHOS_SDK/native/llvm/bin/llvm-ar"
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_RUSTFLAGS="-C link-arg=--sysroot=$OHOS_SDK/native/sysroot -C link-arg=-L$OHOS_SDK/native/sysroot/usr/lib/aarch64-linux-ohos -C link-arg=-Wl,--allow-multiple-definition -C link-arg=-Wl,--undefined-version -C link-arg=-Wl,--defsym=__xpg_strerror_r=0"
+```
+
+Then build:
+
+```sh
+cargo build --target aarch64-unknown-linux-ohos --release
+```
+
+> **Note:** On OpenHarmony the user/process model is sandbox-based. GitUI automatically disables libgit2's owner validation on OHOS targets to avoid spurious "not owned by current user" errors.
+
 [discord-server]: https://discord.gg/rZv4uxSQx3
 [good-first-issues]: https://github.com/gitui-org/gitui/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
