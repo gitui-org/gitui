@@ -63,8 +63,11 @@ test-linux-musl:
 
 # aarch64 test binaries are cross-compiled, so CI runs them under qemu via a
 # CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER (see .github/workflows/ci.yml).
+# Exclude test_hook_with_missing_shebang: it needs the kernel's ENOEXEC (so
+# gitui retries the hook via `sh`), which qemu-user doesn't emulate — the exec
+# just exits 127. It passes on real aarch64 hardware.
 test-linux-arm:
-	cargo nextest run --workspace --target=aarch64-unknown-linux-gnu
+	cargo nextest run --workspace --target=aarch64-unknown-linux-gnu -E 'not test(test_hook_with_missing_shebang)'
 
 release-linux-arm: build-linux-arm-release
 	mkdir -p release
