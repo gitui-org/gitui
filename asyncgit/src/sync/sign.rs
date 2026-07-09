@@ -533,6 +533,82 @@ mod tests {
 		Ok(())
 	}
 
+	/// Export a PKCS#12 bundle for `key`+`cert` with the given `cipher_args`,
+	/// import it into the gpgsm keyring under `home`, and return the imported
+	/// secret key's fingerprint. Returns `None` when this openssl/gpgsm pair
+	/// can't round-trip the bundle, so the caller can try another cipher.
+	#[cfg(unix)]
+	fn gpgsm_import_p12(
+		home: &std::path::Path,
+		key: &std::path::Path,
+		cert: &std::path::Path,
+		cipher_args: &[&str],
+	) -> Option<String> {
+		use std::process::Command;
+
+		let p12 = home.join("bundle.p12");
+		// tolerates failure (unlike the test's `run`) so a failed cipher can
+		// fall back to another.
+		let run = |program: &str, args: &[&str]| {
+			Command::new(program)
+				.args(args)
+				.env("GNUPGHOME", home)
+				.output()
+				.unwrap_or_else(|e| {
+					panic!("failed to run {program}: {e}")
+				})
+		};
+
+		let mut export_args = vec![
+			"pkcs12",
+			"-export",
+			"-inkey",
+			key.to_str().unwrap(),
+			"-in",
+			cert.to_str().unwrap(),
+			"-out",
+			p12.to_str().unwrap(),
+			"-passout",
+			"pass:",
+		];
+		export_args.extend_from_slice(cipher_args);
+		if !run("openssl", &export_args).status.success() {
+			return None;
+		}
+
+		run(
+			"gpgsm",
+			&[
+				"--batch",
+				"--pinentry-mode",
+				"loopback",
+				"--passphrase",
+				"",
+				"--import",
+				p12.to_str().unwrap(),
+			],
+		);
+
+		// a listed secret key (fpr line) means the import gave us a key.
+		let listing = run(
+			"gpgsm",
+			&["--batch", "--with-colons", "--list-secret-keys"],
+		);
+		String::from_utf8_lossy(&listing.stdout)
+			.lines()
+			.filter_map(|line| line.strip_prefix("fpr:"))
+			.find_map(|rest| {
+				rest.split(':')
+					.find(|field| {
+						field.len() == 40
+							&& field
+								.bytes()
+								.all(|b| b.is_ascii_hexdigit())
+					})
+					.map(|field| field.to_string())
+			})
+	}
+
 	/// e2e x509 signing: set up a throwaway `gpgsm` identity, sign a real
 	/// commit and verify it. Serial + unix-only: uses a process-wide `GNUPGHOME`.
 	#[cfg(unix)]
@@ -609,7 +685,6 @@ mod tests {
 
 		let key = home.join("key.pem");
 		let cert = home.join("cert.pem");
-		let p12 = home.join("bundle.p12");
 		run(
 			"openssl",
 			&[
@@ -628,59 +703,24 @@ mod tests {
 				&format!("/CN=gitui test/emailAddress={email}"),
 			],
 		);
-		run(
-			"openssl",
-			&[
-				"pkcs12",
-				"-export",
-				"-inkey",
-				key.to_str().unwrap(),
-				"-in",
-				cert.to_str().unwrap(),
-				"-out",
-				p12.to_str().unwrap(),
-				"-passout",
-				"pass:",
-				// legacy PBE: gpgsm can't read OpenSSL 3's default PBES2/AES.
-				"-keypbe",
-				"PBE-SHA1-3DES",
-				"-certpbe",
-				"PBE-SHA1-3DES",
-				"-macalg",
-				"sha1",
-			],
-		);
-		run(
-			"gpgsm",
-			&[
-				"--batch",
-				"--pinentry-mode",
-				"loopback",
-				"--passphrase",
-				"",
-				"--import",
-				p12.to_str().unwrap(),
-			],
-		);
+		// gpgsm's PKCS#12 reader accepts different ciphers across versions, so
+		// try a legacy (3DES/SHA1) then a modern (OpenSSL default) bundle and
+		// fail only if neither imports a usable secret key.
+		let legacy = &[
+			"-keypbe",
+			"PBE-SHA1-3DES",
+			"-certpbe",
+			"PBE-SHA1-3DES",
+			"-macalg",
+			"sha1",
+		];
+		let fingerprint = gpgsm_import_p12(home, &key, &cert, legacy)
+			.or_else(|| gpgsm_import_p12(home, &key, &cert, &[]))
+			.expect(
+				"gpgsm could not import a legacy or modern PKCS#12 bundle",
+			);
 
 		// trust our self-signed root ("S" relaxes CA checks) so gpgsm will sign.
-		let listing = run(
-			"gpgsm",
-			&["--batch", "--with-colons", "--list-secret-keys"],
-		);
-		let listing = String::from_utf8_lossy(&listing.stdout);
-		let fingerprint = listing
-			.lines()
-			.filter_map(|line| line.strip_prefix("fpr:"))
-			.find_map(|rest| {
-				rest.split(':').find(|field| {
-					field.len() == 40
-						&& field
-							.bytes()
-							.all(|b| b.is_ascii_hexdigit())
-				})
-			})
-			.expect("could not determine cert fingerprint");
 		std::fs::write(
 			home.join("trustlist.txt"),
 			format!("{fingerprint} S\n"),
