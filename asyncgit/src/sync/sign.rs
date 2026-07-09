@@ -352,11 +352,11 @@ impl Sign for SSHSign {
 			.arg("-f")
 			.arg(&self.signing_key_path);
 
-		// `-U` (use agent) makes ssh-keygen error instead of prompting for a
-		// passphrase, but third-party signers (e.g. 1Password's op-ssh-sign)
-		// reject the flag, so only pass it to ssh-keygen itself.
+		// `-P ""` avoids a passphrase prompt without forcing agent-only signing
+		// (`-U` breaks on-disk keys, see #2464). Third-party signers such as
+		// 1Password's op-ssh-sign reject the flag, so pass it to ssh-keygen only.
 		if &self.program == "ssh-keygen" {
-			cmd.arg("-U");
+			cmd.arg("-P").arg("");
 		}
 
 		log::trace!("signing command: {cmd:?}");
@@ -949,6 +949,157 @@ mod tests {
 		);
 
 		std::env::remove_var("GNUPGHOME");
+		Ok(())
+	}
+
+	/// e2e ssh signing: generate a throwaway unencrypted ssh key on disk, sign a
+	/// real commit with no agent reachable and verify it. Reproduces the hang
+	/// reported in PR #2464: `-U` forced ssh-keygen to sign only with an
+	/// agent-held key, so an on-disk key failed ("Couldn't get agent socket") or
+	/// hung when no matching key was loaded. Serial + unix-only: it mutates the
+	/// process-wide `SSH_AUTH_SOCK`.
+	#[cfg(unix)]
+	#[test]
+	#[serial]
+	fn test_ssh_sign_and_verify_e2e() -> Result<()> {
+		use std::process::{Command, Stdio};
+
+		// ssh-keygen exits non-zero when invoked with no args, so availability
+		// is "did it spawn at all", not "did it succeed".
+		let ssh_keygen_available = Command::new("ssh-keygen")
+			.stdin(Stdio::null())
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.status()
+			.is_ok();
+		assert!(
+			ssh_keygen_available,
+			"ssh-keygen is required for the ssh e2e test"
+		);
+
+		let run = |program: &str, args: &[&str]| {
+			let out = Command::new(program)
+				.args(args)
+				.output()
+				.unwrap_or_else(|e| {
+					panic!("failed to run {program}: {e}")
+				});
+			assert!(
+				out.status.success(),
+				"{program} {args:?} failed: {}",
+				String::from_utf8_lossy(&out.stderr)
+			);
+			out
+		};
+
+		let email = "gitui-ssh-test@example.com";
+		let dir = tempfile::tempdir()?;
+		let key_path = dir.path().join("id_ed25519");
+		let pub_path = dir.path().join("id_ed25519.pub");
+
+		// unencrypted key (-N "") so no passphrase and no agent are involved.
+		run(
+			"ssh-keygen",
+			&[
+				"-t",
+				"ed25519",
+				"-N",
+				"",
+				"-C",
+				email,
+				"-f",
+				key_path.to_str().unwrap(),
+			],
+		);
+
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "ssh")?;
+			// the common on-disk config: point at the public key file.
+			config.set_str(
+				"user.signingKey",
+				pub_path.to_str().unwrap(),
+			)?;
+		}
+		let signer =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+		assert_eq!("ssh-keygen", signer.program());
+
+		let sig = git2::Signature::now("gitui test", email)?;
+		let tree = {
+			let mut index = repo.index()?;
+			let tree_id = index.write_tree()?;
+			repo.find_tree(tree_id)?
+		};
+
+		// no agent reachable: with the buggy `-U` this fails/hangs, with the
+		// on-disk key it must just work.
+		let saved_sock = std::env::var_os("SSH_AUTH_SOCK");
+		std::env::remove_var("SSH_AUTH_SOCK");
+		let commit_id = create_signed_commit(
+			&repo,
+			&*signer,
+			&sig,
+			&sig,
+			"ssh signed commit",
+			&tree,
+			&[],
+		);
+		match saved_sock {
+			Some(sock) => std::env::set_var("SSH_AUTH_SOCK", sock),
+			None => std::env::remove_var("SSH_AUTH_SOCK"),
+		}
+		let commit_id = commit_id?;
+
+		let (signature, signed_data) =
+			repo.extract_signature(&commit_id, None)?;
+		let signature = std::str::from_utf8(&signature).unwrap();
+		assert!(
+			signature.contains("BEGIN SSH SIGNATURE"),
+			"expected an ssh signature, got: {signature}"
+		);
+
+		// verify against an allowed_signers file built from the public key.
+		let pub_key = std::fs::read_to_string(&pub_path)?;
+		let mut fields = pub_key.split_whitespace();
+		let key_type = fields.next().expect("key type");
+		let key_blob = fields.next().expect("key blob");
+		let allowed = dir.path().join("allowed_signers");
+		std::fs::write(
+			&allowed,
+			format!("{email} {key_type} {key_blob}\n"),
+		)?;
+
+		let sig_file = dir.path().join("commit.sig");
+		let data_file = dir.path().join("commit.data");
+		std::fs::write(&sig_file, signature)?;
+		std::fs::write(&data_file, &*signed_data)?;
+		let verify = Command::new("ssh-keygen")
+			.args([
+				"-Y",
+				"verify",
+				"-f",
+				allowed.to_str().unwrap(),
+				"-I",
+				email,
+				"-n",
+				"git",
+				"-s",
+				sig_file.to_str().unwrap(),
+			])
+			.stdin(std::fs::File::open(&data_file)?)
+			.output()?;
+		let verify_out = String::from_utf8_lossy(&verify.stdout);
+		assert!(
+			verify.status.success()
+				&& verify_out.contains("Good")
+				&& verify_out.contains(email),
+			"ssh-keygen did not accept the signature: {}{}",
+			verify_out,
+			String::from_utf8_lossy(&verify.stderr)
+		);
+
 		Ok(())
 	}
 }
