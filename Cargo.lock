@@ -329,9 +329,9 @@ dependencies = [
 
 [[package]]
 name = "bugreport"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f280f65ce85b880919349bbfcb204930291251eedcb2e5f84ce2f51df969c162"
+checksum = "60c65ffd876f5b1dbfe5dde48856f146da8640989cbc11f157762ebfa3c2309e"
 dependencies = [
  "git-version",
  "shell-escape",
