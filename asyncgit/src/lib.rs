@@ -45,6 +45,7 @@ It wraps libraries like git2 and gix.
 
 pub mod asyncjob;
 mod blame;
+mod branch_compare;
 mod branches;
 pub mod cached;
 mod commit_files;
@@ -66,6 +67,7 @@ mod treefiles;
 
 pub use crate::{
 	blame::{AsyncBlame, BlameParams},
+	branch_compare::AsyncBranchCompareJob,
 	branches::AsyncBranchesJob,
 	commit_files::{AsyncCommitFiles, CommitFilesParams},
 	diff::{AsyncDiff, DiffParams, DiffType},
@@ -124,6 +126,8 @@ pub enum AsyncGitNotification {
 	Fetch,
 	///
 	Branches,
+	///
+	BranchCompare,
 	///
 	TreeFiles,
 	///
