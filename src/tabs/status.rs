@@ -804,6 +804,12 @@ impl Component for Status {
 				true,
 				true,
 			));
+
+			out.push(CommandInfo::new(
+				strings::commands::view_worktrees(&self.key_config),
+				true,
+				true,
+			));
 		}
 
 		self.commands_nav(out, force_all);
@@ -946,6 +952,12 @@ impl Component for Status {
 					self.key_config.keys.view_submodules,
 				) {
 					self.queue.push(InternalEvent::ViewSubmodules);
+					Ok(EventState::Consumed)
+				} else if key_match(
+					k,
+					self.key_config.keys.view_worktrees,
+				) {
+					self.queue.push(InternalEvent::ViewWorktrees);
 					Ok(EventState::Consumed)
 				} else {
 					Ok(EventState::NotConsumed)

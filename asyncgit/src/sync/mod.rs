@@ -34,6 +34,7 @@ mod submodules;
 mod tags;
 mod tree;
 pub mod utils;
+mod worktree;
 
 pub use blame::{blame_file, BlameHunk, FileBlame};
 pub use branch::{
@@ -108,6 +109,7 @@ pub use utils::{
 	get_head, get_head_tuple, repo_dir, repo_open_error,
 	stage_add_all, stage_add_file, stage_addremoved, Head,
 };
+pub use worktree::{get_worktrees, WorktreeInfo};
 
 pub use git2::ResetType;
 

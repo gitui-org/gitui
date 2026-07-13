@@ -30,6 +30,7 @@ pub static PUSH_TAGS_STATES_PUSHING: &str = "pushing";
 pub static PUSH_TAGS_STATES_DONE: &str = "done";
 
 pub static POPUP_TITLE_SUBMODULES: &str = "Submodules";
+pub static POPUP_TITLE_WORKTREES: &str = "Worktrees";
 pub static POPUP_TITLE_REMOTES: &str = "Remotes";
 pub static POPUP_SUBTITLE_REMOTES: &str = "Details";
 pub static POPUP_TITLE_FUZZY_FIND: &str = "Fuzzy Finder";
@@ -929,6 +930,32 @@ pub mod commands {
 				key_config.get_hint(key_config.keys.view_submodules),
 			),
 			"open submodule view",
+			CMD_GROUP_GENERAL,
+		)
+	}
+
+	pub fn view_worktrees(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Worktrees [{}]",
+				key_config.get_hint(key_config.keys.view_worktrees),
+			),
+			"open worktree view",
+			CMD_GROUP_GENERAL,
+		)
+	}
+
+	pub fn open_worktree(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Switch [{}]",
+				key_config.get_hint(key_config.keys.enter),
+			),
+			"switch to selected worktree",
 			CMD_GROUP_GENERAL,
 		)
 	}
