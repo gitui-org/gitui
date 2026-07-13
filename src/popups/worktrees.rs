@@ -5,12 +5,14 @@ use crate::{
 		DrawableComponent, EventState, ScrollType, VerticalScroll,
 	},
 	keys::{key_match, SharedKeyConfig},
-	queue::{InternalEvent, Queue},
+	queue::{Action, InternalEvent, Queue},
 	strings,
 	ui::{self, Size},
 };
 use anyhow::Result;
-use asyncgit::sync::{get_worktrees, RepoPathRef, WorktreeInfo};
+use asyncgit::sync::{
+	get_worktrees, toggle_worktree_lock, RepoPathRef, WorktreeInfo,
+};
 use crossterm::event::Event;
 use ratatui::{
 	layout::{Alignment, Margin, Rect},
@@ -108,6 +110,18 @@ impl Component for WorktreesPopup {
 				true,
 				true,
 			));
+
+			out.push(CommandInfo::new(
+				strings::commands::remove_worktree(&self.key_config),
+				self.can_remove_worktree(),
+				true,
+			));
+
+			out.push(CommandInfo::new(
+				strings::commands::lock_worktree(&self.key_config),
+				self.can_lock_worktree(),
+				true,
+			));
 		}
 		visibility_blocking(self)
 	}
@@ -157,6 +171,37 @@ impl Component for WorktreesPopup {
 			{
 				self.queue.push(InternalEvent::CreateWorktree);
 				self.hide();
+			} else if key_match(e, self.key_config.keys.delete_branch)
+			{
+				if let Some(worktree) = self.selected_entry() {
+					if !worktree.is_main && !worktree.is_current {
+						self.queue.push(
+							InternalEvent::ConfirmAction(
+								Action::DeleteWorktree(
+									worktree.name.clone(),
+								),
+							),
+						);
+					}
+				}
+			} else if key_match(e, self.key_config.keys.lock_worktree)
+			{
+				let name = self
+					.selected_entry()
+					.filter(|w| !w.is_main)
+					.map(|w| w.name.clone());
+
+				if let Some(name) = name {
+					if let Err(err) = toggle_worktree_lock(
+						&self.repo.borrow(),
+						&name,
+					) {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							err.to_string(),
+						));
+					}
+					self.update_worktrees()?;
+				}
 			} else if key_match(
 				e,
 				self.key_config.keys.cmd_bar_toggle,
@@ -222,6 +267,15 @@ impl WorktreesPopup {
 
 	fn can_switch_worktree(&self) -> bool {
 		self.selected_entry().is_some_and(|w| !w.is_current)
+	}
+
+	fn can_remove_worktree(&self) -> bool {
+		self.selected_entry()
+			.is_some_and(|w| !w.is_main && !w.is_current)
+	}
+
+	fn can_lock_worktree(&self) -> bool {
+		self.selected_entry().is_some_and(|w| !w.is_main)
 	}
 
 	//TODO: dedup this almost identical with BranchListComponent

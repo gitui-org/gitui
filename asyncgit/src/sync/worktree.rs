@@ -2,17 +2,23 @@
 
 use std::path::{Path, PathBuf};
 
-use git2::{Repository, WorktreeLockStatus};
+use git2::{Repository, WorktreeLockStatus, WorktreePruneOptions};
 use scopetime::scope_time;
 
-use super::{repo, RepoPath};
+use super::{is_workdir_clean, repo, RepoPath};
 use crate::error::{Error, Result};
 
 /// name reported for the primary working tree
 const MAIN_WORKTREE_NAME: &str = "(main)";
 
 /// Information about one git worktree (the primary tree or a linked one).
+///
+/// The four flag fields are independent (e.g. the primary tree can be
+/// current or not, a linked tree can be locked or not, etc.), so they
+/// don't collapse into a smaller enum; see `status_tree.rs` for the
+/// same precedent in this codebase.
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct WorktreeInfo {
 	/// Linked-worktree name; "(main)" for the primary working tree.
 	pub name: String,
@@ -27,6 +33,9 @@ pub struct WorktreeInfo {
 	pub is_locked: bool,
 	/// Whether this is the worktree gitui is currently operating in.
 	pub is_current: bool,
+	/// Whether this is the primary ("(main)") working tree, which
+	/// cannot be removed or locked.
+	pub is_main: bool,
 }
 
 /// Lists the worktrees of the repo at `repo_path`, returning the
@@ -93,6 +102,7 @@ fn main_worktree_info(
 		branch,
 		is_valid: true,
 		is_locked: false,
+		is_main: true,
 	})
 }
 
@@ -119,6 +129,7 @@ fn linked_worktree_info(
 		branch,
 		is_valid: wt.validate().is_ok(),
 		is_locked,
+		is_main: false,
 	})
 }
 
@@ -167,6 +178,83 @@ pub fn create_worktree(
 	Ok(worktree.path().to_path_buf())
 }
 
+/// Removes the linked worktree named `name`: deletes its working
+/// directory and prunes its administrative files.
+///
+/// Refuses (returns an error, mirroring `git worktree remove` without
+/// `--force`) when the worktree is the current one, is locked, or has
+/// uncommitted/untracked changes — since removal deletes the working
+/// directory irrecoverably.
+pub fn remove_worktree(
+	repo_path: &RepoPath,
+	name: &str,
+) -> Result<()> {
+	scope_time!("remove_worktree");
+
+	let repo = repo(repo_path)?;
+	let worktree = repo.find_worktree(name)?;
+
+	// never remove the worktree gitui is operating in.
+	if same_workdir(worktree.path(), repo.workdir()) {
+		return Err(Error::Generic(
+			"cannot remove the current worktree".to_string(),
+		));
+	}
+
+	// a locked worktree is deliberately protected; require unlock.
+	if matches!(worktree.is_locked()?, WorktreeLockStatus::Locked(_))
+	{
+		return Err(Error::Generic(
+			"worktree is locked; unlock it before removing"
+				.to_string(),
+		));
+	}
+
+	// refuse to delete a worktree with uncommitted or untracked
+	// changes (libgit2 does not refuse this itself). Only checkable
+	// when the working dir still exists.
+	if worktree.validate().is_ok() {
+		if let Some(path) = worktree.path().to_str() {
+			let wt_path: RepoPath = path.into();
+			if !is_workdir_clean(&wt_path, None)? {
+				return Err(Error::Generic(
+					"worktree has uncommitted changes; commit or discard them first"
+						.to_string(),
+				));
+			}
+		}
+	}
+
+	// valid(true): also prune worktrees whose dir still exists;
+	// working_tree(true): delete the working directory too.
+	let mut opts = WorktreePruneOptions::new();
+	opts.valid(true).working_tree(true);
+	worktree.prune(Some(&mut opts))?;
+
+	Ok(())
+}
+
+/// Toggles the lock state of the linked worktree named `name`: locks
+/// it (with no reason) when unlocked, unlocks it when locked.
+pub fn toggle_worktree_lock(
+	repo_path: &RepoPath,
+	name: &str,
+) -> Result<()> {
+	scope_time!("toggle_worktree_lock");
+
+	let repo = repo(repo_path)?;
+	let worktree = repo.find_worktree(name)?;
+
+	if matches!(worktree.is_locked()?, WorktreeLockStatus::Locked(_))
+	{
+		worktree.unlock()?;
+	} else {
+		worktree.lock(None)?;
+	}
+
+	Ok(())
+}
+
 /// short name of the branch a repo's HEAD points at, or `None` when
 /// HEAD is unborn or detached.
 fn head_branch(repo: &Repository) -> Option<String> {
@@ -197,7 +285,10 @@ fn same_workdir(path: &Path, current: Option<&Path>) -> bool {
 
 #[cfg(test)]
 mod tests {
-	use super::{create_worktree, get_worktrees, WorktreeInfo};
+	use super::{
+		create_worktree, get_worktrees, remove_worktree,
+		toggle_worktree_lock, WorktreeInfo,
+	};
 	use crate::sync::{tests::repo_init, RepoPath};
 	use pretty_assertions::assert_eq;
 
@@ -324,5 +415,71 @@ mod tests {
 		// a path ending in ".." has no usable final component
 		let res = create_worktree(&repo_path, "..");
 		assert!(res.is_err());
+	}
+
+	#[test]
+	fn test_remove_worktree() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		let wt_dir = tempfile::TempDir::new().unwrap();
+		let wt_path = wt_dir.path().join("gone");
+		create_worktree(&repo_path, wt_path.to_str().unwrap())
+			.unwrap();
+		assert_eq!(get_worktrees(&repo_path).unwrap().len(), 2);
+
+		remove_worktree(&repo_path, "gone").unwrap();
+
+		let list = get_worktrees(&repo_path).unwrap();
+		assert_eq!(list.len(), 1);
+		assert_eq!(list[0].name, "(main)");
+		assert!(!wt_path.exists());
+	}
+
+	#[test]
+	fn test_remove_worktree_refuses_dirty() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		let wt_dir = tempfile::TempDir::new().unwrap();
+		let wt_path = wt_dir.path().join("dirty");
+		create_worktree(&repo_path, wt_path.to_str().unwrap())
+			.unwrap();
+
+		// introduce an untracked file inside the worktree
+		std::fs::write(wt_path.join("scratch.txt"), b"wip").unwrap();
+
+		assert!(remove_worktree(&repo_path, "dirty").is_err());
+		// still present because removal was refused
+		assert_eq!(get_worktrees(&repo_path).unwrap().len(), 2);
+	}
+
+	#[test]
+	fn test_toggle_worktree_lock() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		let wt_dir = tempfile::TempDir::new().unwrap();
+		let wt_path = wt_dir.path().join("lockme");
+		create_worktree(&repo_path, wt_path.to_str().unwrap())
+			.unwrap();
+
+		let locked = |p: &RepoPath| {
+			get_worktrees(p)
+				.unwrap()
+				.into_iter()
+				.find(|w| w.name == "lockme")
+				.unwrap()
+				.is_locked
+		};
+
+		assert!(!locked(&repo_path));
+		toggle_worktree_lock(&repo_path, "lockme").unwrap();
+		assert!(locked(&repo_path));
+		toggle_worktree_lock(&repo_path, "lockme").unwrap();
+		assert!(!locked(&repo_path));
 	}
 }

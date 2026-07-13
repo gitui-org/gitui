@@ -172,6 +172,10 @@ impl ConfirmPopup {
 			strings::confirm_title_delete_remote(&self.key_config),
 			strings::confirm_msg_delete_remote(&self.key_config,remote_name),
 		),
+                Action::DeleteWorktree(name) => (
+                    strings::confirm_title_delete_worktree(&self.key_config),
+                    strings::confirm_msg_delete_worktree(&self.key_config, name),
+                ),
                 Action::DeleteTag(tag_name) => (
                     strings::confirm_title_delete_tag(
                         &self.key_config,

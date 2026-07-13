@@ -249,6 +249,19 @@ pub fn confirm_msg_delete_branch(
 ) -> String {
 	format!("Confirm deleting branch: '{branch_ref}' ?")
 }
+pub fn confirm_title_delete_worktree(
+	_key_config: &SharedKeyConfig,
+) -> String {
+	"Remove Worktree".to_string()
+}
+pub fn confirm_msg_delete_worktree(
+	_key_config: &SharedKeyConfig,
+	name: &str,
+) -> String {
+	format!(
+		"Really remove worktree `{name}`? Its working directory will be deleted."
+	)
+}
 pub fn confirm_title_delete_remote_branch(
 	_key_config: &SharedKeyConfig,
 ) -> String {
@@ -1733,6 +1746,32 @@ pub mod commands {
 				key_config.get_hint(key_config.keys.create_branch),
 			),
 			"create a new worktree",
+			CMD_GROUP_GENERAL,
+		)
+	}
+
+	pub fn remove_worktree(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Remove [{}]",
+				key_config.get_hint(key_config.keys.delete_branch),
+			),
+			"remove the selected worktree",
+			CMD_GROUP_GENERAL,
+		)
+	}
+
+	pub fn lock_worktree(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Lock/Unlock [{}]",
+				key_config.get_hint(key_config.keys.lock_worktree),
+			),
+			"lock or unlock the selected worktree",
 			CMD_GROUP_GENERAL,
 		)
 	}

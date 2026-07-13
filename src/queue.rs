@@ -52,6 +52,7 @@ pub enum Action {
 	DeleteTag(String),
 	DeleteRemoteTag(String, String),
 	DeleteRemote(String),
+	DeleteWorktree(String),
 	ForcePush(String, bool),
 	PullMerge { incoming: usize, rebase: bool },
 	AbortMerge,

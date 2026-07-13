@@ -1009,6 +1009,17 @@ impl App {
 
 				self.select_branch_popup.update_branches()?;
 			}
+			Action::DeleteWorktree(name) => {
+				if let Err(e) =
+					sync::remove_worktree(&self.repo.borrow(), &name)
+				{
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						e.to_string(),
+					));
+				}
+				self.worktree_popup.update_worktrees()?;
+				flags.insert(NeedsUpdate::ALL);
+			}
 			Action::DeleteRemoteBranch(branch_ref) => {
 				self.delete_remote_branch(&branch_ref)?;
 			}
