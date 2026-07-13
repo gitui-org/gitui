@@ -353,6 +353,17 @@ pub fn create_branch_popup_msg(
 ) -> String {
 	"type branch name".to_string()
 }
+pub fn create_worktree_popup_title(
+	_key_config: &SharedKeyConfig,
+) -> String {
+	"Create Worktree".to_string()
+}
+pub fn create_worktree_popup_msg(
+	_key_config: &SharedKeyConfig,
+) -> String {
+	"path (absolute, or relative to repo root — e.g. ../feature-x)"
+		.to_string()
+}
 pub fn rename_remote_popup_title(
 	_key_config: &SharedKeyConfig,
 ) -> String {
@@ -1711,6 +1722,19 @@ pub mod commands {
 			CMD_GROUP_BRANCHES,
 		)
 		.hide_help()
+	}
+
+	pub fn create_worktree_confirm_msg(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Create Worktree [{}]",
+				key_config.get_hint(key_config.keys.create_branch),
+			),
+			"create a new worktree",
+			CMD_GROUP_GENERAL,
+		)
 	}
 	pub fn open_branch_create_popup(
 		key_config: &SharedKeyConfig,

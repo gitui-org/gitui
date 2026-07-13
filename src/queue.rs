@@ -113,6 +113,8 @@ pub enum InternalEvent {
 	///
 	CreateBranch,
 	///
+	CreateWorktree,
+	///
 	RenameRemote(String),
 	///
 	UpdateRemoteUrl(String, String),

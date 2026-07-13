@@ -6,7 +6,7 @@ use git2::{Repository, WorktreeLockStatus};
 use scopetime::scope_time;
 
 use super::{repo, RepoPath};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// name reported for the primary working tree
 const MAIN_WORKTREE_NAME: &str = "(main)";
@@ -122,6 +122,44 @@ fn linked_worktree_info(
 	})
 }
 
+/// Creates a new linked worktree at `worktree_path`, checking out a
+/// new branch named after the final path component.
+///
+/// `worktree_path` may be absolute or relative to the repository's
+/// working directory. Returns the absolute path of the created
+/// worktree.
+pub fn create_worktree(
+	repo_path: &RepoPath,
+	worktree_path: &str,
+) -> Result<PathBuf> {
+	scope_time!("create_worktree");
+
+	let repo = repo(repo_path)?;
+
+	let requested = Path::new(worktree_path);
+
+	let target = if requested.is_absolute() {
+		requested.to_path_buf()
+	} else {
+		repo.workdir().ok_or(Error::NoWorkDir)?.join(requested)
+	};
+
+	let name = target
+		.file_name()
+		.and_then(|n| n.to_str())
+		.ok_or_else(|| {
+			Error::Generic(
+				"invalid worktree path: no final component"
+					.to_string(),
+			)
+		})?
+		.to_string();
+
+	let worktree = repo.worktree(&name, &target, None)?;
+
+	Ok(worktree.path().to_path_buf())
+}
+
 /// short name of the branch a repo's HEAD points at, or `None` when
 /// HEAD is unborn or detached.
 fn head_branch(repo: &Repository) -> Option<String> {
@@ -152,7 +190,7 @@ fn same_workdir(path: &Path, current: Option<&Path>) -> bool {
 
 #[cfg(test)]
 mod tests {
-	use super::{get_worktrees, WorktreeInfo};
+	use super::{create_worktree, get_worktrees, WorktreeInfo};
 	use crate::sync::{tests::repo_init, RepoPath};
 	use pretty_assertions::assert_eq;
 
@@ -222,5 +260,41 @@ mod tests {
 		assert_eq!(list.len(), 1);
 		assert_eq!(list[0].name, "(main)");
 		assert!(list[0].branch.is_none());
+	}
+
+	#[test]
+	fn test_create_worktree_new_branch() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		// keep the linked worktree outside the main workdir; wt_dir
+		// must stay alive for the whole test.
+		let wt_dir = tempfile::TempDir::new().unwrap();
+		let wt_path = wt_dir.path().join("feature-x");
+
+		let created =
+			create_worktree(&repo_path, wt_path.to_str().unwrap())
+				.unwrap();
+
+		assert!(created.ends_with("feature-x"));
+
+		let list = get_worktrees(&repo_path).unwrap();
+		let wt = find(&list, "feature-x");
+		assert!(wt.path.is_absolute());
+		// libgit2 names the new branch after the worktree.
+		assert_eq!(wt.branch.as_deref(), Some("feature-x"));
+		assert!(!wt.is_current);
+	}
+
+	#[test]
+	fn test_create_worktree_rejects_pathless_name() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		// a path ending in ".." has no usable final component
+		let res = create_worktree(&repo_path, "..");
+		assert!(res.is_err());
 	}
 }

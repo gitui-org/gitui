@@ -14,13 +14,14 @@ use crate::{
 		AppOption, BlameFilePopup, BranchListPopup,
 		CheckoutOptionPopup, CommitPopup, CompareCommitsPopup,
 		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
-		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
-		FuzzyFindPopup, GotoLinePopup, HelpPopup, InspectCommitPopup,
-		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
-		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
-		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
-		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
-		TagListPopup, UpdateRemoteUrlPopup, WorktreesPopup,
+		CreateWorktreePopup, ExternalEditorPopup, FetchPopup,
+		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
+		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
+		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
+		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
+		ResetPopup, RevisionFilesPopup, StashMsgPopup,
+		SubmodulesListPopup, TagCommitPopup, TagListPopup,
+		UpdateRemoteUrlPopup, WorktreesPopup,
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -89,6 +90,7 @@ pub struct App {
 	fetch_popup: FetchPopup,
 	tag_commit_popup: TagCommitPopup,
 	create_branch_popup: CreateBranchPopup,
+	create_worktree_popup: CreateWorktreePopup,
 	create_remote_popup: CreateRemotePopup,
 	rename_remote_popup: RenameRemotePopup,
 	update_remote_url_popup: UpdateRemoteUrlPopup,
@@ -213,6 +215,7 @@ impl App {
 			fetch_popup: FetchPopup::new(&env),
 			tag_commit_popup: TagCommitPopup::new(&env),
 			create_branch_popup: CreateBranchPopup::new(&env),
+			create_worktree_popup: CreateWorktreePopup::new(&env),
 			create_remote_popup: CreateRemotePopup::new(&env),
 			rename_remote_popup: RenameRemotePopup::new(&env),
 			update_remote_url_popup: UpdateRemoteUrlPopup::new(&env),
@@ -418,6 +421,7 @@ impl App {
 		self.stashing_tab.update()?;
 		self.stashlist_tab.update()?;
 		self.reset_popup.update()?;
+		self.worktree_popup.update_worktrees()?;
 
 		self.update_commands();
 
@@ -523,6 +527,7 @@ impl App {
 			reset_popup,
 			checkout_option_popup,
 			create_branch_popup,
+			create_worktree_popup,
 			create_remote_popup,
 			rename_remote_popup,
 			update_remote_url_popup,
@@ -566,6 +571,7 @@ impl App {
 			reset_popup,
 			checkout_option_popup,
 			create_branch_popup,
+			create_worktree_popup,
 			rename_branch_popup,
 			revision_files_popup,
 			fuzzy_find_popup,
@@ -796,6 +802,9 @@ impl App {
 			}
 			InternalEvent::CreateBranch => {
 				self.create_branch_popup.open()?;
+			}
+			InternalEvent::CreateWorktree => {
+				self.create_worktree_popup.open()?;
 			}
 			InternalEvent::RenameBranch(branch_ref, cur_name) => {
 				self.rename_branch_popup

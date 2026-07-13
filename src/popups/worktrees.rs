@@ -100,6 +100,14 @@ impl Component for WorktreesPopup {
 				self.can_switch_worktree(),
 				true,
 			));
+
+			out.push(CommandInfo::new(
+				strings::commands::create_worktree_confirm_msg(
+					&self.key_config,
+				),
+				true,
+				true,
+			));
 		}
 		visibility_blocking(self)
 	}
@@ -144,6 +152,10 @@ impl Component for WorktreesPopup {
 						});
 					}
 				}
+				self.hide();
+			} else if key_match(e, self.key_config.keys.create_branch)
+			{
+				self.queue.push(InternalEvent::CreateWorktree);
 				self.hide();
 			} else if key_match(
 				e,
