@@ -155,6 +155,13 @@ pub fn create_worktree(
 		})?
 		.to_string();
 
+	// libgit2 only creates the leaf directory, not missing parents
+	// (unlike `git worktree add`), so create the parent chain first
+	// to support nested paths such as `worktrees/foo`.
+	if let Some(parent) = target.parent() {
+		std::fs::create_dir_all(parent)?;
+	}
+
 	let worktree = repo.worktree(&name, &target, None)?;
 
 	Ok(worktree.path().to_path_buf())
@@ -285,6 +292,27 @@ mod tests {
 		// libgit2 names the new branch after the worktree.
 		assert_eq!(wt.branch.as_deref(), Some("feature-x"));
 		assert!(!wt.is_current);
+	}
+
+	#[test]
+	fn test_create_worktree_creates_missing_parents() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		// nested path whose parent dirs do not exist yet; libgit2
+		// would fail to mkdir the leaf without this being handled.
+		let wt_dir = tempfile::TempDir::new().unwrap();
+		let nested = wt_dir.path().join("a").join("b").join("wt");
+
+		let created =
+			create_worktree(&repo_path, nested.to_str().unwrap())
+				.unwrap();
+
+		assert!(created.ends_with("wt"));
+		let list = get_worktrees(&repo_path).unwrap();
+		let wt = find(&list, "wt");
+		assert_eq!(wt.branch.as_deref(), Some("wt"));
 	}
 
 	#[test]
