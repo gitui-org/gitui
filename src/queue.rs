@@ -147,8 +147,6 @@ pub enum InternalEvent {
 	///
 	ViewSubmodules,
 	///
-	ViewWorktrees,
-	///
 	ViewRemotes,
 	///
 	CreateRemote,

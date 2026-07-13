@@ -362,6 +362,12 @@ impl App {
 				) {
 					self.options_popup.show()?;
 					NeedsUpdate::ALL
+				} else if key_match(
+					k,
+					self.key_config.keys.view_worktrees,
+				) {
+					self.worktree_popup.open()?;
+					NeedsUpdate::ALL
 				} else {
 					NeedsUpdate::empty()
 				};
@@ -801,9 +807,6 @@ impl App {
 			InternalEvent::ViewSubmodules => {
 				self.submodule_popup.open()?;
 			}
-			InternalEvent::ViewWorktrees => {
-				self.worktree_popup.open()?;
-			}
 			InternalEvent::Tags => {
 				self.tags_popup.open()?;
 			}
@@ -1145,6 +1148,14 @@ impl App {
 		res.push(
 			CommandInfo::new(
 				strings::commands::options_popup(&self.key_config),
+				true,
+				!self.any_popup_visible(),
+			)
+			.order(order::NAV),
+		);
+		res.push(
+			CommandInfo::new(
+				strings::commands::view_worktrees(&self.key_config),
 				true,
 				!self.any_popup_visible(),
 			)
