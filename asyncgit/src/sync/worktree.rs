@@ -214,14 +214,12 @@ pub fn remove_worktree(
 	// changes (libgit2 does not refuse this itself). Only checkable
 	// when the working dir still exists.
 	if worktree.validate().is_ok() {
-		if let Some(path) = worktree.path().to_str() {
-			let wt_path: RepoPath = path.into();
-			if !is_workdir_clean(&wt_path, None)? {
-				return Err(Error::Generic(
-					"worktree has uncommitted changes; commit or discard them first"
-						.to_string(),
-				));
-			}
+		let wt_path: RepoPath = worktree.path().to_path_buf().into();
+		if !is_workdir_clean(&wt_path, None)? {
+			return Err(Error::Generic(
+				"worktree has uncommitted changes; commit or discard them first"
+					.to_string(),
+			));
 		}
 	}
 
