@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use git2::{Repository, WorktreeLockStatus, WorktreePruneOptions};
 use scopetime::scope_time;
 
+use super::status::{get_status, StatusType};
 use super::{is_workdir_clean, repo, RepoPath};
 use crate::error::{Error, Result};
 
@@ -215,7 +216,13 @@ pub fn remove_worktree(
 	// when the working dir still exists.
 	if worktree.validate().is_ok() {
 		let wt_path: RepoPath = worktree.path().to_path_buf().into();
-		if !is_workdir_clean(&wt_path, None)? {
+		// `is_workdir_clean` only compares the index to the working
+		// dir, so it misses staged-but-uncommitted changes; also
+		// reject those (HEAD vs index) to match `git worktree remove`.
+		let has_staged =
+			!get_status(&wt_path, StatusType::Stage, None)?
+				.is_empty();
+		if has_staged || !is_workdir_clean(&wt_path, None)? {
 			return Err(Error::Generic(
 				"worktree has uncommitted changes; commit or discard them first"
 					.to_string(),
@@ -451,6 +458,30 @@ mod tests {
 
 		assert!(remove_worktree(&repo_path, "dirty").is_err());
 		// still present because removal was refused
+		assert_eq!(get_worktrees(&repo_path).unwrap().len(), 2);
+	}
+
+	#[test]
+	fn test_remove_worktree_refuses_staged() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		let wt_dir = tempfile::TempDir::new().unwrap();
+		let wt_path = wt_dir.path().join("staged");
+		create_worktree(&repo_path, wt_path.to_str().unwrap())
+			.unwrap();
+
+		// stage a new file inside the worktree: it matches the index,
+		// so only the HEAD-vs-index (staged) check can catch it — the
+		// working-dir check alone would see this as clean.
+		std::fs::write(wt_path.join("new.txt"), b"data").unwrap();
+		let wt_repo = git2::Repository::open(&wt_path).unwrap();
+		let mut index = wt_repo.index().unwrap();
+		index.add_path(std::path::Path::new("new.txt")).unwrap();
+		index.write().unwrap();
+
+		assert!(remove_worktree(&repo_path, "staged").is_err());
 		assert_eq!(get_worktrees(&repo_path).unwrap().len(), 2);
 	}
 
