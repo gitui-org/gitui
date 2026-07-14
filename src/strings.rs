@@ -259,7 +259,7 @@ pub fn confirm_msg_delete_worktree(
 	name: &str,
 ) -> String {
 	format!(
-		"Really remove worktree `{name}`? Its working directory will be deleted."
+		"Really remove worktree `{name}`? Its working directory will be deleted.\n\ny = delete    n / Esc = cancel"
 	)
 }
 pub fn confirm_title_delete_remote_branch(
