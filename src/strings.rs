@@ -841,6 +841,19 @@ pub mod commands {
 			CMD_GROUP_DIFF,
 		)
 	}
+	pub fn diff_toggle_syntax(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Diff highlight [{}]",
+				key_config
+					.get_hint(key_config.keys.diff_toggle_syntax),
+			),
+			"cycle diff highlight style (off / gutter / +- / tint)",
+			CMD_GROUP_DIFF,
+		)
+	}
 	pub fn close_fuzzy_finder(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {

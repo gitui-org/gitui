@@ -74,6 +74,28 @@ impl SyntaxText {
 		params: &RunParams<AsyncAppNotification, ProgressPercent>,
 		syntax: &str,
 	) -> asyncgit::Result<Self> {
+		Self::build(text, file_path, Some(params), syntax)
+	}
+
+	/// Synchronously highlight `text` without async progress
+	/// reporting — for callers not inside an `AsyncJob` (the diff
+	/// view).
+	pub fn new_sync(
+		text: String,
+		file_path: &Path,
+		syntax: &str,
+	) -> asyncgit::Result<Self> {
+		Self::build(text, file_path, None, syntax)
+	}
+
+	fn build(
+		text: String,
+		file_path: &Path,
+		params: Option<
+			&RunParams<AsyncAppNotification, ProgressPercent>,
+		>,
+		syntax: &str,
+	) -> asyncgit::Result<Self> {
 		scope_time!("syntax_highlighting");
 		let mut state = {
 			scope_time!("syntax_highlighting.0");
@@ -120,10 +142,14 @@ impl SyntaxText {
 				total_count,
 				Duration::from_millis(200),
 			);
-			params.set_progress(buffer.send_progress())?;
-			params.send(AsyncAppNotification::SyntaxHighlighting(
-				SyntaxHighlightProgress::Progress,
-			))?;
+			if let Some(params) = params {
+				params.set_progress(buffer.send_progress())?;
+				params.send(
+					AsyncAppNotification::SyntaxHighlighting(
+						SyntaxHighlightProgress::Progress,
+					),
+				)?;
+			}
 
 			for (number, line) in text.lines().enumerate() {
 				let ops = state
@@ -149,13 +175,16 @@ impl SyntaxText {
 						.collect(),
 				});
 
-				if buffer.update(number) {
-					params.set_progress(buffer.send_progress())?;
-					params.send(
-						AsyncAppNotification::SyntaxHighlighting(
-							SyntaxHighlightProgress::Progress,
-						),
-					)?;
+				if let Some(params) = params {
+					if buffer.update(number) {
+						params
+							.set_progress(buffer.send_progress())?;
+						params.send(
+							AsyncAppNotification::SyntaxHighlighting(
+								SyntaxHighlightProgress::Progress,
+							),
+						)?;
+					}
 				}
 			}
 		}
