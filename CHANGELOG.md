@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * add `--file` cli flag to open the files tab with the given file already selected [[@laktak](https://github.com/laktak)] ([#2510](https://github.com/gitui-org/gitui/issues/2510))
 * add the ability to specify a custom keybinding/symbols file via the cli [[@0x61nas](https://github.com/0x61nas)] ([#2731](https://github.com/gitui-org/gitui/pull/2731))
 * add mise alternative method installation [[@jylenhof](https://github.com/jylenhof)] ([#2817](https://github.com/gitui-org/gitui/pull/2817))
+* ssh commit signing with ssh-agents and external signers [[@chirpcel](https://github.com/chirpcel)] ([#2188](https://github.com/extrawurst/gitui/issues/2188))
 
 ### Changed
 * execute git-hooks directly if possible (on *nix) else use sh instead of bash (without reading SHELL variable) [[@Joshix](https://github.com/Joshix-1)] ([#2483](https://github.com/extrawurst/gitui/pull/2483))

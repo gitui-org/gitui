@@ -1,7 +1,6 @@
 //! Sign commit data.
 
-use ssh_key::{HashAlg, LineEnding, PrivateKey};
-use std::path::PathBuf;
+use tempfile::NamedTempFile;
 
 /// Error type for [`SignBuilder`], used to create [`Sign`]'s
 #[derive(thiserror::Error, Debug)]
@@ -72,11 +71,11 @@ pub trait Sign {
 
 	/// only available in `#[cfg(test)]` helping to diagnose issues
 	#[cfg(test)]
-	fn program(&self) -> &String;
+	fn program(&self) -> String;
 
 	/// only available in `#[cfg(test)]` helping to diagnose issues
 	#[cfg(test)]
-	fn signing_key(&self) -> &String;
+	fn signing_key(&self) -> String;
 }
 
 /// Build a signed commit object and return its [`git2::Oid`].
@@ -193,34 +192,60 @@ impl SignBuilder {
 				}))
 			}
 			"ssh" => {
-				let ssh_signer = config
+				let program = config
+					.get_string("gpg.ssh.program")
+					.unwrap_or_else(|_| "ssh-keygen".to_string());
+
+				let signing_key = config
 					.get_string("user.signingKey")
-					.ok()
-					.and_then(|key_path| {
-						key_path.strip_prefix('~').map_or_else(
-							|| Some(PathBuf::from(&key_path)),
-							|ssh_key_path| {
-								dirs::home_dir().map(|home| {
-									home.join(
-										ssh_key_path
-											.strip_prefix('/')
-											.unwrap_or(ssh_key_path),
-									)
-								})
-							},
+					.map_err(|err| {
+						SignBuilderError::SSHSigningKey(
+							err.to_string(),
 						)
-					})
-					.ok_or_else(|| {
-						SignBuilderError::SSHSigningKey(String::from(
-							"ssh key setting absent",
-						))
-					})
-					.and_then(SSHSign::new)?;
-				let signer: Box<dyn Sign> = Box::new(ssh_signer);
-				Ok(signer)
+					})?;
+				// `key::<literal>` is git's syntax for an inline key
+				let signing_key = signing_key
+					.strip_prefix("key::")
+					.map(str::to_string)
+					.unwrap_or(signing_key);
+
+				// A literal public key has to be written to a temp
+				// file so `ssh-keygen -f` can read it; the file must
+				// outlive the signer, hence it is kept in the struct.
+				let (signing_key_path, pub_key_temp_file) =
+					if signing_key.starts_with("ssh-") {
+						let temp_file =
+							Self::write_signing_key_to_temp_file(
+								&signing_key,
+							)?;
+						let path =
+							temp_file.path().display().to_string();
+						(path, Some(temp_file))
+					} else {
+						(signing_key, None)
+					};
+
+				Ok(Box::new(SSHSign {
+					program,
+					signing_key_path,
+					_pub_key_temp_file: pub_key_temp_file,
+				}))
 			}
 			_ => Err(SignBuilderError::InvalidFormat(format)),
 		}
+	}
+
+	fn write_signing_key_to_temp_file(
+		signing_key: &str,
+	) -> Result<NamedTempFile, SignBuilderError> {
+		use std::io::Write;
+		let mut temp_file = NamedTempFile::new().map_err(|err| {
+			SignBuilderError::SSHSigningKey(err.to_string())
+		})?;
+		writeln!(temp_file, "{signing_key}").map_err(|err| {
+			SignBuilderError::SSHSigningKey(err.to_string())
+		})?;
+		Ok(temp_file)
 	}
 }
 
@@ -228,16 +253,6 @@ impl SignBuilder {
 pub struct GPGSign {
 	program: String,
 	signing_key: String,
-}
-
-impl GPGSign {
-	/// Create new [`GPGSign`] using given program and signing key.
-	pub fn new(program: &str, signing_key: &str) -> Self {
-		Self {
-			program: program.to_string(),
-			signing_key: signing_key.to_string(),
-		}
-	}
 }
 
 impl Sign for GPGSign {
@@ -298,55 +313,24 @@ impl Sign for GPGSign {
 	}
 
 	#[cfg(test)]
-	fn program(&self) -> &String {
-		&self.program
+	fn program(&self) -> String {
+		self.program.clone()
 	}
 
 	#[cfg(test)]
-	fn signing_key(&self) -> &String {
-		&self.signing_key
+	fn signing_key(&self) -> String {
+		self.signing_key.clone()
 	}
 }
 
-/// Sign commit data using `SSHDiskKeySign`
+/// Sign commit data using `ssh-keygen`
 pub struct SSHSign {
-	#[cfg(test)]
 	program: String,
-	#[cfg(test)]
-	key_path: String,
-	secret_key: PrivateKey,
-}
-
-impl SSHSign {
-	/// Create new `SSHDiskKeySign` for sign.
-	pub fn new(mut key: PathBuf) -> Result<Self, SignBuilderError> {
-		key.set_extension("");
-		if key.is_file() {
-			#[cfg(test)]
-			let key_path = format!("{}", &key.display());
-			std::fs::read(key)
-				.ok()
-				.and_then(|bytes| {
-					PrivateKey::from_openssh(bytes).ok()
-				})
-				.map(|secret_key| Self {
-					#[cfg(test)]
-					program: "ssh".to_string(),
-					#[cfg(test)]
-					key_path,
-					secret_key,
-				})
-				.ok_or_else(|| {
-					SignBuilderError::SSHSigningKey(String::from(
-						"Fail to read the private key for sign.",
-					))
-				})
-		} else {
-			Err(SignBuilderError::SSHSigningKey(
-				String::from("Currently, we only support a pair of ssh key in disk."),
-			))
-		}
-	}
+	signing_key_path: String,
+	/// Holds the temp file backing a literal public key so it is
+	/// deleted only when the signer is dropped. Never read directly,
+	/// hence the underscore; `signing_key_path` points at its path.
+	_pub_key_temp_file: Option<NamedTempFile>,
 }
 
 impl Sign for SSHSign {
@@ -354,23 +338,70 @@ impl Sign for SSHSign {
 		&self,
 		commit: &[u8],
 	) -> Result<(String, Option<String>), SignError> {
-		let sig = self
-			.secret_key
-			.sign("git", HashAlg::Sha256, commit)
-			.map_err(|err| SignError::Spawn(err.to_string()))?
-			.to_pem(LineEnding::LF)
-			.map_err(|err| SignError::Spawn(err.to_string()))?;
-		Ok((sig, None))
+		use std::io::Write;
+		use std::process::{Command, Stdio};
+
+		let mut cmd = Command::new(&self.program);
+		cmd.stdin(Stdio::piped())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
+			.arg("-Y")
+			.arg("sign")
+			.arg("-n")
+			.arg("git")
+			.arg("-f")
+			.arg(&self.signing_key_path);
+
+		// `-P ""` avoids a passphrase prompt without forcing agent-only signing
+		// (`-U` breaks on-disk keys, see #2464). Third-party signers such as
+		// 1Password's op-ssh-sign reject the flag, so pass it to ssh-keygen only.
+		if &self.program == "ssh-keygen" {
+			cmd.arg("-P").arg("");
+		}
+
+		log::trace!("signing command: {cmd:?}");
+
+		let mut child = cmd
+			.spawn()
+			.map_err(|e| SignError::Spawn(e.to_string()))?;
+
+		let mut stdin = child.stdin.take().ok_or(SignError::Stdin)?;
+
+		stdin
+			.write_all(commit)
+			.map_err(|e| SignError::WriteBuffer(e.to_string()))?;
+		drop(stdin);
+
+		let output = child
+			.wait_with_output()
+			.map_err(|e| SignError::Output(e.to_string()))?;
+
+		if !output.status.success() {
+			let error_msg = std::str::from_utf8(&output.stderr)
+				.unwrap_or("[error could not be read from stderr]");
+			if error_msg.contains("passphrase") {
+				return Err(SignError::Shellout(String::from("Currently, we only support unencrypted pairs of ssh keys in disk or ssh-agents")));
+			}
+			return Err(SignError::Shellout(format!(
+				"failed to sign data, program '{}' exited non-zero: {}",
+				self.program, error_msg
+			)));
+		}
+
+		let signed_commit = std::str::from_utf8(&output.stdout)
+			.map_err(|e| SignError::Shellout(e.to_string()))?;
+
+		Ok((signed_commit.to_string(), None))
 	}
 
 	#[cfg(test)]
-	fn program(&self) -> &String {
-		&self.program
+	fn program(&self) -> String {
+		self.program.clone()
 	}
 
 	#[cfg(test)]
-	fn signing_key(&self) -> &String {
-		&self.key_path
+	fn signing_key(&self) -> String {
+		self.signing_key_path.clone()
 	}
 }
 
@@ -463,18 +494,74 @@ mod tests {
 	#[test]
 	fn test_ssh_program_configs() -> Result<()> {
 		let (_tmp_dir, repo) = repo_init_empty()?;
+		let temp_file = tempfile::NamedTempFile::new()
+			.expect("failed to create temp file");
 
 		{
 			let mut config = repo.config()?;
-			config.set_str("gpg.program", "ssh")?;
-			config.set_str("user.signingKey", "/tmp/key.pub")?;
+			config.set_str("gpg.format", "ssh")?;
+			config.set_str(
+				"user.signingKey",
+				temp_file.path().to_str().unwrap(),
+			)?;
 		}
 
 		let sign =
 			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
 
-		assert_eq!("ssh", sign.program());
-		assert_eq!("/tmp/key.pub", sign.signing_key());
+		assert_eq!("ssh-keygen", sign.program());
+		assert_eq!(
+			temp_file.path().to_str().unwrap(),
+			sign.signing_key()
+		);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_ssh_keyliteral_config() -> Result<()> {
+		use std::path::PathBuf;
+		let (_tmp_dir, repo) = repo_init_empty()?;
+
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "ssh")?;
+			config.set_str("user.signingKey", "ssh-ed25519 test")?;
+		}
+
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+
+		assert_eq!("ssh-keygen", sign.program());
+		assert!(PathBuf::from(sign.signing_key()).is_file());
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_ssh_external_bin_config() -> Result<()> {
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		let temp_file = tempfile::NamedTempFile::new()
+			.expect("failed to create temp file");
+
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "ssh")?;
+			config.set_str("gpg.ssh.program", "/opt/ssh/signer")?;
+			config.set_str(
+				"user.signingKey",
+				temp_file.path().to_str().unwrap(),
+			)?;
+		}
+
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+
+		assert_eq!("/opt/ssh/signer", sign.program());
+		assert_eq!(
+			temp_file.path().to_str().unwrap(),
+			sign.signing_key()
+		);
 
 		Ok(())
 	}
@@ -902,6 +989,157 @@ mod tests {
 		);
 
 		std::env::remove_var("GNUPGHOME");
+		Ok(())
+	}
+
+	/// e2e ssh signing: generate a throwaway unencrypted ssh key on disk, sign a
+	/// real commit with no agent reachable and verify it. Reproduces the hang
+	/// reported in PR #2464: `-U` forced ssh-keygen to sign only with an
+	/// agent-held key, so an on-disk key failed ("Couldn't get agent socket") or
+	/// hung when no matching key was loaded. Serial + unix-only: it mutates the
+	/// process-wide `SSH_AUTH_SOCK`.
+	#[cfg(unix)]
+	#[test]
+	#[serial]
+	fn test_ssh_sign_and_verify_e2e() -> Result<()> {
+		use std::process::{Command, Stdio};
+
+		// ssh-keygen exits non-zero when invoked with no args, so availability
+		// is "did it spawn at all", not "did it succeed".
+		let ssh_keygen_available = Command::new("ssh-keygen")
+			.stdin(Stdio::null())
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.status()
+			.is_ok();
+		assert!(
+			ssh_keygen_available,
+			"ssh-keygen is required for the ssh e2e test"
+		);
+
+		let run = |program: &str, args: &[&str]| {
+			let out = Command::new(program)
+				.args(args)
+				.output()
+				.unwrap_or_else(|e| {
+					panic!("failed to run {program}: {e}")
+				});
+			assert!(
+				out.status.success(),
+				"{program} {args:?} failed: {}",
+				String::from_utf8_lossy(&out.stderr)
+			);
+			out
+		};
+
+		let email = "gitui-ssh-test@example.com";
+		let dir = tempfile::tempdir()?;
+		let key_path = dir.path().join("id_ed25519");
+		let pub_path = dir.path().join("id_ed25519.pub");
+
+		// unencrypted key (-N "") so no passphrase and no agent are involved.
+		run(
+			"ssh-keygen",
+			&[
+				"-t",
+				"ed25519",
+				"-N",
+				"",
+				"-C",
+				email,
+				"-f",
+				key_path.to_str().unwrap(),
+			],
+		);
+
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "ssh")?;
+			// the common on-disk config: point at the public key file.
+			config.set_str(
+				"user.signingKey",
+				pub_path.to_str().unwrap(),
+			)?;
+		}
+		let signer =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+		assert_eq!("ssh-keygen", signer.program());
+
+		let sig = git2::Signature::now("gitui test", email)?;
+		let tree = {
+			let mut index = repo.index()?;
+			let tree_id = index.write_tree()?;
+			repo.find_tree(tree_id)?
+		};
+
+		// no agent reachable: with the buggy `-U` this fails/hangs, with the
+		// on-disk key it must just work.
+		let saved_sock = std::env::var_os("SSH_AUTH_SOCK");
+		std::env::remove_var("SSH_AUTH_SOCK");
+		let commit_id = create_signed_commit(
+			&repo,
+			&*signer,
+			&sig,
+			&sig,
+			"ssh signed commit",
+			&tree,
+			&[],
+		);
+		match saved_sock {
+			Some(sock) => std::env::set_var("SSH_AUTH_SOCK", sock),
+			None => std::env::remove_var("SSH_AUTH_SOCK"),
+		}
+		let commit_id = commit_id?;
+
+		let (signature, signed_data) =
+			repo.extract_signature(&commit_id, None)?;
+		let signature = std::str::from_utf8(&signature).unwrap();
+		assert!(
+			signature.contains("BEGIN SSH SIGNATURE"),
+			"expected an ssh signature, got: {signature}"
+		);
+
+		// verify against an allowed_signers file built from the public key.
+		let pub_key = std::fs::read_to_string(&pub_path)?;
+		let mut fields = pub_key.split_whitespace();
+		let key_type = fields.next().expect("key type");
+		let key_blob = fields.next().expect("key blob");
+		let allowed = dir.path().join("allowed_signers");
+		std::fs::write(
+			&allowed,
+			format!("{email} {key_type} {key_blob}\n"),
+		)?;
+
+		let sig_file = dir.path().join("commit.sig");
+		let data_file = dir.path().join("commit.data");
+		std::fs::write(&sig_file, signature)?;
+		std::fs::write(&data_file, &*signed_data)?;
+		let verify = Command::new("ssh-keygen")
+			.args([
+				"-Y",
+				"verify",
+				"-f",
+				allowed.to_str().unwrap(),
+				"-I",
+				email,
+				"-n",
+				"git",
+				"-s",
+				sig_file.to_str().unwrap(),
+			])
+			.stdin(std::fs::File::open(&data_file)?)
+			.output()?;
+		let verify_out = String::from_utf8_lossy(&verify.stdout);
+		assert!(
+			verify.status.success()
+				&& verify_out.contains("Good")
+				&& verify_out.contains(email),
+			"ssh-keygen did not accept the signature: {}{}",
+			verify_out,
+			String::from_utf8_lossy(&verify.stderr)
+		);
+
 		Ok(())
 	}
 }
