@@ -101,6 +101,12 @@ GitUI is in beta and may contain bugs and missing features. However, for persona
     <img src="https://repology.org/badge/vertical-allrepos/gitui.svg" alt="Packaging status" align="right">
 </a>
 
+### Cargo latest nightly
+
+```sh
+cargo install --git https://github.com/gitui-org/gitui
+```
+
 ### Various Package Managers
 
 <details>
