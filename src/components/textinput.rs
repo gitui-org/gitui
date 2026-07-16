@@ -259,358 +259,218 @@ impl TextInputComponent {
 		}
 	}
 
-	#[allow(clippy::too_many_lines, clippy::unnested_or_patterns)]
-	fn process_inputs(ta: &mut TextArea<'_>, input: &Input) -> bool {
-		match input {
-			Input {
-				key: Key::Char(c),
-				ctrl: false,
-				alt: false,
-				..
-			} => {
-				ta.insert_char(*c);
+	fn process_non_modded(ta: &mut TextArea<'_>, key: Key) -> bool {
+		match key {
+			Key::Char(c) => {
+				ta.insert_char(c);
 				true
 			}
-			Input {
-				key: Key::Tab,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Tab => {
 				ta.insert_tab();
 				true
 			}
-			Input {
-				key: Key::Char('h'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Backspace,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Backspace => {
 				ta.delete_char();
 				true
 			}
-			Input {
-				key: Key::Char('d'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Delete,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Delete => {
 				ta.delete_next_char();
 				true
 			}
-			Input {
-				key: Key::Char('k'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.delete_line_by_end();
-				true
-			}
-			Input {
-				key: Key::Char('j'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.delete_line_by_head();
-				true
-			}
-			Input {
-				key: Key::Char('w'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Char('h'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Backspace,
-				ctrl: false,
-				alt: true,
-				..
-			} => {
-				ta.delete_word();
-				true
-			}
-			Input {
-				key: Key::Delete,
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Char('d'),
-				ctrl: false,
-				alt: true,
-				..
-			} => {
-				ta.delete_next_word();
-				true
-			}
-			Input {
-				key: Key::Char('n'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Down,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Down => {
 				ta.move_cursor(CursorMove::Down);
 				true
 			}
-			Input {
-				key: Key::Char('p'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Up,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Up => {
 				ta.move_cursor(CursorMove::Up);
 				true
 			}
-			Input {
-				key: Key::Char('f'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Right,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Right => {
 				ta.move_cursor(CursorMove::Forward);
 				true
 			}
-			Input {
-				key: Key::Char('b'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::Left,
-				ctrl: false,
-				alt: false,
-				..
-			} => {
+			Key::Left => {
 				ta.move_cursor(CursorMove::Back);
 				true
 			}
-			Input {
-				key: Key::Char('a'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input { key: Key::Home, .. }
-			| Input {
-				key: Key::Left | Key::Char('b'),
-				ctrl: true,
-				alt: true,
-				..
-			} => {
+			Key::Home => {
 				ta.move_cursor(CursorMove::Head);
 				true
 			}
-			Input {
-				key: Key::Char('e'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input { key: Key::End, .. }
-			| Input {
-				key: Key::Right | Key::Char('f'),
-				ctrl: true,
-				alt: true,
-				..
-			} => {
+			Key::End => {
 				ta.move_cursor(CursorMove::End);
 				true
 			}
-			Input {
-				key: Key::Char('<'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Up | Key::Char('p'),
-				ctrl: true,
-				alt: true,
-				..
-			} => {
-				ta.move_cursor(CursorMove::Top);
-				true
-			}
-			Input {
-				key: Key::Char('>'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Down | Key::Char('n'),
-				ctrl: true,
-				alt: true,
-				..
-			} => {
-				ta.move_cursor(CursorMove::Bottom);
-				true
-			}
-			Input {
-				key: Key::Char('f'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Right,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::WordForward);
-				true
-			}
-			Input {
-				key: Key::Char('b'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Left,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::WordBack);
-				true
-			}
-
-			Input {
-				key: Key::Char(']'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Char('n'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Down,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::ParagraphForward);
-				true
-			}
-			Input {
-				key: Key::Char('['),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Char('p'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::Up,
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.move_cursor(CursorMove::ParagraphBack);
-				true
-			}
-			Input {
-				key: Key::Char('u'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.undo();
-				true
-			}
-			Input {
-				key: Key::Char('r'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.redo();
-				true
-			}
-			Input {
-				key: Key::Char('y'),
-				ctrl: true,
-				alt: false,
-				..
-			} => {
-				ta.paste();
-				true
-			}
-			Input {
-				key: Key::Char('v'),
-				ctrl: true,
-				alt: false,
-				..
-			}
-			| Input {
-				key: Key::PageDown, ..
-			} => {
+			Key::PageDown => {
 				ta.scroll(Scrolling::PageDown);
 				true
 			}
-			Input {
-				key: Key::Char('v'),
-				ctrl: false,
-				alt: true,
-				..
-			}
-			| Input {
-				key: Key::PageUp, ..
-			} => {
+			Key::PageUp => {
 				ta.scroll(Scrolling::PageUp);
 				true
 			}
 			_ => false,
+		}
+	}
+
+	fn process_command_key(ta: &mut TextArea<'_>, key: Key) -> bool {
+		match key {
+			Key::Char('h') => {
+				ta.delete_char();
+				true
+			}
+			Key::Char('d') => {
+				ta.delete_next_char();
+				true
+			}
+			Key::Char('k') => {
+				ta.delete_line_by_end();
+				true
+			}
+			Key::Char('j') => {
+				ta.delete_line_by_head();
+				true
+			}
+			Key::Char('w') => {
+				ta.delete_word();
+				true
+			}
+			Key::Char('n') => {
+				ta.move_cursor(CursorMove::Down);
+				true
+			}
+			Key::Char('p') => {
+				ta.move_cursor(CursorMove::Up);
+				true
+			}
+			Key::Char('f') => {
+				ta.move_cursor(CursorMove::Forward);
+				true
+			}
+			Key::Char('b') => {
+				ta.move_cursor(CursorMove::Back);
+				true
+			}
+			Key::Char('a') => {
+				ta.move_cursor(CursorMove::Head);
+				true
+			}
+			Key::Char('e') => {
+				ta.move_cursor(CursorMove::End);
+				true
+			}
+			Key::Right => {
+				ta.move_cursor(CursorMove::WordForward);
+				true
+			}
+			Key::Left => {
+				ta.move_cursor(CursorMove::WordBack);
+				true
+			}
+			Key::Down => {
+				ta.move_cursor(CursorMove::ParagraphForward);
+				true
+			}
+			Key::Up => {
+				ta.move_cursor(CursorMove::ParagraphBack);
+				true
+			}
+			Key::Char('u') => {
+				ta.undo();
+				true
+			}
+			Key::Char('r') => {
+				ta.redo();
+				true
+			}
+			Key::Char('y') => {
+				ta.paste();
+				true
+			}
+			// ctrl+v = down, alt+v = up
+			Key::Char('v') => {
+				ta.scroll(Scrolling::PageDown);
+				true
+			}
+			_ => false,
+		}
+	}
+
+	fn process_meta_key(ta: &mut TextArea<'_>, key: Key) -> bool {
+		match key {
+			Key::Char('h') | Key::Backspace => {
+				ta.delete_word();
+				true
+			}
+			Key::Delete | Key::Char('d') => {
+				ta.delete_next_word();
+				true
+			}
+			Key::Char('<') => {
+				ta.move_cursor(CursorMove::Top);
+				true
+			}
+			Key::Char('>') => {
+				ta.move_cursor(CursorMove::Bottom);
+				true
+			}
+			Key::Char('f') => {
+				ta.move_cursor(CursorMove::WordForward);
+				true
+			}
+			Key::Char('b') => {
+				ta.move_cursor(CursorMove::WordBack);
+				true
+			}
+			Key::Char(']' | 'n') => {
+				ta.move_cursor(CursorMove::ParagraphForward);
+				true
+			}
+			Key::Char('[' | 'p') => {
+				ta.move_cursor(CursorMove::ParagraphBack);
+				true
+			}
+			Key::Char('v') => {
+				ta.scroll(Scrolling::PageUp);
+				true
+			}
+			_ => false,
+		}
+	}
+
+	fn process_meta_command_key(
+		ta: &mut TextArea<'_>,
+		key: Key,
+	) -> bool {
+		match key {
+			Key::Left | Key::Char('b') => {
+				ta.move_cursor(CursorMove::Head);
+				true
+			}
+			Key::Right | Key::Char('f') => {
+				ta.move_cursor(CursorMove::End);
+				true
+			}
+			Key::Up | Key::Char('p') => {
+				ta.move_cursor(CursorMove::Top);
+				true
+			}
+			Key::Down | Key::Char('n') => {
+				ta.move_cursor(CursorMove::Bottom);
+				true
+			}
+			_ => false,
+		}
+	}
+
+	fn process_inputs(ta: &mut TextArea<'_>, input: &Input) -> bool {
+		match (input.ctrl, input.alt) {
+			(true, true) => {
+				Self::process_meta_command_key(ta, input.key)
+			}
+			(true, false) => Self::process_command_key(ta, input.key),
+			(false, true) => Self::process_meta_key(ta, input.key),
+			(false, false) => Self::process_non_modded(ta, input.key),
 		}
 	}
 }
