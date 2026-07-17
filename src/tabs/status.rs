@@ -81,6 +81,9 @@ pub struct Status {
 	git_action_executed: bool,
 	options: SharedOptions,
 	key_config: SharedKeyConfig,
+	horizontal_split: (u16, u16), // Left vs Right
+	vertical_split_wd: (u16, u16), // Top vs Bottom when WorkingDir
+	vertical_split_index: (u16, u16),
 }
 
 impl DrawableComponent for Status {
@@ -112,8 +115,12 @@ impl DrawableComponent for Status {
 					]
 				} else {
 					[
-						Constraint::Percentage(50),
-						Constraint::Percentage(50),
+						Constraint::Percentage(
+							self.horizontal_split.0,
+						),
+						Constraint::Percentage(
+							self.horizontal_split.1,
+						),
 					]
 				}
 				.as_ref(),
@@ -125,13 +132,21 @@ impl DrawableComponent for Status {
 			.constraints(
 				if self.diff_target == DiffTarget::WorkingDir {
 					[
-						Constraint::Percentage(60),
-						Constraint::Percentage(40),
+						Constraint::Percentage(
+							self.vertical_split_wd.0,
+						),
+						Constraint::Percentage(
+							self.vertical_split_wd.1,
+						),
 					]
 				} else {
 					[
-						Constraint::Percentage(40),
-						Constraint::Percentage(60),
+						Constraint::Percentage(
+							self.vertical_split_index.0,
+						),
+						Constraint::Percentage(
+							self.vertical_split_index.1,
+						),
 					]
 				}
 				.as_ref(),
@@ -200,6 +215,9 @@ impl Status {
 			key_config: env.key_config.clone(),
 			options: env.options.clone(),
 			repo: env.repo.clone(),
+			horizontal_split: (50, 50),
+			vertical_split_wd: (60, 40),
+			vertical_split_index: (40, 60),
 		}
 	}
 
@@ -946,6 +964,49 @@ impl Component for Status {
 					self.key_config.keys.view_submodules,
 				) {
 					self.queue.push(InternalEvent::ViewSubmodules);
+					Ok(EventState::Consumed)
+				} else if key_match(k, self.key_config.keys.alt_left)
+				{
+					if self.horizontal_split.0 > 10 {
+						self.horizontal_split.0 -= 5;
+						self.horizontal_split.1 += 5;
+					}
+					Ok(EventState::Consumed)
+				} else if key_match(k, self.key_config.keys.alt_right)
+				{
+					if self.horizontal_split.1 > 10 {
+						self.horizontal_split.0 += 5;
+						self.horizontal_split.1 -= 5;
+					}
+					Ok(EventState::Consumed)
+				} else if key_match(k, self.key_config.keys.alt_up) {
+					let (top, bottom) = match self.diff_target {
+						DiffTarget::WorkingDir => {
+							&mut self.vertical_split_wd
+						}
+						DiffTarget::Stage => {
+							&mut self.vertical_split_index
+						}
+					};
+					if *top > 10 {
+						*top -= 5;
+						*bottom += 5;
+					}
+					Ok(EventState::Consumed)
+				} else if key_match(k, self.key_config.keys.alt_down)
+				{
+					let (top, bottom) = match self.diff_target {
+						DiffTarget::WorkingDir => {
+							&mut self.vertical_split_wd
+						}
+						DiffTarget::Stage => {
+							&mut self.vertical_split_index
+						}
+					};
+					if *bottom > 10 {
+						*top += 5;
+						*bottom -= 5;
+					}
 					Ok(EventState::Consumed)
 				} else {
 					Ok(EventState::NotConsumed)
