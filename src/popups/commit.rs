@@ -235,19 +235,6 @@ impl CommitPopup {
 		let verify = self.verify;
 		self.verify = true;
 
-		if verify {
-			// run pre commit hook - can reject commit
-			if let HookResult::NotOk(e) =
-				sync::hooks_pre_commit(&self.repo.borrow())?
-			{
-				log::error!("pre-commit hook error: {e}");
-				self.queue.push(InternalEvent::ShowErrorMsg(
-					format!("pre-commit hook error:\n{e}"),
-				));
-				return Ok(CommitResult::Aborted);
-			}
-		}
-
 		let mut msg =
 			commit_message_prettify(&self.repo.borrow(), msg)?;
 
@@ -349,6 +336,21 @@ impl CommitPopup {
 		self.verify = !self.verify;
 	}
 
+	fn run_pre_commit_hook(&self) -> Result<bool> {
+		if self.verify {
+			if let HookResult::NotOk(e) =
+				sync::hooks_pre_commit(&self.repo.borrow())?
+			{
+				log::error!("pre-commit hook error: {e}");
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("pre-commit hook error:\n{e}"),
+				));
+				return Ok(false);
+			}
+		}
+		Ok(true)
+	}
+
 	pub fn open(&mut self, reword: Option<CommitId>) -> Result<()> {
 		//only clear text if it was not a normal commit dlg before, so to preserve old commit msg that was edited
 		if !matches!(self.mode, Mode::Normal) {
@@ -441,6 +443,10 @@ impl CommitPopup {
 		};
 
 		self.mode = mode;
+
+		if !self.run_pre_commit_hook()? {
+			return Ok(());
+		}
 
 		let mut msg = self.input.get_text().to_string();
 		if let HookResult::NotOk(e) = sync::hooks_prepare_commit_msg(
