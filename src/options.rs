@@ -16,12 +16,48 @@ use std::{
 	rc::Rc,
 };
 
+#[derive(
+	Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize,
+)]
+pub enum DiffHighlightStyle {
+	Off,
+	Gutter,
+	Sign,
+	#[default]
+	Tint,
+}
+
+impl DiffHighlightStyle {
+	pub const fn next(self) -> Self {
+		match self {
+			Self::Off => Self::Gutter,
+			Self::Gutter => Self::Sign,
+			Self::Sign => Self::Tint,
+			Self::Tint => Self::Off,
+		}
+	}
+	pub const fn is_on(self) -> bool {
+		!matches!(self, Self::Off)
+	}
+	pub const fn color_gutter(self) -> bool {
+		matches!(self, Self::Gutter)
+	}
+	pub const fn shows_sign(self) -> bool {
+		matches!(self, Self::Sign)
+	}
+	pub const fn shows_tint(self) -> bool {
+		matches!(self, Self::Tint)
+	}
+}
+
 #[derive(Default, Clone, Serialize, Deserialize)]
 struct OptionsData {
 	pub tab: usize,
 	pub diff: DiffOptions,
 	pub status_show_untracked: Option<ShowUntrackedFilesConfig>,
 	pub commit_msgs: Vec<String>,
+	#[serde(default)]
+	pub diff_highlight_style: Option<DiffHighlightStyle>,
 }
 
 const COMMIT_MSG_HISTORY_LENGTH: usize = 20;
@@ -104,6 +140,16 @@ impl Options {
 		self.data.diff.ignore_whitespace =
 			!self.data.diff.ignore_whitespace;
 
+		self.save();
+	}
+
+	pub fn diff_highlight_style(&self) -> DiffHighlightStyle {
+		self.data.diff_highlight_style.unwrap_or_default()
+	}
+
+	pub fn diff_cycle_highlight(&mut self) {
+		let next = self.diff_highlight_style().next();
+		self.data.diff_highlight_style = Some(next);
 		self.save();
 	}
 

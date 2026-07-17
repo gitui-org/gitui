@@ -41,6 +41,7 @@ mod commit_details;
 mod commitlist;
 mod cred;
 mod diff;
+mod diff_highlight;
 mod revision_files;
 mod status_tree;
 mod syntax_text;
