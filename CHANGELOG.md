@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 * support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
+* worktrees popup: list worktrees and switch between them ([Shift+W])
+* worktrees popup: create a new worktree with a new branch ([c] from the worktrees list)
+* worktrees popup: remove a worktree ([Shift+D], refused if it is dirty or locked) and lock/unlock it ([l])
 
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
@@ -17,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * support rewording non-HEAD commits when `commit.gpgsign` is enabled (gpg format only) [[@guerinoni](https://github.com/guerinoni)] ([#2959](https://github.com/gitui-org/gitui/pull/2959))
 
 ### Fixes
+* first keystroke after switching to a submodule or worktree was dropped
 * crash when opening submodule ([#2895](https://github.com/gitui-org/gitui/issues/2895))
 * when staging the last file in a directory, the first item after the directory is no longer skipped [[@Tillerino](https://github.com/Tillerino)] ([#2748](https://github.com/gitui-org/gitui/issues/2748))
 * index-out-of-bounds panic when unstaging lines near the end of a diff ([#2953](https://github.com/gitui-org/gitui/issues/2953))

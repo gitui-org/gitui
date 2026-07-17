@@ -6,6 +6,7 @@ mod compare_commits;
 mod confirm;
 mod create_branch;
 mod create_remote;
+mod create_worktree;
 mod externaleditor;
 mod fetch;
 mod file_revlog;
@@ -29,6 +30,7 @@ mod submodules;
 mod tag_commit;
 mod taglist;
 mod update_remote_url;
+mod worktrees;
 
 pub use blame_file::{BlameFileOpen, BlameFilePopup};
 pub use branchlist::BranchListPopup;
@@ -38,6 +40,7 @@ pub use compare_commits::CompareCommitsPopup;
 pub use confirm::ConfirmPopup;
 pub use create_branch::CreateBranchPopup;
 pub use create_remote::CreateRemotePopup;
+pub use create_worktree::CreateWorktreePopup;
 pub use externaleditor::ExternalEditorPopup;
 pub use fetch::FetchPopup;
 pub use file_revlog::{FileRevOpen, FileRevlogPopup};
@@ -61,6 +64,7 @@ pub use submodules::SubmodulesListPopup;
 pub use tag_commit::TagCommitPopup;
 pub use taglist::TagListPopup;
 pub use update_remote_url::UpdateRemoteUrlPopup;
+pub use worktrees::WorktreesPopup;
 
 use crate::ui::style::Theme;
 use ratatui::{

@@ -14,13 +14,14 @@ use crate::{
 		AppOption, BlameFilePopup, BranchListPopup,
 		CheckoutOptionPopup, CommitPopup, CompareCommitsPopup,
 		ConfirmPopup, CreateBranchPopup, CreateRemotePopup,
-		ExternalEditorPopup, FetchPopup, FileRevlogPopup,
-		FuzzyFindPopup, GotoLinePopup, HelpPopup, InspectCommitPopup,
-		LogSearchPopupPopup, MsgPopup, OptionsPopup, PullPopup,
-		PushPopup, PushTagsPopup, RemoteListPopup, RenameBranchPopup,
-		RenameRemotePopup, ResetPopup, RevisionFilesPopup,
-		StashMsgPopup, SubmodulesListPopup, TagCommitPopup,
-		TagListPopup, UpdateRemoteUrlPopup,
+		CreateWorktreePopup, ExternalEditorPopup, FetchPopup,
+		FileRevlogPopup, FuzzyFindPopup, GotoLinePopup, HelpPopup,
+		InspectCommitPopup, LogSearchPopupPopup, MsgPopup,
+		OptionsPopup, PullPopup, PushPopup, PushTagsPopup,
+		RemoteListPopup, RenameBranchPopup, RenameRemotePopup,
+		ResetPopup, RevisionFilesPopup, StashMsgPopup,
+		SubmodulesListPopup, TagCommitPopup, TagListPopup,
+		UpdateRemoteUrlPopup, WorktreesPopup,
 	},
 	queue::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
@@ -89,6 +90,7 @@ pub struct App {
 	fetch_popup: FetchPopup,
 	tag_commit_popup: TagCommitPopup,
 	create_branch_popup: CreateBranchPopup,
+	create_worktree_popup: CreateWorktreePopup,
 	create_remote_popup: CreateRemotePopup,
 	rename_remote_popup: RenameRemotePopup,
 	update_remote_url_popup: UpdateRemoteUrlPopup,
@@ -97,6 +99,7 @@ pub struct App {
 	select_branch_popup: BranchListPopup,
 	options_popup: OptionsPopup,
 	submodule_popup: SubmodulesListPopup,
+	worktree_popup: WorktreesPopup,
 	tags_popup: TagListPopup,
 	reset_popup: ResetPopup,
 	checkout_option_popup: CheckoutOptionPopup,
@@ -212,6 +215,7 @@ impl App {
 			fetch_popup: FetchPopup::new(&env),
 			tag_commit_popup: TagCommitPopup::new(&env),
 			create_branch_popup: CreateBranchPopup::new(&env),
+			create_worktree_popup: CreateWorktreePopup::new(&env),
 			create_remote_popup: CreateRemotePopup::new(&env),
 			rename_remote_popup: RenameRemotePopup::new(&env),
 			update_remote_url_popup: UpdateRemoteUrlPopup::new(&env),
@@ -221,6 +225,7 @@ impl App {
 			tags_popup: TagListPopup::new(&env),
 			options_popup: OptionsPopup::new(&env),
 			submodule_popup: SubmodulesListPopup::new(&env),
+			worktree_popup: WorktreesPopup::new(&env),
 			log_search_popup: LogSearchPopupPopup::new(&env),
 			fuzzy_find_popup: FuzzyFindPopup::new(&env),
 			do_quit: QuitState::None,
@@ -360,6 +365,12 @@ impl App {
 				) {
 					self.options_popup.show()?;
 					NeedsUpdate::ALL
+				} else if key_match(
+					k,
+					self.key_config.keys.view_worktrees,
+				) {
+					self.worktree_popup.open()?;
+					NeedsUpdate::ALL
 				} else {
 					NeedsUpdate::empty()
 				};
@@ -410,6 +421,7 @@ impl App {
 		self.stashing_tab.update()?;
 		self.stashlist_tab.update()?;
 		self.reset_popup.update()?;
+		self.worktree_popup.update_worktrees()?;
 
 		self.update_commands();
 
@@ -515,6 +527,7 @@ impl App {
 			reset_popup,
 			checkout_option_popup,
 			create_branch_popup,
+			create_worktree_popup,
 			create_remote_popup,
 			rename_remote_popup,
 			update_remote_url_popup,
@@ -523,6 +536,7 @@ impl App {
 			select_branch_popup,
 			revision_files_popup,
 			submodule_popup,
+			worktree_popup,
 			tags_popup,
 			options_popup,
 			help_popup,
@@ -552,10 +566,12 @@ impl App {
 			rename_remote_popup,
 			update_remote_url_popup,
 			submodule_popup,
+			worktree_popup,
 			tags_popup,
 			reset_popup,
 			checkout_option_popup,
 			create_branch_popup,
+			create_worktree_popup,
 			rename_branch_popup,
 			revision_files_popup,
 			fuzzy_find_popup,
@@ -787,6 +803,9 @@ impl App {
 			InternalEvent::CreateBranch => {
 				self.create_branch_popup.open()?;
 			}
+			InternalEvent::CreateWorktree => {
+				self.create_worktree_popup.open()?;
+			}
 			InternalEvent::RenameBranch(branch_ref, cur_name) => {
 				self.rename_branch_popup
 					.open(branch_ref, cur_name)?;
@@ -990,6 +1009,17 @@ impl App {
 
 				self.select_branch_popup.update_branches()?;
 			}
+			Action::DeleteWorktree(name) => {
+				if let Err(e) =
+					sync::remove_worktree(&self.repo.borrow(), &name)
+				{
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						e.to_string(),
+					));
+				}
+				self.worktree_popup.update_worktrees()?;
+				flags.insert(NeedsUpdate::ALL);
+			}
 			Action::DeleteRemoteBranch(branch_ref) => {
 				self.delete_remote_branch(&branch_ref)?;
 			}
@@ -1138,6 +1168,14 @@ impl App {
 		res.push(
 			CommandInfo::new(
 				strings::commands::options_popup(&self.key_config),
+				true,
+				!self.any_popup_visible(),
+			)
+			.order(order::NAV),
+		);
+		res.push(
+			CommandInfo::new(
+				strings::commands::view_worktrees(&self.key_config),
 				true,
 				!self.any_popup_visible(),
 			)

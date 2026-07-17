@@ -9,7 +9,7 @@ use crate::{
 	strings, ui,
 };
 use anyhow::Result;
-use crossterm::event::Event;
+use crossterm::event::{Event, KeyCode};
 use ratatui::{layout::Rect, text::Text, widgets::Clear, Frame};
 use std::borrow::Cow;
 use ui::style::SharedTheme;
@@ -74,6 +74,14 @@ impl Component for ConfirmPopup {
 					self.hide();
 				} else if key_match(e, self.key_config.keys.enter) {
 					self.confirm();
+				} else if self.is_worktree_removal() {
+					// worktree removal additionally accepts explicit
+					// y/n, as spelled out in its message copy.
+					match e.code {
+						KeyCode::Char('y') => self.confirm(),
+						KeyCode::Char('n') => self.hide(),
+						_ => {}
+					}
 				}
 
 				return Ok(EventState::Consumed);
@@ -125,6 +133,10 @@ impl ConfirmPopup {
 		self.hide();
 	}
 
+	const fn is_worktree_removal(&self) -> bool {
+		matches!(self.target, Some(Action::DeleteWorktree(_)))
+	}
+
 	fn get_text(&self) -> (String, String) {
 		if let Some(ref a) = self.target {
 			return match a {
@@ -172,6 +184,10 @@ impl ConfirmPopup {
 			strings::confirm_title_delete_remote(&self.key_config),
 			strings::confirm_msg_delete_remote(&self.key_config,remote_name),
 		),
+                Action::DeleteWorktree(name) => (
+                    strings::confirm_title_delete_worktree(&self.key_config),
+                    strings::confirm_msg_delete_worktree(&self.key_config, name),
+                ),
                 Action::DeleteTag(tag_name) => (
                     strings::confirm_title_delete_tag(
                         &self.key_config,
