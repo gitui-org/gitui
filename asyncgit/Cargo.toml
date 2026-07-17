@@ -19,7 +19,7 @@ easy-cast = "0.5"
 fuzzy-matcher = "0.3"
 git2 = { version = "0.21", features = ["https"] }
 git2-hooks = { path = "../git2-hooks", version = "0.7" }
-gix = { version = "0.78.0", default-features = false, features = ["mailmap", "max-performance", "revision", "status"] }
+gix = { version = "0.84.0", default-features = false, features = ["mailmap", "max-performance", "revision", "sha1", "sha256", "status"] }
 log = "0.4"
 # git2 = { path = "../../extern/git2-rs", features = ["vendored-openssl"]}
 # git2 = { git="https://github.com/extrawurst/git2-rs.git", rev="fc13dcc", features = ["vendored-openssl"]}
