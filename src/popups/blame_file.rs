@@ -326,7 +326,10 @@ impl Component for BlameFilePopup {
 						.as_ref()
 						.and_then(|blame| blame.result());
 					if let Some(blame_result) = maybe_blame_result {
-						let max_line = blame_result.lines().len() - 1;
+						let max_line = blame_result
+							.lines()
+							.len()
+							.saturating_sub(1);
 						self.queue.push(
 							InternalEvent::OpenGotoLinePopup(
 								max_line,
@@ -703,7 +706,9 @@ impl BlameFilePopup {
 		self.blame
 			.as_ref()
 			.and_then(|blame| blame.result())
-			.map_or(0, |file_blame| file_blame.lines().len() - 1)
+			.map_or(0, |file_blame| {
+				file_blame.lines().len().saturating_sub(1)
+			})
 	}
 
 	fn get_line_number_width(&self) -> usize {
