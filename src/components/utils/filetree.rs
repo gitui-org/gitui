@@ -167,6 +167,20 @@ impl FileTreeItems {
 	}
 
 	///
+	pub(crate) fn new_flat(list: &[StatusItem]) -> Result<Self> {
+		let mut items = Vec::with_capacity(list.len());
+
+		for e in list {
+			items.push(FileTreeItem::new_file(e)?);
+		}
+
+		Ok(Self {
+			items,
+			file_count: list.len(),
+		})
+	}
+
+	///
 	pub(crate) const fn items(&self) -> &Vec<FileTreeItem> {
 		&self.items
 	}

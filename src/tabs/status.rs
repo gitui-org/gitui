@@ -157,6 +157,7 @@ impl Status {
 	///
 	pub fn new(env: &Environment) -> Self {
 		let repo_clone = env.repo.borrow().clone();
+		let is_tree = env.options.borrow().status_tree();
 		Self {
 			queue: env.queue.clone(),
 			visible: true,
@@ -167,18 +168,26 @@ impl Status {
 			git_state: RepoState::Clean,
 			focus: Focus::WorkDir,
 			diff_target: DiffTarget::WorkingDir,
-			index_wd: ChangesComponent::new(
-				env,
-				&strings::title_status(&env.key_config),
-				true,
-				true,
-			),
-			index: ChangesComponent::new(
-				env,
-				&strings::title_index(&env.key_config),
-				false,
-				false,
-			),
+			index_wd: {
+				let mut c = ChangesComponent::new(
+					env,
+					&strings::title_status(&env.key_config),
+					true,
+					true,
+				);
+				c.set_flat(!is_tree);
+				c
+			},
+			index: {
+				let mut c = ChangesComponent::new(
+					env,
+					&strings::title_index(&env.key_config),
+					false,
+					false,
+				);
+				c.set_flat(!is_tree);
+				c
+			},
 			diff: DiffComponent::new(env, false),
 			git_diff: AsyncDiff::new(
 				repo_clone.clone(),
@@ -456,6 +465,10 @@ impl Status {
 	}
 
 	fn update_status(&mut self) -> Result<()> {
+		let is_tree = self.options.borrow().status_tree();
+		self.index_wd.set_flat(!is_tree);
+		self.index.set_flat(!is_tree);
+
 		let stage_status = self.git_status_stage.last()?;
 		self.index.set_items(&stage_status.items)?;
 
