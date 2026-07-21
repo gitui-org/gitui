@@ -107,7 +107,8 @@ impl LogSearchPopupPopup {
 				self.mode = PopupMode::JumpCommitSha;
 				self.jump_commit_id = None;
 				self.find_text.set_default_msg("commit sha".into());
-				self.find_text.enabled(false);
+				// Field stays focused; invalid SHA is shown via block style.
+				self.find_text.enabled(true);
 				self.selection = Selection::EnterText;
 			}
 		}
@@ -164,106 +165,66 @@ impl LogSearchPopupPopup {
 		}
 	}
 
+	fn option_mark(on: bool) -> &'static str {
+		if on {
+			"X"
+		} else {
+			" "
+		}
+	}
+
+	fn option_line(
+		&self,
+		checked: bool,
+		label: &str,
+		selected: bool,
+	) -> Line<'_> {
+		Line::from(vec![Span::styled(
+			format!("[{}] {label}", Self::option_mark(checked)),
+			// enabled=true keeps normal fg; selected applies selection_bg
+			self.theme.text(true, selected),
+		)])
+	}
+
 	fn get_text_options(&self) -> Vec<Line<'_>> {
-		let x_summary =
-			if self.options.0.contains(SearchFields::MESSAGE_SUMMARY)
-			{
-				"X"
-			} else {
-				" "
-			};
-
-		let x_body =
-			if self.options.0.contains(SearchFields::MESSAGE_BODY) {
-				"X"
-			} else {
-				" "
-			};
-
-		let x_files =
-			if self.options.0.contains(SearchFields::FILENAMES) {
-				"X"
-			} else {
-				" "
-			};
-
-		let x_authors =
-			if self.options.0.contains(SearchFields::AUTHORS) {
-				"X"
-			} else {
-				" "
-			};
-
-		let x_opt_fuzzy =
-			if self.options.1.contains(SearchOptions::FUZZY_SEARCH) {
-				"X"
-			} else {
-				" "
-			};
-
-		let x_opt_casesensitive =
-			if self.options.1.contains(SearchOptions::CASE_SENSITIVE)
-			{
-				"X"
-			} else {
-				" "
-			};
-
 		vec![
-			Line::from(vec![Span::styled(
-				format!("[{x_opt_fuzzy}] fuzzy search"),
-				self.theme.text(
-					matches!(self.selection, Selection::FuzzyOption),
-					false,
+			self.option_line(
+				self.options.1.contains(SearchOptions::FUZZY_SEARCH),
+				"fuzzy search",
+				matches!(self.selection, Selection::FuzzyOption),
+			),
+			self.option_line(
+				self.options
+					.1
+					.contains(SearchOptions::CASE_SENSITIVE),
+				"case sensitive",
+				matches!(self.selection, Selection::CaseOption),
+			),
+			self.option_line(
+				self.options
+					.0
+					.contains(SearchFields::MESSAGE_SUMMARY),
+				"summary",
+				matches!(self.selection, Selection::SummarySearch),
+			),
+			self.option_line(
+				self.options.0.contains(SearchFields::MESSAGE_BODY),
+				"message body",
+				matches!(
+					self.selection,
+					Selection::MessageBodySearch
 				),
-			)]),
-			Line::from(vec![Span::styled(
-				format!("[{x_opt_casesensitive}] case sensitive"),
-				self.theme.text(
-					matches!(self.selection, Selection::CaseOption),
-					false,
-				),
-			)]),
-			Line::from(vec![Span::styled(
-				format!("[{x_summary}] summary"),
-				self.theme.text(
-					matches!(
-						self.selection,
-						Selection::SummarySearch
-					),
-					false,
-				),
-			)]),
-			Line::from(vec![Span::styled(
-				format!("[{x_body}] message body"),
-				self.theme.text(
-					matches!(
-						self.selection,
-						Selection::MessageBodySearch
-					),
-					false,
-				),
-			)]),
-			Line::from(vec![Span::styled(
-				format!("[{x_files}] committed files"),
-				self.theme.text(
-					matches!(
-						self.selection,
-						Selection::FilenameSearch
-					),
-					false,
-				),
-			)]),
-			Line::from(vec![Span::styled(
-				format!("[{x_authors}] authors"),
-				self.theme.text(
-					matches!(
-						self.selection,
-						Selection::AuthorsSearch
-					),
-					false,
-				),
-			)]),
+			),
+			self.option_line(
+				self.options.0.contains(SearchFields::FILENAMES),
+				"committed files",
+				matches!(self.selection, Selection::FilenameSearch),
+			),
+			self.option_line(
+				self.options.0.contains(SearchFields::AUTHORS),
+				"authors",
+				matches!(self.selection, Selection::AuthorsSearch),
+			),
 		]
 	}
 
@@ -315,7 +276,7 @@ impl LogSearchPopupPopup {
 		}
 	}
 
-	const fn move_selection(&mut self, arg: bool) {
+	fn move_selection(&mut self, arg: bool) {
 		if arg {
 			//up
 			self.selection = match self.selection {
@@ -513,9 +474,6 @@ impl LogSearchPopupPopup {
 				self.execute_confirm();
 			} else if self.find_text.event(event)?.is_consumed() {
 				self.validate_commit_sha();
-				self.find_text.enabled(
-					!self.find_text.get_text().trim().is_empty(),
-				);
 			}
 		}
 
@@ -627,5 +585,60 @@ impl Component for LogSearchPopupPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::app::Environment;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+	use ratatui::{backend::TestBackend, style::Color, Terminal};
+
+	fn key(code: KeyCode) -> Event {
+		Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
+	}
+
+	#[test]
+	fn search_option_selection_uses_selection_background() {
+		let env = Environment::test_env();
+		let mut popup = LogSearchPopupPopup::new(&env);
+		popup.open().unwrap();
+
+		// Move focus from the text field onto the first option.
+		popup.event(&key(KeyCode::Down)).unwrap();
+
+		let backend = TestBackend::new(80, 24);
+		let mut terminal = Terminal::new(backend).unwrap();
+		terminal
+			.draw(|f| {
+				popup.draw(f, f.area()).unwrap();
+			})
+			.unwrap();
+
+		let buf = terminal.backend().buffer();
+		// Find the "fuzzy search" row and assert it has selection_bg.
+		let mut found_selected = false;
+		let area = *buf.area();
+		for y in area.top()..area.bottom() {
+			for x in area.left()..area.right() {
+				let cell = &buf[(x, y)];
+				if cell.symbol() == "f"
+					&& cell.fg == Color::White
+					&& cell.bg == Color::Blue
+				{
+					// Selection highlight: command_fg on selection_bg
+					found_selected = true;
+					break;
+				}
+			}
+			if found_selected {
+				break;
+			}
+		}
+		assert!(
+			found_selected,
+			"focused search option should use selection background"
+		);
 	}
 }

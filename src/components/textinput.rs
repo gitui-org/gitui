@@ -131,9 +131,34 @@ impl TextInputComponent {
 		self.embed = true;
 	}
 
-	///
-	pub const fn enabled(&mut self, enable: bool) {
+	/// Focus/unfocus the text input visually (style + cursor).
+	/// Used by popups that share the field with other selectable rows.
+	pub fn enabled(&mut self, enable: bool) {
 		self.selected = Some(enable);
+		self.apply_enabled_style();
+	}
+
+	fn is_enabled(&self) -> bool {
+		self.selected.unwrap_or(true)
+	}
+
+	fn apply_enabled_style(&mut self) {
+		let enabled = self.is_enabled();
+		let Some(ta) = self.textarea.as_mut() else {
+			return;
+		};
+
+		let style = self.theme.text(enabled, false);
+		ta.set_style(style);
+		ta.set_placeholder_style(style);
+		// Hide the block cursor when another control has focus.
+		// Default REVERSED cursor is what ratatui-textarea uses when focused.
+		ta.set_cursor_style(if enabled {
+			ratatui::style::Style::default()
+				.add_modifier(ratatui::style::Modifier::REVERSED)
+		} else {
+			ratatui::style::Style::default()
+		});
 	}
 
 	fn show_inner_textarea(&mut self) {
@@ -156,13 +181,6 @@ impl TextInputComponent {
 			text_area
 				.set_cursor_line_style(self.theme.text(true, false));
 			text_area.set_placeholder_text(self.default_msg.clone());
-			text_area.set_placeholder_style(
-				self.theme
-					.text(self.selected.unwrap_or_default(), false),
-			);
-			text_area.set_style(
-				self.theme.text(self.selected.unwrap_or(true), false),
-			);
 
 			if !self.embed {
 				text_area.set_block(
@@ -179,6 +197,8 @@ impl TextInputComponent {
 			}
 			text_area
 		});
+		// Apply focus style/cursor after the widget exists (and on rebuilds).
+		self.apply_enabled_style();
 	}
 
 	/// Set the `msg`.
@@ -886,5 +906,31 @@ mod tests {
 			ta.move_cursor(CursorMove::WordBack);
 			assert_eq!(ta.cursor(), save_cursor);
 		}
+	}
+
+	#[test]
+	fn test_enabled_toggles_cursor_visibility() {
+		use ratatui::style::Modifier;
+
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.enabled(true);
+		assert!(comp
+			.textarea
+			.as_ref()
+			.unwrap()
+			.cursor_style()
+			.add_modifier
+			.contains(Modifier::REVERSED));
+
+		comp.enabled(false);
+		assert!(!comp
+			.textarea
+			.as_ref()
+			.unwrap()
+			.cursor_style()
+			.add_modifier
+			.contains(Modifier::REVERSED));
 	}
 }
