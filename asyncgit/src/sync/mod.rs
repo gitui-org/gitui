@@ -17,6 +17,8 @@ pub mod diff;
 mod hooks;
 mod hunks;
 mod ignore;
+mod graph_lanes;
+mod graph_log;
 mod logwalker;
 mod merge;
 mod patches;
@@ -70,6 +72,8 @@ pub use hooks::{
 	hooks_pre_push, hooks_prepare_commit_msg, HookResult,
 	PrePushTarget, PrepareCommitMsgSource,
 };
+pub use graph_lanes::{assign_lanes, GraphCell, GraphRow};
+pub use graph_log::{get_graph_commits, get_graph_tips, GraphCommit};
 pub use hunks::{reset_hunk, stage_hunk, unstage_hunk};
 pub use ignore::add_to_ignore;
 pub use logwalker::{LogWalker, LogWalkerWithoutFilter};
