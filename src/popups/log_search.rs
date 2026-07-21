@@ -165,7 +165,7 @@ impl LogSearchPopupPopup {
 		}
 	}
 
-	fn option_mark(on: bool) -> &'static str {
+	const fn option_mark(on: bool) -> &'static str {
 		if on {
 			"X"
 		} else {
