@@ -73,10 +73,38 @@ fn create_watcher(
 
 	let mut bouncer =
 		new_debouncer(timeout, tx).expect("Watch create error");
-	bouncer
+
+	match bouncer
 		.watcher()
 		.watch(Path::new(&workdir), RecursiveMode::Recursive)
-		.expect("Watch error");
+	{
+		Ok(()) => std::mem::forget(bouncer),
+		Err(e) => {
+			// e.g. a subdirectory owned by another user can make the
+			// recursive watch fail with `PermissionDenied`. Live
+			// updates are disabled in that case, but gitui should
+			// still start up normally instead of crashing (#2900).
+			log::error!(
+				"failed to watch '{workdir}' for changes, live-refresh disabled: {e}"
+			);
+		}
+	}
+}
 
-	std::mem::forget(bouncer);
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_create_watcher_does_not_panic_on_watch_error() {
+		// a path that cannot be watched (e.g. because it does not
+		// exist, or - as in #2900 - because a subdirectory is owned
+		// by another user) must not crash gitui.
+		let (tx, _rx) = std::sync::mpsc::channel();
+		create_watcher(
+			Duration::from_millis(100),
+			tx,
+			"/nonexistent/gitui-watcher-test-path",
+		);
+	}
 }
