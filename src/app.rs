@@ -378,9 +378,7 @@ impl App {
 							Path::new(&path),
 						)
 					} else {
-						let changes =
-							self.status_tab.get_files_changes()?;
-						self.commit_popup.show_editor(changes)
+						self.commit_popup.show_editor()
 					};
 
 				if let Err(e) = result {

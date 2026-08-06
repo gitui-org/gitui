@@ -131,12 +131,6 @@ pub fn commit_first_line_warning(count: usize) -> String {
 pub const fn branch_name_invalid() -> &'static str {
 	"[invalid name]"
 }
-pub fn commit_editor_msg(_key_config: &SharedKeyConfig) -> String {
-	r"
-# Edit your commit message
-# Lines starting with '#' will be ignored"
-		.to_string()
-}
 pub fn stash_popup_title(_key_config: &SharedKeyConfig) -> String {
 	"Stash".to_string()
 }
