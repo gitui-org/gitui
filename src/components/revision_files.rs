@@ -17,7 +17,8 @@ use anyhow::Result;
 use asyncgit::{
 	asyncjob::AsyncSingleJob,
 	sync::{
-		get_commit_info, CommitId, CommitInfo, RepoPathRef, TreeFile,
+		get_commit_info, get_head, tree_file_content, CommitId,
+		CommitInfo, RepoPathRef, TreeFile,
 	},
 	AsyncGitNotification, AsyncTreeFilesJob,
 };
@@ -54,6 +55,7 @@ pub struct RevisionFilesComponent {
 	scroll: VerticalScroll,
 	visible: bool,
 	revision: Option<CommitInfo>,
+	revision_is_head: bool,
 	focus: Focus,
 	key_config: SharedKeyConfig,
 	select_file: Option<PathBuf>,
@@ -76,6 +78,7 @@ impl RevisionFilesComponent {
 				env.sender_git.clone(),
 			),
 			revision: None,
+			revision_is_head: false,
 			focus: Focus::Tree,
 			key_config: env.key_config.clone(),
 			repo: env.repo.clone(),
@@ -99,6 +102,9 @@ impl RevisionFilesComponent {
 			self.revision =
 				Some(get_commit_info(&self.repo.borrow(), &commit)?);
 		}
+
+		self.revision_is_head = get_head(&self.repo.borrow())
+			.is_ok_and(|head| head == commit);
 
 		Ok(())
 	}
@@ -263,6 +269,54 @@ impl RevisionFilesComponent {
 				.unwrap_or_default()
 				.to_string()
 		})
+	}
+
+	/// dumps the selected file at the currently viewed revision into a
+	/// temporary file and opens that in the external editor
+	fn open_file_revision(&self) -> Result<()> {
+		let Some(file_path) = self.selected_file_path_with_prefix()
+		else {
+			return Ok(());
+		};
+
+		let path = Path::new(&file_path);
+
+		let Some(file) = self
+			.files
+			.as_ref()
+			.and_then(|files| files.iter().find(|f| f.path == path))
+		else {
+			return Ok(());
+		};
+
+		let content = tree_file_content(&self.repo.borrow(), file)?;
+
+		let file_name = path
+			.file_name()
+			.map(|name| name.to_string_lossy().to_string())
+			.unwrap_or_default();
+
+		let temp_file = tempfile::Builder::new()
+			.prefix(&format!("gitui-{}-", self.revision_short_id()))
+			.suffix(&format!("-{file_name}"))
+			.tempfile()?
+			.into_temp_path()
+			.keep()?;
+
+		std::fs::write(&temp_file, content)?;
+
+		self.queue.push(InternalEvent::OpenExternalEditor(Some(
+			temp_file.to_string_lossy().to_string(),
+		)));
+
+		Ok(())
+	}
+
+	fn revision_short_id(&self) -> String {
+		self.revision
+			.as_ref()
+			.map(|commit| commit.id.get_short_string())
+			.unwrap_or_default()
 	}
 
 	fn selection_changed(&mut self) {
@@ -437,11 +491,21 @@ impl Component for RevisionFilesComponent {
 				)
 				.order(order::NAV),
 			);
-			out.push(CommandInfo::new(
-				strings::commands::edit_item(&self.key_config),
-				self.tree.selected_file().is_some(),
-				true,
-			));
+			if self.revision_is_head {
+				out.push(CommandInfo::new(
+					strings::commands::edit_item(&self.key_config),
+					self.tree.selected_file().is_some(),
+					true,
+				));
+			} else {
+				out.push(CommandInfo::new(
+					strings::commands::open_file_revision(
+						&self.key_config,
+					),
+					self.tree.selected_file().is_some(),
+					true,
+				));
+			}
 			out.push(
 				CommandInfo::new(
 					strings::commands::open_file_history(
@@ -516,9 +580,23 @@ impl Component for RevisionFilesComponent {
 					self.open_finder();
 					return Ok(EventState::Consumed);
 				}
+			} else if key_match(
+				key,
+				self.key_config.keys.open_file_revision,
+			) {
+				if !self.revision_is_head {
+					try_or_popup!(
+						self,
+						"failed to open file revision:",
+						self.open_file_revision()
+					);
+					return Ok(EventState::Consumed);
+				}
 			} else if key_match(key, self.key_config.keys.edit_file) {
-				if let Some(file) =
-					self.selected_file_path_with_prefix()
+				if let Some(file) = self
+					.revision_is_head
+					.then(|| self.selected_file_path_with_prefix())
+					.flatten()
 				{
 					//Note: switch to status tab so its clear we are
 					// not altering a file inside a revision here

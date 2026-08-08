@@ -1232,6 +1232,18 @@ pub mod commands {
 			CMD_GROUP_CHANGES,
 		)
 	}
+	pub fn open_file_revision(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Open [{}]",
+				key_config.get_hint(key_config.keys.open_file_revision),
+			),
+			"open the selected revision of the file in an external editor (as a temporary file)",
+			CMD_GROUP_CHANGES,
+		)
+	}
 	pub fn stage_item(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(
