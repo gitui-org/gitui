@@ -37,8 +37,8 @@ impl Options {
 	pub fn test_env() -> Self {
 		use asyncgit::sync::RepoPath;
 		Self {
-			repo: RefCell::new(RepoPath::Path(Default::default())),
-			data: Default::default(),
+			repo: RefCell::new(RepoPath::Path(PathBuf::default())),
+			data: OptionsData::default(),
 		}
 	}
 }

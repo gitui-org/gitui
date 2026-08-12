@@ -976,7 +976,7 @@ mod tests {
 		let diff_line = DiffLine {
 			content: "".into(),
 			line_type: DiffLineType::Add,
-			position: Default::default(),
+			position: DiffLinePosition::default(),
 		};
 
 		{
