@@ -161,10 +161,12 @@ macro_rules! log_eprintln {
 fn main() -> Result<()> {
 	let app_start = Instant::now();
 
-	let cliargs = process_cmdline()?;
+	let mut cliargs = process_cmdline()?;
 
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
+	// pin to the repo root so operations survive deletion of the cwd
+	cliargs.repo_path = cliargs.repo_path.resolve_root()?;
 
 	let key_config = KeyConfig::init(
 		cliargs.key_bindings_path.as_ref(),

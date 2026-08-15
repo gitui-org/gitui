@@ -40,6 +40,23 @@ impl RepoPath {
 			Self::Workdir { workdir, .. } => Some(workdir.as_path()),
 		}
 	}
+
+	/// resolve to the absolute repo root so later operations survive
+	/// the deletion of the process cwd (see #2651)
+	pub fn resolve_root(&self) -> Result<Self> {
+		match self {
+			Self::Path(_) => {
+				let repo = repo(self)?;
+				// bare repos have no workdir
+				let root = repo
+					.workdir()
+					.unwrap_or_else(|| repo.path())
+					.to_path_buf();
+				Ok(Self::Path(root))
+			}
+			Self::Workdir { .. } => Ok(self.clone()),
+		}
+	}
 }
 
 impl From<PathBuf> for RepoPath {
