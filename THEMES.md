@@ -88,3 +88,20 @@ This can be changed by specifying the `use_selection_fg` boolean in your `theme.
 ```
 
 By default, `use_selection_fg` is set to `true`.
+
+## Disabling the command bar background
+
+The command bar at the bottom is filled with `cmdbar_bg` (`Blue` by
+default). If you run a terminal with transparency or blur and want it to
+show through, set the field to `Some(None)`:
+
+```ron
+(
+    cmdbar_bg: Some(None),
+)
+```
+
+The extra `Some` is required because overrides are applied as a patch:
+a plain `cmdbar_bg: None` is read as "leave the default alone", so
+`Some(None)` is what actually clears the fill. Setting a color still
+works as before, e.g. `cmdbar_bg: Some("Red")`.

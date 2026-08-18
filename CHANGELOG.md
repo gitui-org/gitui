@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 * support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
+* allow disabling the command bar background via `cmdbar_bg: Some(None)` so the terminal can show through ([#3011](https://github.com/gitui-org/gitui/issues/3011))
 
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
