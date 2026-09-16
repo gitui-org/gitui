@@ -16,8 +16,8 @@ use anyhow::Result;
 use asyncgit::{
 	asyncjob::AsyncSingleJob,
 	sync::{
-		self, filter_commit_by_search, CommitId, LogFilterSearch,
-		LogFilterSearchOptions, RepoPathRef,
+		self, diff_contains_file, filter_commit_by_search, CommitId,
+		LogFilterSearch, LogFilterSearchOptions, RepoPathRef,
 	},
 	AsyncBranchesJob, AsyncCommitFilterJob, AsyncGitNotification,
 	AsyncLog, AsyncTags, CommitFilesParams, FetchStatus,
@@ -90,7 +90,9 @@ impl Revlog {
 			git_log: AsyncLog::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
-				None,
+				env.scope
+					.path()
+					.map(|scope| diff_contains_file(scope.into())),
 			),
 			search: LogSearch::Off,
 			git_tags: AsyncTags::new(

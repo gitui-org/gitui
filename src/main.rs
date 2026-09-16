@@ -73,6 +73,7 @@ mod options;
 mod popup_stack;
 mod popups;
 mod queue;
+mod scope;
 mod spinner;
 mod string_utils;
 mod strings;
@@ -84,7 +85,7 @@ use crate::{
 	app::App,
 	args::{process_cmdline, CliArgs},
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use app::QuitState;
 use asyncgit::{sync::RepoPath, AsyncGitNotification};
 use backtrace::Backtrace;
@@ -100,6 +101,7 @@ use gitui::Gitui;
 use input::InputEvent;
 use keys::KeyConfig;
 use ratatui::backend::CrosstermBackend;
+use scope::PathScope;
 use scopeguard::defer;
 use std::{
 	io::{self, Stdout},
@@ -166,6 +168,8 @@ fn main() -> Result<()> {
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
 
+	let mut scope = repo_scope(&cliargs)?;
+
 	let key_config = KeyConfig::init(
 		cliargs.key_bindings_path.as_ref(),
 		cliargs.key_symbols_path.as_ref(),
@@ -196,6 +200,7 @@ fn main() -> Result<()> {
 		let quit_state = run_app(
 			app_start,
 			args.clone(),
+			scope.clone(),
 			theme.clone(),
 			&key_config,
 			updater,
@@ -206,12 +211,16 @@ fn main() -> Result<()> {
 			QuitState::OpenSubmodule(p) => {
 				args = CliArgs {
 					repo_path: p,
+					only_this_dir: false,
 					select_file: None,
 					theme: args.theme,
 					notify_watcher: args.notify_watcher,
 					key_bindings_path: args.key_bindings_path,
 					key_symbols_path: args.key_symbols_path,
-				}
+				};
+				// the submodule is a repository of its own, so the
+				// directory we started in says nothing about it
+				scope = PathScope::everything();
 			}
 			_ => break,
 		}
@@ -223,12 +232,14 @@ fn main() -> Result<()> {
 fn run_app(
 	app_start: Instant,
 	cliargs: CliArgs,
+	scope: PathScope,
 	theme: Theme,
 	key_config: &KeyConfig,
 	updater: Updater,
 	terminal: &mut Terminal,
 ) -> Result<QuitState, anyhow::Error> {
-	let mut gitui = Gitui::new(cliargs, theme, key_config, updater)?;
+	let mut gitui =
+		Gitui::new(cliargs, scope, theme, key_config, updater)?;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 
@@ -271,6 +282,16 @@ fn draw<B: ratatui::backend::Backend>(
 	})?;
 
 	Ok(())
+}
+
+/// the part of the repository gitui is restricted to
+fn repo_scope(cliargs: &CliArgs) -> Result<PathScope> {
+	if cliargs.only_this_dir {
+		PathScope::current_dir(&cliargs.repo_path)
+			.context("--only-this-dir")
+	} else {
+		Ok(PathScope::everything())
+	}
 }
 
 fn ensure_valid_path(repo_path: &RepoPath) -> Result<()> {

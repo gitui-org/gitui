@@ -14,6 +14,7 @@ use crate::{
 	draw,
 	input::{Input, InputEvent, InputState},
 	keys::KeyConfig,
+	scope::PathScope,
 	select_event,
 	spinner::Spinner,
 	ui::style::Theme,
@@ -34,6 +35,7 @@ pub struct Gitui {
 impl Gitui {
 	pub(crate) fn new(
 		cliargs: CliArgs,
+		scope: PathScope,
 		theme: Theme,
 		key_config: &KeyConfig,
 		updater: Updater,
@@ -56,6 +58,7 @@ impl Gitui {
 
 		let app = App::new(
 			cliargs,
+			scope,
 			tx_git,
 			tx_app,
 			input.clone(),
@@ -205,6 +208,7 @@ impl Gitui {
 mod tests {
 	use std::path::PathBuf;
 
+	use crate::scope::PathScope;
 	use asyncgit::{sync::RepoPath, AsyncGitNotification};
 	use crossterm::event::{KeyCode, KeyModifiers};
 	use git2_testing::repo_init_suffix;
@@ -241,6 +245,7 @@ mod tests {
 			theme: PathBuf::from("theme.ron"),
 			select_file: None,
 			repo_path: path,
+			only_this_dir: false,
 			notify_watcher: false,
 			key_bindings_path: None,
 			key_symbols_path: None,
@@ -249,9 +254,14 @@ mod tests {
 		let theme = Theme::init(&PathBuf::new());
 		let key_config = KeyConfig::default();
 
-		let mut gitui =
-			Gitui::new(cliargs, theme, &key_config, Updater::Ticker)
-				.unwrap();
+		let mut gitui = Gitui::new(
+			cliargs,
+			PathScope::everything(),
+			theme,
+			&key_config,
+			Updater::Ticker,
+		)
+		.unwrap();
 
 		let mut terminal =
 			Terminal::new(TestBackend::new(90, 12)).unwrap();

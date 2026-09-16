@@ -62,6 +62,8 @@ impl Stashing {
 			git_status: AsyncStatus::new(
 				env.repo.borrow().clone(),
 				env.sender_git.clone(),
+				// stashing always affects the whole repository
+				None,
 			),
 			queue: env.queue.clone(),
 			key_config: env.key_config.clone(),
