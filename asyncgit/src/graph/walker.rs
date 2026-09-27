@@ -7,7 +7,7 @@ use super::{
 };
 use crate::sync::CommitId;
 use core::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Get the lane's color index, which cycles through the color palette.
 fn lane_color(lane: usize) -> LaneIndex {
@@ -157,13 +157,15 @@ pub struct GraphWalker {
 	pub buffer: Buffer,
 	pub oids: GraphOids,
 
-	/// Maps a merge commit's alias to the alias of its second parent.
-	pub merge_parents: HashMap<CommitAlias, CommitAlias>,
+	/// For each merge commit's alias, the alias of its second parent.
+	/// Indexed directly by alias: aliases are dense `0..n`, so no
+	/// hashing is needed.
+	pub merge_parents: Vec<Option<CommitAlias>>,
 
-	/// Aliases of commits already folded into the buffer; consulted
-	/// by [`Self::mint_drawable_parent`], which refuses to mint an
-	/// [`UnwalkedAlias`] for any of them.
-	pub processed: HashSet<CommitAlias>,
+	/// Whether an alias has already been folded into the buffer;
+	/// consulted by [`Self::mint_drawable_parent`], which refuses to
+	/// mint an [`UnwalkedAlias`] for any of them. Indexed by alias.
+	pub processed: Vec<bool>,
 }
 
 impl GraphWalker {
@@ -178,8 +180,19 @@ impl GraphWalker {
 		id: &CommitId,
 	) -> Option<UnwalkedAlias> {
 		let alias = self.oids.get_or_insert(id);
-		(!self.processed.contains(&alias))
-			.then_some(UnwalkedAlias(alias))
+		(!self.is_processed(alias)).then_some(UnwalkedAlias(alias))
+	}
+
+	fn is_processed(&self, alias: CommitAlias) -> bool {
+		self.processed.get(*alias).copied().unwrap_or(false)
+	}
+
+	fn mark_processed(&mut self, alias: CommitAlias) {
+		let index = *alias;
+		if self.processed.len() <= index {
+			self.processed.resize(index + 1, false);
+		}
+		self.processed[index] = true;
 	}
 
 	pub fn process(
@@ -220,14 +233,18 @@ impl GraphWalker {
 
 		if let LaneSlot::FlowingMerge { second, .. } = &chunk {
 			let second = **second;
-			self.merge_parents.insert(commit_alias, second);
+			let index = *commit_alias;
+			if self.merge_parents.len() <= index {
+				self.merge_parents.resize(index + 1, None);
+			}
+			self.merge_parents[index] = Some(second);
 
 			if !self.has_lane_to_parent(second) {
 				self.buffer.track_merge_commit(commit_alias);
 			}
 		}
 
-		self.processed.insert(commit_alias);
+		self.mark_processed(commit_alias);
 		self.buffer.update(&chunk);
 	}
 
@@ -482,7 +499,7 @@ impl GraphWalker {
 		let commit_alias = self.oids.get(commit_id);
 		let head_alias = head_id.and_then(|id| self.oids.get(id));
 		let second_parent_alias = commit_alias.and_then(|alias| {
-			self.merge_parents.get(&alias).copied()
+			self.merge_parents.get(*alias).copied().flatten()
 		});
 
 		let commit_lane =
