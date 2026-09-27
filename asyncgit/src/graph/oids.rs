@@ -2,9 +2,15 @@ use super::CommitAlias;
 use crate::sync::CommitId;
 use std::collections::HashMap;
 
-/// mapping of `CommitId` to a numeric alias
+/// mapping of `CommitId` to a numeric alias.
+///
+/// `foldhash` is a non-cryptographic hasher — plenty for ids that
+/// never leave this process — and notably cheaper than the default
+/// `SipHash` for the millions of lookups a full history generates.
 #[derive(Default)]
-pub struct GraphOids(HashMap<CommitId, CommitAlias>);
+pub struct GraphOids(
+	HashMap<CommitId, CommitAlias, foldhash::fast::RandomState>,
+);
 
 impl GraphOids {
 	/// Create an empty alias map.

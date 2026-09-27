@@ -130,6 +130,7 @@ dependencies = [
  "dirs",
  "easy-cast",
  "env_logger",
+ "foldhash",
  "fuzzy-matcher",
  "git2",
  "git2-hooks",
