@@ -3,7 +3,7 @@ use crate::{
 	graph::{GraphRow, GraphWalker},
 	sync::{
 		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
-		RepoPath, SharedCommitFilterFn,
+		RepoPath, SharedCommitFilterFn, WalkEntry,
 	},
 	AsyncGitNotification, Error,
 };
@@ -47,10 +47,10 @@ pub struct AsyncLog {
 	filter: Option<SharedCommitFilterFn>,
 	partial_extract: AtomicBool,
 	repo: RepoPath,
-	/// All commit ids collected by the background thread, in walk order.
-	/// The graph walker reads these lazily, only as far as the viewport
-	/// requires, looking up each commit's parents on demand.
-	walk_entries: Arc<Mutex<Vec<CommitId>>>,
+	/// All commits collected by the background thread, in walk order,
+	/// together with their parents. The graph walker reads these
+	/// lazily, only as far as the viewport requires.
+	walk_entries: Arc<Mutex<Vec<WalkEntry>>>,
 	graph_walker: Arc<Mutex<GraphWalker>>,
 }
 
@@ -113,18 +113,11 @@ impl AsyncLog {
 			let processed =
 				walker.processed_commit_count().min(needed_end);
 
-			// The graph only needs topology for the commits it is
-			// about to fold in, so parents are looked up here on
-			// demand instead of being carried along the whole walk.
-			if processed < needed_end {
-				let mut repo = gix_repo(&self.repo).ok()?;
-				repo.object_cache_size_if_unset(2_usize.pow(14));
-
-				for id in &entries[processed..needed_end] {
-					let parents =
-						Self::parents_of(&repo, *id).ok()?;
-					walker.process(*id, &parents);
-				}
+			// Parents were already decoded by the walk and are carried
+			// along in `entries`, so folding a commit into the graph is
+			// pure in-memory work.
+			for (id, parents) in &entries[processed..needed_end] {
+				walker.process(*id, parents);
 			}
 		}
 
@@ -135,22 +128,6 @@ impl AsyncLog {
 			stashes,
 			head_id,
 		))
-	}
-
-	/// Looks up a commit's (up to two) parents on demand.
-	///
-	/// The graph caps support at two parents, ignoring octopus
-	/// merges, so anything beyond the first two is dropped here.
-	fn parents_of(
-		repo: &gix::Repository,
-		id: CommitId,
-	) -> Result<Vec<CommitId>> {
-		Ok(repo
-			.find_commit(id)?
-			.parent_ids()
-			.take(2)
-			.map(Into::into)
-			.collect())
 	}
 
 	///
@@ -280,7 +257,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
-		arc_walk_entries: &Arc<Mutex<Vec<CommitId>>>,
+		arc_walk_entries: &Arc<Mutex<Vec<WalkEntry>>>,
 		filter: Option<SharedCommitFilterFn>,
 	) -> Result<()> {
 		filter.map_or_else(
@@ -337,7 +314,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
-		arc_walk_entries: &Arc<Mutex<Vec<CommitId>>>,
+		arc_walk_entries: &Arc<Mutex<Vec<WalkEntry>>>,
 	) -> Result<()> {
 		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walker =
@@ -357,51 +334,45 @@ impl AsyncLog {
 	}
 
 	/// Drives `read` in batches, publishing every batch's commit ids
-	/// to `arc_current` and (when given) moving the full entries into
-	/// `walk_entries` for the graph.
+	/// to `arc_current` and, when given, moving the full entries,
+	/// both ids and parents; into `walk_entries` for the graph.
 	fn walk_loop(
-		mut read: impl FnMut(&mut Vec<CommitId>) -> Result<usize>,
+		mut read: impl FnMut(&mut Vec<WalkEntry>) -> Result<usize>,
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
-		walk_entries: Option<&Mutex<Vec<CommitId>>>,
+		walk_entries: Option<&Mutex<Vec<WalkEntry>>>,
 	) -> Result<()> {
 		let start_time = Instant::now();
+		let mut entries = Vec::with_capacity(LIMIT_COUNT);
 
-		let mut entries: Vec<CommitId> =
-			Vec::with_capacity(LIMIT_COUNT);
+		while read(&mut entries)? > 0 {
+			// publish
+			let mut current = arc_current.lock()?;
+			current.commits.extend(entries.iter().map(|&(id, _)| id));
+			current.duration = start_time.elapsed();
 
-		loop {
-			let read_count = read(&mut entries)?;
-
-			{
-				let mut current = arc_current.lock()?;
-				current.commits.extend(entries.iter().copied());
-				current.duration = start_time.elapsed();
+			if let Some(arc_walk_entries) = walk_entries {
+				arc_walk_entries.lock()?.append(&mut entries);
 			}
+			entries.clear();
 
-			if let Some(walk_entries) = walk_entries {
-				walk_entries.lock()?.append(&mut entries);
-			} else {
-				entries.clear();
-			}
-
-			if read_count == 0 {
-				break;
-			}
 			Self::notify(sender);
-
-			let sleep_duration =
-				if arc_background.load(Ordering::Relaxed) {
-					SLEEP_BACKGROUND
-				} else {
-					SLEEP_FOREGROUND
-				};
-
-			thread::sleep(sleep_duration);
+			thread::sleep(Self::pause(arc_background));
 		}
 
+		arc_current.lock()?.duration = start_time.elapsed();
+
 		Ok(())
+	}
+
+	/// The pause between batches
+	fn pause(arc_background: &Arc<AtomicBool>) -> Duration {
+		if arc_background.load(Ordering::Relaxed) {
+			SLEEP_BACKGROUND
+		} else {
+			SLEEP_FOREGROUND
+		}
 	}
 
 	fn clear(&self) -> Result<()> {
