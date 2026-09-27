@@ -1,7 +1,7 @@
 use super::{CommitAlias, UnwalkedAlias};
 
 /// A lane's occupant at one point in the walk.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LaneSlot {
 	/// A walked commit flowing down to its first parent.
 	Flowing {

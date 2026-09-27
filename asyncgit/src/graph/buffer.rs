@@ -85,9 +85,9 @@ impl Buffer {
 			.unwrap_or(self.current.len());
 
 		if target < self.current.len() {
-			self.record_replace(target, Some(new_chunk.clone()));
+			self.record_replace(target, Some(*new_chunk));
 		} else {
-			self.record_insert(target, Some(new_chunk.clone()));
+			self.record_insert(target, Some(*new_chunk));
 		}
 		target
 	}
@@ -114,33 +114,36 @@ impl Buffer {
 		alias: CommitAlias,
 		skip_index: usize,
 	) {
-		let current = self.current.clone();
-		for (index, slot) in current.into_iter().enumerate() {
-			let chunk = match slot {
-				Some(chunk) if index != skip_index => chunk,
-				_ => continue,
-			};
+		for index in 0..self.current.len() {
+			if index == skip_index {
+				continue;
+			}
 
-			let new_chunk = match chunk {
-				// The awaited parent was JUST placed. Close the lane.
-				// The pending second parent is dropped with it.
-				LaneSlot::Flowing { parent, .. }
-				| LaneSlot::FlowingMerge { parent, .. }
-				| LaneSlot::Reserved { parent }
-					if *parent == alias =>
-				{
+			// `LaneSlot` is `Copy`; matching by value lets us read
+			// the slot out before `record_replace` mutates `current`.
+			let new_chunk = match self.current[index] {
+				Some(
+					LaneSlot::Flowing { parent, .. }
+					| LaneSlot::FlowingMerge { parent, .. }
+					| LaneSlot::Reserved { parent },
+				) if *parent == alias => {
+					// The awaited parent was JUST placed. Close the
+					// lane. The pending second parent is dropped
+					// with it.
 					None
 				}
-				// The second parent was just placed
-				// bridge resolves and the lane flows
-				LaneSlot::FlowingMerge {
+				Some(LaneSlot::FlowingMerge {
 					alias: merge_alias,
 					parent,
 					second,
-				} if *second == alias => Some(LaneSlot::Flowing {
-					alias: merge_alias,
-					parent,
-				}),
+				}) if *second == alias => {
+					// The second parent was just placed
+					// bridge resolves and the lane flows
+					Some(LaneSlot::Flowing {
+						alias: merge_alias,
+						parent,
+					})
+				}
 				_ => continue,
 			};
 
@@ -155,9 +158,9 @@ impl Buffer {
 			let Some((index, chunk)) =
 				self.current.iter().enumerate().find_map(
 					|(index, slot)| {
-						let chunk = slot.as_ref()?;
+						let chunk = *slot.as_ref()?;
 						(chunk.alias() == Some(alias))
-							.then(|| (index, chunk.clone()))
+							.then_some((index, chunk))
 					},
 				)
 			else {
@@ -214,10 +217,7 @@ impl Buffer {
 		index: usize,
 		new: Option<LaneSlot>,
 	) {
-		self.pending_delta.push(DeltaOp::Replace {
-			index,
-			new: new.clone(),
-		});
+		self.pending_delta.push(DeltaOp::Replace { index, new });
 		self.current[index] = new;
 	}
 
@@ -226,10 +226,7 @@ impl Buffer {
 		index: usize,
 		item: Option<LaneSlot>,
 	) {
-		self.pending_delta.push(DeltaOp::Insert {
-			index,
-			item: item.clone(),
-		});
+		self.pending_delta.push(DeltaOp::Insert { index, item });
 		self.current.insert(index, item);
 	}
 
@@ -282,7 +279,7 @@ impl Buffer {
 		for op in &delta.0 {
 			match op {
 				DeltaOp::Insert { index, item } => {
-					state.insert(*index, item.clone());
+					state.insert(*index, *item);
 				}
 				DeltaOp::Remove { index } => {
 					state.remove(*index);
