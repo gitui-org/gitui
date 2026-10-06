@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::error::Result;
 use git2::Repository;
 use scopetime::scope_time;
@@ -73,11 +75,10 @@ pub enum PushDefaultStrategyConfig {
 	Matching,
 }
 
-impl<'a> TryFrom<&'a str> for PushDefaultStrategyConfig {
-	type Error = crate::Error;
-	fn try_from(
-		value: &'a str,
-	) -> std::result::Result<Self, Self::Error> {
+impl FromStr for PushDefaultStrategyConfig {
+	type Err = crate::Error;
+
+	fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
 		match value {
 			"nothing" => Ok(Self::Nothing),
 			"current" => Ok(Self::Current),
@@ -97,7 +98,7 @@ pub fn push_default_strategy_config_repo(
 	(get_config_string_repo(repo, "push.default")?).map_or_else(
 		|| Ok(PushDefaultStrategyConfig::default()),
 		|entry_str| {
-			PushDefaultStrategyConfig::try_from(entry_str.as_str())
+			PushDefaultStrategyConfig::from_str(entry_str.as_str())
 		},
 	)
 }
