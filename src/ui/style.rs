@@ -254,6 +254,20 @@ impl Theme {
 		)
 	}
 
+	/// Color for a commit-graph lane (SourceTree-style).
+	pub fn graph_lane(&self, lane_color: usize, selected: bool) -> Style {
+		const PALETTE: [Color; 6] = [
+			Color::Cyan,
+			Color::Yellow,
+			Color::Magenta,
+			Color::Green,
+			Color::LightBlue,
+			Color::LightRed,
+		];
+		let fg = PALETTE[lane_color % PALETTE.len()];
+		self.apply_select(Style::default().fg(fg), selected)
+	}
+
 	pub fn commit_hash_in_blame(
 		&self,
 		is_blamed_commit: bool,

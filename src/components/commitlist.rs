@@ -15,7 +15,7 @@ use crate::{
 use anyhow::Result;
 use asyncgit::sync::{
 	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
-	RepoPathRef, Tags,
+	GraphRow, RepoPathRef, Tags,
 };
 use chrono::{DateTime, Local};
 use crossterm::event::Event;
@@ -53,6 +53,8 @@ pub struct CommitList {
 	tags: Option<Tags>,
 	local_branches: BTreeMap<CommitId, Vec<BranchInfo>>,
 	remote_branches: BTreeMap<CommitId, Vec<BranchInfo>>,
+	/// Optional SourceTree-style lane glyphs keyed by commit id.
+	graph_rows: Option<BTreeMap<CommitId, GraphRow>>,
 	current_size: Cell<Option<(u16, u16)>>,
 	scroll_top: Cell<usize>,
 	theme: SharedTheme,
@@ -75,6 +77,7 @@ impl CommitList {
 			tags: None,
 			local_branches: BTreeMap::default(),
 			remote_branches: BTreeMap::default(),
+			graph_rows: None,
 			current_size: Cell::new(None),
 			scroll_top: Cell::new(0),
 			theme: env.theme.clone(),
@@ -96,6 +99,11 @@ impl CommitList {
 	}
 
 	///
+	pub fn is_empty(&self) -> bool {
+		self.commits.is_empty()
+	}
+
+	///
 	pub fn copy_items(&self) -> Vec<CommitId> {
 		self.commits.iter().copied().collect_vec()
 	}
@@ -103,6 +111,14 @@ impl CommitList {
 	///
 	pub fn set_tags(&mut self, tags: Tags) {
 		self.tags = Some(tags);
+	}
+
+	/// Attach precomputed graph lanes (or clear with `None`).
+	pub fn set_graph_rows(
+		&mut self,
+		graph_rows: Option<BTreeMap<CommitId, GraphRow>>,
+	) {
+		self.graph_rows = graph_rows;
 	}
 
 	///
@@ -451,9 +467,12 @@ impl CommitList {
 		width: usize,
 		now: DateTime<Local>,
 		marked: Option<bool>,
+		graph: Option<&GraphRow>,
 	) -> Line<'a> {
 		let mut txt: Vec<Span> = Vec::with_capacity(
-			ELEMENTS_PER_LINE + if marked.is_some() { 2 } else { 0 },
+			ELEMENTS_PER_LINE
+				+ if marked.is_some() { 2 } else { 0 }
+				+ graph.map_or(0, |g| g.cells.len()),
 		);
 
 		let normal = !self.items.highlighting()
@@ -479,6 +498,22 @@ impl CommitList {
 				}),
 				theme.log_marker(selected),
 			));
+			txt.push(splitter.clone());
+		}
+
+		// SourceTree-style lane graph
+		if let Some(graph) = graph {
+			for cell in &graph.cells {
+				let style = if normal {
+					theme.graph_lane(cell.color, selected)
+				} else {
+					theme.commit_unhighlighted()
+				};
+				txt.push(Span::styled(
+					Cow::from(cell.ch.to_string()),
+					style,
+				));
+			}
 			txt.push(splitter.clone());
 		}
 
@@ -595,7 +630,18 @@ impl CommitList {
 					local_branch
 						.iter()
 						.map(|local_branch| {
-							format!("{{{0}}}", local_branch.name)
+							let head = match &local_branch.details {
+								BranchDetails::Local(details)
+									if details.is_head =>
+								{
+									"*"
+								}
+								_ => "",
+							};
+							format!(
+								"{{{head}{0}}}",
+								local_branch.name
+							)
 						})
 						.join(" ")
 				});
@@ -616,6 +662,9 @@ impl CommitList {
 				width,
 				now,
 				marked,
+				self.graph_rows
+					.as_ref()
+					.and_then(|rows| rows.get(&e.id)),
 			));
 		}
 

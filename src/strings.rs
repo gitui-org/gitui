@@ -91,6 +91,12 @@ pub fn tab_stashes(key_config: &SharedKeyConfig) -> String {
 		key_config.get_hint(key_config.keys.tab_stashes)
 	)
 }
+pub fn tab_graph(key_config: &SharedKeyConfig) -> String {
+	format!(
+		"Graph [{}]",
+		key_config.get_hint(key_config.keys.tab_graph)
+	)
+}
 pub fn tab_divider(_key_config: &SharedKeyConfig) -> String {
 	" | ".to_string()
 }
@@ -327,6 +333,9 @@ pub fn tag_popup_annotation_msg() -> String {
 }
 pub fn stashlist_title(_key_config: &SharedKeyConfig) -> String {
 	"Stashes".to_string()
+}
+pub fn graph_title(_key_config: &SharedKeyConfig) -> String {
+	"Graph".to_string()
 }
 pub fn help_title(_key_config: &SharedKeyConfig) -> String {
 	"Help: all commands".to_string()
@@ -577,12 +586,13 @@ pub mod commands {
 	) -> CommandText {
 		CommandText::new(
 			format!(
-				"Tab [{}{}{}{}{}]",
+				"Tab [{}{}{}{}{}{}]",
 				key_config.get_hint(key_config.keys.tab_status),
 				key_config.get_hint(key_config.keys.tab_log),
 				key_config.get_hint(key_config.keys.tab_files),
 				key_config.get_hint(key_config.keys.tab_stashing),
 				key_config.get_hint(key_config.keys.tab_stashes),
+				key_config.get_hint(key_config.keys.tab_graph),
 			),
 			"switch top level tabs directly",
 			CMD_GROUP_GENERAL,

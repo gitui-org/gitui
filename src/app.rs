@@ -28,7 +28,7 @@ use crate::{
 	},
 	setup_popups,
 	strings::{self, ellipsis_trim_start, order},
-	tabs::{FilesTab, Revlog, StashList, Stashing, Status},
+	tabs::{FilesTab, RefGraph, Revlog, StashList, Stashing, Status},
 	try_or_popup,
 	ui::style::{SharedTheme, Theme},
 	AsyncAppNotification, AsyncNotification,
@@ -106,6 +106,7 @@ pub struct App {
 	status_tab: Status,
 	stashing_tab: Stashing,
 	stashlist_tab: StashList,
+	graph_tab: RefGraph,
 	files_tab: FilesTab,
 	queue: Queue,
 	theme: SharedTheme,
@@ -234,6 +235,7 @@ impl App {
 			status_tab: Status::new(&env),
 			stashing_tab: Stashing::new(&env),
 			stashlist_tab: StashList::new(&env),
+			graph_tab: RefGraph::new(&env),
 			files_tab: FilesTab::new(&env, select_file),
 			checkout_option_popup: CheckoutOptionPopup::new(&env),
 			goto_line_popup: GotoLinePopup::new(&env),
@@ -293,6 +295,7 @@ impl App {
 				2 => self.files_tab.draw(f, chunks_main[1])?,
 				3 => self.stashing_tab.draw(f, chunks_main[1])?,
 				4 => self.stashlist_tab.draw(f, chunks_main[1])?,
+				5 => self.graph_tab.draw(f, chunks_main[1])?,
 				_ => bail!("unknown tab"),
 			}
 		}
@@ -409,6 +412,7 @@ impl App {
 		self.files_tab.update()?;
 		self.stashing_tab.update()?;
 		self.stashlist_tab.update()?;
+		self.graph_tab.update()?;
 		self.reset_popup.update()?;
 
 		self.update_commands();
@@ -530,7 +534,8 @@ impl App {
 			status_tab,
 			files_tab,
 			stashing_tab,
-			stashlist_tab
+			stashlist_tab,
+			graph_tab
 		]
 	);
 
@@ -601,6 +606,7 @@ impl App {
 			&mut self.files_tab,
 			&mut self.stashing_tab,
 			&mut self.stashlist_tab,
+			&mut self.graph_tab,
 		]
 	}
 
@@ -626,6 +632,8 @@ impl App {
 			self.switch_to_tab(&AppTabs::Stashing)?;
 		} else if key_match(k, self.key_config.keys.tab_stashes) {
 			self.switch_to_tab(&AppTabs::Stashlist)?;
+		} else if key_match(k, self.key_config.keys.tab_graph) {
+			self.switch_to_tab(&AppTabs::Graph)?;
 		}
 
 		Ok(())
@@ -654,6 +662,7 @@ impl App {
 			AppTabs::Files => self.set_tab(2)?,
 			AppTabs::Stashing => self.set_tab(3)?,
 			AppTabs::Stashlist => self.set_tab(4)?,
+			AppTabs::Graph => self.set_tab(5)?,
 		}
 		Ok(())
 	}
@@ -1173,6 +1182,7 @@ impl App {
 			Span::raw(strings::tab_files(&self.key_config)),
 			Span::raw(strings::tab_stashing(&self.key_config)),
 			Span::raw(strings::tab_stashes(&self.key_config)),
+			Span::raw(strings::tab_graph(&self.key_config)),
 		];
 		let divider = strings::tab_divider(&self.key_config);
 
