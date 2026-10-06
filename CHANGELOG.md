@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
 
 ### Changed
+* Give more space to right-side diff view [[@hongquan](https://github.com/hongquan)] ([#2772](https://github.com/gitui-org/gitui/pull/2772))
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting
 * open the external editor from the status diff view [[@WaterWhisperer](https://github.com/WaterWhisperer)] ([#2805](https://github.com/gitui-org/gitui/issues/2805))
 * automatically convert spaces to dashes when creating or renaming a branch [[@pbouillon]](https//pbouillon.github.io)] ([#2916](https://github.com/gitui-org/gitui/pull/2916))
