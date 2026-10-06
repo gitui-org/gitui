@@ -1,14 +1,16 @@
 use crate::{
 	error::Result,
+	graph::{GraphRow, GraphWalker},
 	sync::{
 		gix_repo, repo, CommitId, LogWalker, LogWalkerWithoutFilter,
-		RepoPath, SharedCommitFilterFn,
+		RepoPath, SharedCommitFilterFn, WalkEntry,
 	},
 	AsyncGitNotification, Error,
 };
 use crossbeam_channel::Sender;
 use scopetime::scope_time;
 use std::{
+	collections::HashSet,
 	sync::{
 		atomic::{AtomicBool, Ordering},
 		Arc, Mutex,
@@ -35,7 +37,7 @@ pub struct AsyncLogResult {
 	///
 	pub duration: Duration,
 }
-///
+/// Drives the background commit-log walker and exposes graph rows.
 pub struct AsyncLog {
 	current: Arc<Mutex<AsyncLogResult>>,
 	current_head: Arc<Mutex<Option<CommitId>>>,
@@ -45,6 +47,11 @@ pub struct AsyncLog {
 	filter: Option<SharedCommitFilterFn>,
 	partial_extract: AtomicBool,
 	repo: RepoPath,
+	/// All commits collected by the background thread, in walk order,
+	/// together with their parents. The graph walker reads these
+	/// lazily, only as far as the viewport requires.
+	walk_entries: Arc<Mutex<Vec<WalkEntry>>>,
+	graph_walker: Arc<Mutex<GraphWalker>>,
 }
 
 static LIMIT_COUNT: usize = 3000;
@@ -70,7 +77,57 @@ impl AsyncLog {
 			background: Arc::new(AtomicBool::new(false)),
 			filter,
 			partial_extract: AtomicBool::new(false),
+			walk_entries: Arc::new(Mutex::new(Vec::new())),
+			graph_walker: Arc::new(Mutex::new(GraphWalker::new())),
 		}
+	}
+
+	/// Computes graph rows for `commit_slice` starting at `global_start`.
+	///
+	/// Driven lazily. Processes only as many walked commits as the
+	/// viewport requires, resolving their parents on demand.
+	///
+	/// Returns `None` when the background walk hasn't reached
+	/// `global_start + commit_slice.len()` yet.
+	pub fn get_graph_rows(
+		&self,
+		commit_slice: &[CommitId],
+		global_start: usize,
+		branch_tips: &HashSet<CommitId>,
+		stashes: &HashSet<CommitId>,
+		head_id: Option<&CommitId>,
+	) -> Option<Vec<GraphRow>> {
+		let needed_end = global_start + commit_slice.len();
+
+		let mut walker = self.graph_walker.lock().ok()?;
+
+		{
+			let entries = self.walk_entries.lock().ok()?;
+			if entries.len() < needed_end {
+				return None;
+			}
+
+			// the walker may already be ahead of the requested range
+			// (you know, scrolling up), so only feed it entries
+			// we know it is yet to have seen
+			let processed =
+				walker.processed_commit_count().min(needed_end);
+
+			// Parents were already decoded by the walk and are carried
+			// along in `entries`, so folding a commit into the graph is
+			// pure in-memory work.
+			for (id, parents) in &entries[processed..needed_end] {
+				walker.process(*id, parents);
+			}
+		}
+
+		Some(walker.compute_rows(
+			commit_slice,
+			global_start,
+			branch_tips,
+			stashes,
+			head_id,
+		))
 	}
 
 	///
@@ -165,6 +222,7 @@ impl AsyncLog {
 		let sender = self.sender.clone();
 		let arc_pending = Arc::clone(&self.pending);
 		let arc_background = Arc::clone(&self.background);
+		let arc_walk_entries = Arc::clone(&self.walk_entries);
 		let filter = self.filter.clone();
 		let repo_path = self.repo.clone();
 
@@ -181,6 +239,7 @@ impl AsyncLog {
 				&arc_current,
 				&arc_background,
 				&sender,
+				&arc_walk_entries,
 				filter,
 			)
 			.expect("failed to fetch");
@@ -198,6 +257,7 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
+		arc_walk_entries: &Arc<Mutex<Vec<WalkEntry>>>,
 		filter: Option<SharedCommitFilterFn>,
 	) -> Result<()> {
 		filter.map_or_else(
@@ -207,6 +267,7 @@ impl AsyncLog {
 					arc_current,
 					arc_background,
 					sender,
+					arc_walk_entries,
 				)
 			},
 			|filter| {
@@ -221,6 +282,9 @@ impl AsyncLog {
 		)
 	}
 
+	/// A filtered walk yields a disconnected subset of the history,
+	/// which the graph cannot represent, so no topology entries are
+	/// collected here.
 	fn fetch_helper_with_filter(
 		repo_path: &RepoPath,
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
@@ -228,37 +292,17 @@ impl AsyncLog {
 		sender: &Sender<AsyncGitNotification>,
 		filter: SharedCommitFilterFn,
 	) -> Result<()> {
-		let start_time = Instant::now();
-
-		let mut entries = vec![CommitId::default(); LIMIT_COUNT];
-		entries.resize(0, CommitId::default());
-
 		let r = repo(repo_path)?;
 		let mut walker =
 			LogWalker::new(&r, LIMIT_COUNT)?.filter(Some(filter));
 
-		loop {
-			entries.clear();
-			let read = walker.read(&mut entries)?;
-
-			let mut current = arc_current.lock()?;
-			current.commits.extend(entries.iter());
-			current.duration = start_time.elapsed();
-
-			if read == 0 {
-				break;
-			}
-			Self::notify(sender);
-
-			let sleep_duration =
-				if arc_background.load(Ordering::Relaxed) {
-					SLEEP_BACKGROUND
-				} else {
-					SLEEP_FOREGROUND
-				};
-
-			thread::sleep(sleep_duration);
-		}
+		Self::walk_loop(
+			|out| walker.read(out),
+			arc_current,
+			arc_background,
+			sender,
+			None,
+		)?;
 
 		log::trace!("revlog visited: {}", walker.visited());
 
@@ -270,48 +314,73 @@ impl AsyncLog {
 		arc_current: &Arc<Mutex<AsyncLogResult>>,
 		arc_background: &Arc<AtomicBool>,
 		sender: &Sender<AsyncGitNotification>,
+		arc_walk_entries: &Arc<Mutex<Vec<WalkEntry>>>,
 	) -> Result<()> {
-		let start_time = Instant::now();
-
-		let mut entries = vec![CommitId::default(); LIMIT_COUNT];
-		entries.resize(0, CommitId::default());
-
 		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walker =
 			LogWalkerWithoutFilter::new(&mut repo, LIMIT_COUNT)?;
 
-		loop {
-			entries.clear();
-			let read = walker.read(&mut entries)?;
-
-			let mut current = arc_current.lock()?;
-			current.commits.extend(entries.iter());
-			current.duration = start_time.elapsed();
-
-			if read == 0 {
-				break;
-			}
-			Self::notify(sender);
-
-			let sleep_duration =
-				if arc_background.load(Ordering::Relaxed) {
-					SLEEP_BACKGROUND
-				} else {
-					SLEEP_FOREGROUND
-				};
-
-			thread::sleep(sleep_duration);
-		}
+		Self::walk_loop(
+			|out| walker.read(out),
+			arc_current,
+			arc_background,
+			sender,
+			Some(arc_walk_entries),
+		)?;
 
 		log::trace!("revlog visited: {}", walker.visited());
 
 		Ok(())
 	}
 
+	/// Drives `read` in batches, publishing every batch's commit ids
+	/// to `arc_current` and, when given, moving the full entries,
+	/// both ids and parents; into `walk_entries` for the graph.
+	fn walk_loop(
+		mut read: impl FnMut(&mut Vec<WalkEntry>) -> Result<usize>,
+		arc_current: &Arc<Mutex<AsyncLogResult>>,
+		arc_background: &Arc<AtomicBool>,
+		sender: &Sender<AsyncGitNotification>,
+		walk_entries: Option<&Mutex<Vec<WalkEntry>>>,
+	) -> Result<()> {
+		let start_time = Instant::now();
+		let mut entries = Vec::with_capacity(LIMIT_COUNT);
+
+		while read(&mut entries)? > 0 {
+			// publish
+			let mut current = arc_current.lock()?;
+			current.commits.extend(entries.iter().map(|&(id, _)| id));
+			current.duration = start_time.elapsed();
+
+			if let Some(arc_walk_entries) = walk_entries {
+				arc_walk_entries.lock()?.append(&mut entries);
+			}
+			entries.clear();
+
+			Self::notify(sender);
+			thread::sleep(Self::pause(arc_background));
+		}
+
+		arc_current.lock()?.duration = start_time.elapsed();
+
+		Ok(())
+	}
+
+	/// The pause between batches
+	fn pause(arc_background: &Arc<AtomicBool>) -> Duration {
+		if arc_background.load(Ordering::Relaxed) {
+			SLEEP_BACKGROUND
+		} else {
+			SLEEP_FOREGROUND
+		}
+	}
+
 	fn clear(&self) -> Result<()> {
 		self.current.lock()?.commits.clear();
 		*self.current_head.lock()? = None;
 		self.partial_extract.store(false, Ordering::Relaxed);
+		self.walk_entries.lock()?.clear();
+		*self.graph_walker.lock()? = GraphWalker::new();
 		Ok(())
 	}
 
@@ -359,12 +428,14 @@ mod tests {
 			duration: Duration::default(),
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
+		let arc_walk_entries = Arc::new(Mutex::new(Vec::new()));
 
 		let result = AsyncLog::fetch_helper_without_filter(
 			&subdir_path,
 			&arc_current,
 			&arc_background,
 			&tx_git,
+			&arc_walk_entries,
 		);
 
 		assert_eq!(result.unwrap(), ());
@@ -387,6 +458,7 @@ mod tests {
 			duration: Duration::default(),
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
+		let arc_walk_entries = Arc::new(Mutex::new(Vec::new()));
 
 		std::env::set_var("GIT_DIR", git_dir);
 
@@ -396,6 +468,7 @@ mod tests {
 			&arc_current,
 			&arc_background,
 			&tx_git,
+			&arc_walk_entries,
 		);
 
 		std::env::remove_var("GIT_DIR");

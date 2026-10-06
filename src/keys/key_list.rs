@@ -129,6 +129,7 @@ pub struct KeysList {
 	pub commit: GituiKeyEvent,
 	pub newline: GituiKeyEvent,
 	pub goto_line: GituiKeyEvent,
+	pub log_toggle_graph: GituiKeyEvent,
 }
 
 #[rustfmt::skip]
@@ -227,6 +228,7 @@ impl Default for KeysList {
 			commit: GituiKeyEvent::new(KeyCode::Char('d'),  KeyModifiers::CONTROL),
 			newline: GituiKeyEvent::new(KeyCode::Enter,  KeyModifiers::empty()),
 			goto_line: GituiKeyEvent::new(KeyCode::Char('L'),  KeyModifiers::SHIFT),
+			log_toggle_graph: GituiKeyEvent::new(KeyCode::Char('g'),  KeyModifiers::empty()),
 		}
 	}
 }

@@ -2,10 +2,16 @@ use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
 use git2::{Commit, Oid, Repository};
 use gix::revision::Walk;
+use smallvec::SmallVec;
 use std::{
 	cmp::Ordering,
 	collections::{BinaryHeap, HashSet},
 };
+
+/// One walked commit plus its parents, as decoded by the walk
+/// itself, so consumers never need to touch the object database a
+/// second time.
+pub type WalkEntry = (CommitId, SmallVec<[CommitId; 4]>);
 
 struct TimeOrderedCommit<'a>(Commit<'a>);
 
@@ -69,11 +75,19 @@ impl<'a> LogWalker<'a> {
 		Self { filter, ..self }
 	}
 
-	///
-	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
+	/// Reads up to `limit` commits and their parents, newest first.
+	/// Parents come straight from the already-parsed commit, at no
+	/// extra object-database cost.
+	pub fn read(
+		&mut self,
+		out: &mut Vec<WalkEntry>,
+	) -> Result<usize> {
 		let mut count = 0_usize;
 
 		while let Some(c) = self.commits.pop() {
+			let parents: SmallVec<[CommitId; 4]> =
+				c.0.parent_ids().map(Into::into).collect();
+
 			for p in c.0.parents() {
 				self.visit(p);
 			}
@@ -87,7 +101,7 @@ impl<'a> LogWalker<'a> {
 				};
 
 			if commit_should_be_included {
-				out.push(id);
+				out.push((id, parents));
 			}
 
 			count += 1;
@@ -156,12 +170,24 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 		self.visited
 	}
 
-	///
-	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
+	/// Reads up to `limit` commits and their parents, newest first.
+	/// The parents are already decoded by the walk, so carrying them
+	/// along costs nothing extra and we save a second traversal!
+	pub fn read(
+		&mut self,
+		out: &mut Vec<WalkEntry>,
+	) -> Result<usize> {
 		let mut count = 0_usize;
 
 		while let Some(Ok(info)) = self.walk.next() {
-			out.push(info.id.into());
+			out.push((
+				info.id.into(),
+				info.parent_ids
+					.iter()
+					.copied()
+					.map(Into::into)
+					.collect(),
+			));
 
 			count += 1;
 
@@ -209,12 +235,12 @@ mod tests {
 		stage_add_file(repo_path, file_path).unwrap();
 		let oid2 = commit(repo_path, "commit2").unwrap();
 
-		let mut items = Vec::new();
+		let mut entries = Vec::new();
 		let mut walk = LogWalker::new(&repo, 1)?;
-		walk.read(&mut items).unwrap();
+		walk.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 1);
-		assert_eq!(items[0], oid2);
+		assert_eq!(entries.len(), 1);
+		assert_eq!(entries[0].0, oid2);
 
 		Ok(())
 	}
@@ -234,20 +260,22 @@ mod tests {
 		stage_add_file(repo_path, file_path).unwrap();
 		let oid2 = commit(repo_path, "commit2").unwrap();
 
-		let mut items = Vec::new();
+		let mut entries = Vec::new();
 		let mut walk = LogWalker::new(&repo, 100)?;
-		walk.read(&mut items).unwrap();
+		walk.read(&mut entries).unwrap();
 
-		let info = get_commits_info(repo_path, &items, 50).unwrap();
+		let ids: Vec<CommitId> =
+			entries.iter().map(|(id, _)| *id).collect();
+		let info = get_commits_info(repo_path, &ids, 50).unwrap();
 		dbg!(&info);
 
-		assert_eq!(items.len(), 2);
-		assert_eq!(items[0], oid2);
+		assert_eq!(entries.len(), 2);
+		assert_eq!(entries[0].0, oid2);
 
-		let mut items = Vec::new();
-		walk.read(&mut items).unwrap();
+		let mut entries = Vec::new();
+		walk.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 0);
+		assert_eq!(entries.len(), 0);
 
 		Ok(())
 	}
@@ -269,19 +297,21 @@ mod tests {
 
 		let mut repo: gix::Repository = gix_repo(repo_path)?;
 		let mut walk = LogWalkerWithoutFilter::new(&mut repo, 100)?;
-		let mut items = Vec::new();
-		assert!(matches!(walk.read(&mut items), Ok(2)));
+		let mut entries = Vec::new();
+		assert!(matches!(walk.read(&mut entries), Ok(2)));
 
-		let info = get_commits_info(repo_path, &items, 50).unwrap();
+		let ids: Vec<CommitId> =
+			entries.iter().map(|(id, _)| *id).collect();
+		let info = get_commits_info(repo_path, &ids, 50).unwrap();
 		dbg!(&info);
 
-		assert_eq!(items.len(), 2);
-		assert_eq!(items[0], oid2);
+		assert_eq!(entries.len(), 2);
+		assert_eq!(entries[0].0, oid2);
 
-		let mut items = Vec::new();
-		assert!(matches!(walk.read(&mut items), Ok(0)));
+		let mut entries = Vec::new();
+		assert!(matches!(walk.read(&mut entries), Ok(0)));
 
-		assert_eq!(items.len(), 0);
+		assert_eq!(entries.len(), 0);
 
 		Ok(())
 	}
@@ -312,27 +342,27 @@ mod tests {
 
 		let diff_contains_baz = diff_contains_file("baz".into());
 
-		let mut items = Vec::new();
+		let mut entries = Vec::new();
 		let mut walker = LogWalker::new(&repo, 100)?
 			.filter(Some(diff_contains_baz));
-		walker.read(&mut items).unwrap();
+		walker.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 1);
-		assert_eq!(items[0], second_commit_id);
+		assert_eq!(entries.len(), 1);
+		assert_eq!(entries[0].0, second_commit_id);
 
-		let mut items = Vec::new();
-		walker.read(&mut items).unwrap();
+		let mut entries = Vec::new();
+		walker.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 0);
+		assert_eq!(entries.len(), 0);
 
 		let diff_contains_bar = diff_contains_file("bar".into());
 
-		let mut items = Vec::new();
+		let mut entries = Vec::new();
 		let mut walker = LogWalker::new(&repo, 100)?
 			.filter(Some(diff_contains_bar));
-		walker.read(&mut items).unwrap();
+		walker.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 0);
+		assert_eq!(entries.len(), 0);
 
 		Ok(())
 	}
@@ -358,14 +388,14 @@ mod tests {
 			}),
 		);
 
-		let mut items = Vec::new();
+		let mut entries = Vec::new();
 		let mut walker = LogWalker::new(&repo, 100)
 			.unwrap()
 			.filter(Some(log_filter));
-		walker.read(&mut items).unwrap();
+		walker.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 1);
-		assert_eq!(items[0], second_commit_id);
+		assert_eq!(entries.len(), 1);
+		assert_eq!(entries[0].0, second_commit_id);
 
 		let log_filter = filter_commit_by_search(
 			LogFilterSearch::new(LogFilterSearchOptions {
@@ -375,12 +405,12 @@ mod tests {
 			}),
 		);
 
-		let mut items = Vec::new();
+		let mut entries = Vec::new();
 		let mut walker = LogWalker::new(&repo, 100)
 			.unwrap()
 			.filter(Some(log_filter));
-		walker.read(&mut items).unwrap();
+		walker.read(&mut entries).unwrap();
 
-		assert_eq!(items.len(), 2);
+		assert_eq!(entries.len(), 2);
 	}
 }
