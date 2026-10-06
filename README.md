@@ -109,7 +109,7 @@ GitUI is in beta and may contain bugs and missing features. However, for persona
 ##### [Arch Linux](https://archlinux.org/packages/extra/x86_64/gitui/)
 
 ```sh
-pacman -S gitui
+sudo pacman -S gitui
 ```
 
 ##### Fedora
