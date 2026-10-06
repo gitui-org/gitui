@@ -1297,6 +1297,22 @@ pub mod commands {
 		)
 	}
 
+	pub fn toggle_tree_view(
+		key_config: &SharedKeyConfig,
+		is_tree: bool,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"{} [{}]",
+				if is_tree { "List View" } else { "Tree View" },
+				key_config
+					.get_hint(key_config.keys.status_toggle_tree),
+			),
+			"toggle between tree and flat list view",
+			CMD_GROUP_CHANGES,
+		)
+	}
+
 	pub fn diff_focus_left(
 		key_config: &SharedKeyConfig,
 	) -> CommandText {
