@@ -97,7 +97,7 @@ use crossterm::{
 	ExecutableCommand,
 };
 use gitui::Gitui;
-use input::InputEvent;
+use input::{Input, InputEvent};
 use keys::KeyConfig;
 use ratatui::backend::CrosstermBackend;
 use scopeguard::defer;
@@ -184,6 +184,12 @@ fn main() -> Result<()> {
 	let mut terminal =
 		start_terminal(io::stdout(), &cliargs.repo_path)?;
 
+	// the input reader is created once and shared across app restarts
+	// (e.g. switching to a submodule or worktree). recreating it per
+	// app would let the outgoing reader consume and drop the first
+	// keystroke after a switch; a shared reader buffers it instead.
+	let input = Input::new();
+
 	let updater = if cliargs.notify_watcher {
 		Updater::NotifyWatcher
 	} else {
@@ -199,6 +205,7 @@ fn main() -> Result<()> {
 			theme.clone(),
 			&key_config,
 			updater,
+			&input,
 			&mut terminal,
 		)?;
 
@@ -226,9 +233,11 @@ fn run_app(
 	theme: Theme,
 	key_config: &KeyConfig,
 	updater: Updater,
+	input: &Input,
 	terminal: &mut Terminal,
 ) -> Result<QuitState, anyhow::Error> {
-	let mut gitui = Gitui::new(cliargs, theme, key_config, updater)?;
+	let mut gitui =
+		Gitui::new(cliargs, theme, key_config, updater, input)?;
 
 	log::trace!("app start: {} ms", app_start.elapsed().as_millis());
 

@@ -37,11 +37,10 @@ impl Gitui {
 		theme: Theme,
 		key_config: &KeyConfig,
 		updater: Updater,
+		input: &Input,
 	) -> Result<Self, anyhow::Error> {
 		let (tx_git, rx_git) = unbounded();
 		let (tx_app, rx_app) = unbounded();
-
-		let input = Input::new();
 
 		let (rx_ticker, rx_watcher) = match updater {
 			Updater::NotifyWatcher => {
@@ -212,7 +211,7 @@ mod tests {
 	use ratatui::{backend::TestBackend, Terminal};
 
 	use crate::{
-		args::CliArgs, gitui::Gitui, keys::KeyConfig,
+		args::CliArgs, gitui::Gitui, input::Input, keys::KeyConfig,
 		ui::style::Theme, AsyncNotification, Updater,
 	};
 
@@ -248,10 +247,16 @@ mod tests {
 
 		let theme = Theme::init(&PathBuf::new());
 		let key_config = KeyConfig::default();
+		let input = Input::new();
 
-		let mut gitui =
-			Gitui::new(cliargs, theme, &key_config, Updater::Ticker)
-				.unwrap();
+		let mut gitui = Gitui::new(
+			cliargs,
+			theme,
+			&key_config,
+			Updater::Ticker,
+			&input,
+		)
+		.unwrap();
 
 		let mut terminal =
 			Terminal::new(TestBackend::new(90, 12)).unwrap();
