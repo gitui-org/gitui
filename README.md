@@ -23,6 +23,8 @@
 
 ![](demo.gif)
 
+[![Live demo by Demoshell](https://build.demoshell.com/v1/embed/badge.svg)](https://build.demoshell.com/launch?snapshot=demoshell%2Ftui%3Agitui)
+
 ## <a name="table-of-contents"></a> Table of Contents
 
 1. [Features](#features)
