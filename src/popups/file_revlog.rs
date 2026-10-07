@@ -501,6 +501,12 @@ impl Component for FileRevlogPopup {
 			}
 
 			if let Event::Key(key) = event {
+				// let the command bar more/less toggle ([.])
+				// bubble up to the app-level handler
+				if key_match(key, self.key_config.keys.cmd_bar_toggle)
+				{
+					return Ok(EventState::NotConsumed);
+				}
 				if key_match(key, self.key_config.keys.exit_popup) {
 					if self.diff.focused() {
 						self.diff.focus(false);

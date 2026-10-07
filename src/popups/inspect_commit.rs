@@ -154,6 +154,11 @@ impl Component for InspectCommitPopup {
 			}
 
 			if let Event::Key(e) = ev {
+				// let the command bar more/less toggle ([.])
+				// bubble up to the app-level handler
+				if key_match(e, self.key_config.keys.cmd_bar_toggle) {
+					return Ok(EventState::NotConsumed);
+				}
 				if key_match(e, self.key_config.keys.exit_popup) {
 					if self.diff.focused() {
 						self.details.focus(true);
