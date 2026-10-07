@@ -26,6 +26,9 @@ pub struct Head {
 
 ///
 pub fn repo_open_error(repo_path: &RepoPath) -> Option<String> {
+	#[cfg(target_env = "ohos")]
+	super::repository::init_ohos_owner_validation();
+
 	if let Err(e) = Repository::open_ext(
 		repo_path.gitpath(),
 		RepositoryOpenFlags::FROM_ENV,

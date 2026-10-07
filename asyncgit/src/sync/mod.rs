@@ -85,7 +85,9 @@ pub use remotes::{
 	get_remote_url, get_remotes, push::AsyncProgress, rename_remote,
 	tags::PushTagsProgress, update_remote_url, validate_remote_name,
 };
-pub(crate) use repository::{gix_repo, repo};
+#[cfg(not(target_env = "ohos"))]
+pub(crate) use repository::gix_repo;
+pub(crate) use repository::repo;
 pub use repository::{RepoPath, RepoPathRef};
 pub use reset::{reset_repo, reset_stage, reset_workdir};
 pub use reword::reword;
