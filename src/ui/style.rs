@@ -9,6 +9,38 @@ use struct_patch::Patch;
 
 pub type SharedTheme = Rc<Theme>;
 
+/// Deserializer for the `cmdbar_bg` patch field.
+///
+/// The field became `Option<Color>` so a theme can disable the command
+/// bar background (`cmdbar_bg: Some(None)`) and let the terminal show
+/// through. `struct_patch` wraps it again, giving the patch field type
+/// `Option<Option<Color>>`, so we accept both the new nested form and
+/// the legacy `Some("Color")` themes wrote before the field was
+/// optional.
+// `Option<Option<Color>>` is the type `struct_patch` generates for a
+// patched `Option<Color>` field, so it has to be matched here.
+#[allow(clippy::option_option)]
+fn deserialize_cmdbar_bg<'de, D>(
+	deserializer: D,
+) -> Result<Option<Option<Color>>, D::Error>
+where
+	D: serde::Deserializer<'de>,
+{
+	#[derive(Deserialize)]
+	#[serde(untagged)]
+	enum CmdbarBg {
+		Nested(Option<Color>),
+		Flat(Color),
+	}
+
+	Ok(Option::<CmdbarBg>::deserialize(deserializer)?.map(
+		|v| match v {
+			CmdbarBg::Nested(inner) => inner,
+			CmdbarBg::Flat(color) => Some(color),
+		},
+	))
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Patch)]
 #[patch(attribute(derive(Serialize, Deserialize)))]
 pub struct Theme {
@@ -17,7 +49,11 @@ pub struct Theme {
 	selection_bg: Color,
 	selection_fg: Color,
 	use_selection_fg: bool,
-	cmdbar_bg: Color,
+	#[patch(attribute(serde(
+		default,
+		deserialize_with = "deserialize_cmdbar_bg"
+	)))]
+	cmdbar_bg: Option<Color>,
 	disabled_fg: Color,
 	diff_line_add: Color,
 	diff_line_delete: Color,
@@ -211,12 +247,15 @@ impl Theme {
 	}
 
 	pub fn commandbar(&self, enabled: bool) -> Style {
-		if enabled {
+		let style = if enabled {
 			Style::default().fg(self.command_fg)
 		} else {
 			Style::default().fg(self.disabled_fg)
-		}
-		.bg(self.cmdbar_bg)
+		};
+
+		// `cmdbar_bg: None` leaves the background unset so the
+		// terminal shows through (useful with opacity/blur).
+		self.cmdbar_bg.map_or(style, |bg| style.bg(bg))
 	}
 
 	pub fn commit_hash(&self, selected: bool) -> Style {
@@ -335,7 +374,7 @@ impl Default for Theme {
 			selection_bg: Color::Blue,
 			selection_fg: Color::White,
 			use_selection_fg: true,
-			cmdbar_bg: Color::Blue,
+			cmdbar_bg: Some(Color::Blue),
 			disabled_fg: Color::DarkGray,
 			diff_line_add: Color::Green,
 			diff_line_delete: Color::Red,
@@ -397,5 +436,73 @@ mod tests {
 		assert_eq!(theme.selection_bg, Color::Black);
 		assert_eq!(theme.selection_fg, Color::Rgb(255, 255, 255));
 		assert_eq!(theme.syntax, "InspiredGitHub");
+	}
+
+	fn theme_from_ron(contents: &str) -> Theme {
+		let mut file = NamedTempFile::new().unwrap();
+		write!(file, "{contents}").unwrap();
+		Theme::init(&file.path().to_path_buf())
+	}
+
+	#[test]
+	fn test_cmdbar_bg_default_is_filled() {
+		assert_eq!(Theme::default().cmdbar_bg, Some(Color::Blue));
+		assert_eq!(
+			Theme::default().commandbar(true).bg,
+			Some(Color::Blue)
+		);
+	}
+
+	#[test]
+	fn test_cmdbar_bg_omitted_keeps_default() {
+		let theme =
+			theme_from_ron(r#"( selection_bg: Some("Black") )"#);
+
+		assert_eq!(theme.cmdbar_bg, Some(Color::Blue));
+	}
+
+	#[test]
+	fn test_cmdbar_bg_transparent() {
+		let theme = theme_from_ron("( cmdbar_bg: Some(None) )");
+
+		assert_eq!(theme.cmdbar_bg, None);
+		assert_eq!(theme.commandbar(true).bg, None);
+	}
+
+	#[test]
+	fn test_cmdbar_bg_legacy_some_color() {
+		// themes written before the field was optional
+		let theme = theme_from_ron(r#"( cmdbar_bg: Some("Red") )"#);
+
+		assert_eq!(theme.cmdbar_bg, Some(Color::Red));
+		assert_eq!(theme.commandbar(true).bg, Some(Color::Red));
+	}
+
+	#[test]
+	fn test_cmdbar_bg_nested_some_color() {
+		let theme =
+			theme_from_ron(r#"( cmdbar_bg: Some(Some("Red")) )"#);
+
+		assert_eq!(theme.cmdbar_bg, Some(Color::Red));
+	}
+
+	#[test]
+	fn test_cmdbar_bg_roundtrips_through_patch() {
+		for value in [None, Some(Color::Red)] {
+			let mut theme = Theme::default();
+			theme.cmdbar_bg = value;
+
+			let patch =
+				theme.clone().into_patch_by_diff(Theme::default());
+			let ron =
+				to_string_pretty(&patch, PrettyConfig::default())
+					.unwrap();
+
+			let mut file = NamedTempFile::new().unwrap();
+			write!(file, "{ron}").unwrap();
+			let restored = Theme::init(&file.path().to_path_buf());
+
+			assert_eq!(restored.cmdbar_bg, value);
+		}
 	}
 }
