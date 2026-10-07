@@ -11,6 +11,14 @@ license = "MIT"
 categories = ["asynchronous", "concurrency"]
 keywords = ["git"]
 
+[[bench]]
+harness = false
+name = "logwalker_without_filter"
+
+[[bench]]
+harness = false
+name = "logwalker_with_commit_message_filter"
+
 [dependencies]
 bitflags = "2"
 crossbeam-channel = "0.5"
@@ -35,6 +43,7 @@ unicode-truncate = "2.0"
 url = "2.5"
 
 [dev-dependencies]
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 env_logger = "0.11"
 invalidstring = { path = "../invalidstring", version = "0.1" }
 pretty_assertions = "1.4"
