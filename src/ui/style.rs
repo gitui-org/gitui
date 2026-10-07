@@ -177,6 +177,33 @@ impl Theme {
 		}
 	}
 
+	pub fn diff_line_highlight_bg(&self, selected: bool) -> Style {
+		if selected {
+			Style::default().bg(self.selection_bg)
+		} else {
+			Style::default()
+		}
+	}
+
+	pub fn diff_line_tint(
+		&self,
+		typ: DiffLineType,
+		selected: bool,
+	) -> Style {
+		if selected {
+			return Style::default().bg(self.selection_bg);
+		}
+		match typ {
+			DiffLineType::Add => {
+				Style::default().bg(Color::Rgb(25, 48, 30))
+			}
+			DiffLineType::Delete => {
+				Style::default().bg(Color::Rgb(60, 28, 28))
+			}
+			_ => Style::default(),
+		}
+	}
+
 	pub fn diff_line(
 		&self,
 		typ: DiffLineType,

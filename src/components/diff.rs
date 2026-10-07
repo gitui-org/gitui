@@ -1,7 +1,9 @@
 use super::{
+	diff_highlight::{AsyncDiffHighlightJob, LineHighlight},
 	utils::scroll_horizontal::HorizontalScroll,
-	utils::scroll_vertical::VerticalScroll, CommandBlocking,
-	Direction, DrawableComponent, HorizontalScrollType, ScrollType,
+	utils::scroll_vertical::VerticalScroll,
+	CommandBlocking, Direction, DrawableComponent,
+	HorizontalScrollType, ScrollType,
 };
 use crate::{
 	app::Environment,
@@ -16,6 +18,7 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::{
+	asyncjob::AsyncSingleJob,
 	hash,
 	sync::{self, diff::DiffLinePosition, RepoPathRef},
 	DiffLine, DiffLineType, FileDiff,
@@ -24,12 +27,30 @@ use bytesize::ByteSize;
 use crossterm::event::Event;
 use ratatui::{
 	layout::Rect,
+	style::Style,
 	symbols,
 	text::{Line, Span},
 	widgets::{Block, Borders, Paragraph},
 	Frame,
 };
-use std::{borrow::Cow, cell::Cell, cmp, path::Path};
+use std::{
+	borrow::Cow,
+	cell::{Cell, RefCell},
+	cmp,
+	ops::Range,
+	path::Path,
+};
+use unicode_width::UnicodeWidthStr;
+
+/// Bundles the two hunk-position flags `get_line_to_add` needs to
+/// pick the left gutter glyph/style — kept together to stay under
+/// clippy's `too_many_arguments` limit now that the method also
+/// takes `&self`.
+#[derive(Clone, Copy)]
+struct HunkLineFlags {
+	selected_hunk: bool,
+	end_of_hunk: bool,
+}
 
 #[derive(Default)]
 struct Current {
@@ -119,6 +140,8 @@ pub struct DiffComponent {
 	key_config: SharedKeyConfig,
 	is_immutable: bool,
 	options: SharedOptions,
+	syntax_highlight: RefCell<Vec<Option<LineHighlight>>>,
+	highlight_job: AsyncSingleJob<AsyncDiffHighlightJob>,
 }
 
 impl DiffComponent {
@@ -141,6 +164,10 @@ impl DiffComponent {
 			is_immutable,
 			repo: env.repo.clone(),
 			options: env.options.clone(),
+			syntax_highlight: RefCell::new(Vec::new()),
+			highlight_job: AsyncSingleJob::new(
+				env.sender_app.clone(),
+			),
 		}
 	}
 	///
@@ -165,6 +192,8 @@ impl DiffComponent {
 		self.selection = Selection::Single(0);
 		self.selected_hunk = None;
 		self.pending = pending;
+		self.syntax_highlight.borrow_mut().clear();
+		self.highlight_job.cancel();
 	}
 	///
 	pub fn update(
@@ -217,6 +246,59 @@ impl DiffComponent {
 					Selection::Multiple(start, _) => start,
 				};
 				self.update_selection(old_selection);
+			}
+
+			self.spawn_highlight();
+		}
+	}
+
+	const MAX_HIGHLIGHT_LINES: usize = 10_000;
+
+	/// Spawns the syntect highlight for the current diff on the
+	/// shared threadpool (see [`AsyncDiffHighlightJob`]). The result
+	/// is picked up later by [`Self::poll_highlight`] during `draw`.
+	fn spawn_highlight(&self) {
+		self.syntax_highlight.borrow_mut().clear();
+
+		if !self.options.borrow().diff_highlight_style().is_on() {
+			self.highlight_job.cancel();
+			return;
+		}
+
+		let Some(diff) = self.diff.as_ref() else {
+			return;
+		};
+
+		if diff.hunks.is_empty()
+			|| diff.lines > Self::MAX_HIGHLIGHT_LINES
+		{
+			return;
+		}
+
+		let lines: Vec<(String, DiffLineType)> = diff
+			.hunks
+			.iter()
+			.flat_map(|h| h.lines.iter())
+			.map(|l| (l.content.as_ref().to_string(), l.line_type))
+			.collect();
+
+		let path = self.current.path.clone();
+		let theme = self.theme.get_syntax();
+		let hash = self.current.hash;
+
+		self.highlight_job.spawn(AsyncDiffHighlightJob::new(
+			hash, lines, path, theme,
+		));
+	}
+
+	/// Applies a finished highlight job's result if it matches the
+	/// currently displayed diff (stale results are discarded).
+	fn poll_highlight(&self) {
+		if let Some(job) = self.highlight_job.take_last() {
+			if let Some((hash, result)) = job.result() {
+				if hash == self.current.hash {
+					*self.syntax_highlight.borrow_mut() = result;
+				}
 			}
 		}
 	}
@@ -335,6 +417,8 @@ impl DiffComponent {
 			} else {
 				let mut res: Vec<Line> = Vec::new();
 
+				let highlights = self.syntax_highlight.borrow();
+
 				let min = self.vertical_scroll.get_top();
 				let max = min + height as usize;
 
@@ -361,19 +445,32 @@ impl DiffComponent {
 							if line_cursor >= min
 								&& line_cursor <= max
 							{
-								res.push(Self::get_line_to_add(
-									width,
-									line,
-									self.focused()
-										&& self
-											.selection
-											.contains(line_cursor),
-									hunk_selected,
-									i == hunk_len - 1,
-									&self.theme,
-									self.horizontal_scroll
-										.get_right(),
-								));
+								let highlight = highlights
+									.get(line_cursor)
+									.and_then(Option::as_ref)
+									.map(Vec::as_slice);
+
+								res.push(
+									self.get_line_to_add(
+										width,
+										line,
+										self.focused()
+											&& self
+												.selection
+												.contains(
+													line_cursor,
+												),
+										HunkLineFlags {
+											selected_hunk:
+												hunk_selected,
+											end_of_hunk: i
+												== hunk_len - 1,
+										},
+										self.horizontal_scroll
+											.get_right(),
+										highlight,
+									),
+								);
 								lines_added += 1;
 							}
 
@@ -423,21 +520,30 @@ impl DiffComponent {
 		])]
 	}
 
-	fn get_line_to_add<'a>(
+	fn get_line_to_add(
+		&self,
 		width: u16,
-		line: &'a DiffLine,
+		line: &DiffLine,
 		selected: bool,
-		selected_hunk: bool,
-		end_of_hunk: bool,
-		theme: &SharedTheme,
+		hunk_flags: HunkLineFlags,
 		scrolled_right: usize,
-	) -> Line<'a> {
-		let style = theme.diff_hunk_marker(selected_hunk);
+		highlight: Option<&[(Range<usize>, Style)]>,
+	) -> Line<'_> {
+		let theme = &self.theme;
+		let hl_style = self.options.borrow().diff_highlight_style();
+
+		let style = if hunk_flags.selected_hunk {
+			theme.diff_hunk_marker(true)
+		} else if hl_style.color_gutter() {
+			theme.diff_line(line.line_type, false)
+		} else {
+			theme.diff_hunk_marker(false)
+		};
 
 		let is_content_line =
 			matches!(line.line_type, DiffLineType::None);
 
-		let left_side_of_line = if end_of_hunk {
+		let left_side_of_line = if hunk_flags.end_of_hunk {
 			Span::styled(Cow::from(symbols::line::BOTTOM_LEFT), style)
 		} else {
 			match line.line_type {
@@ -458,6 +564,24 @@ impl DiffComponent {
 			} else {
 				tabs_to_spaces(line.content.as_ref().to_string())
 			};
+
+		if let Some(segments) = highlight {
+			if !segments.is_empty()
+				&& !matches!(line.line_type, DiffLineType::Header)
+			{
+				let mut spans = vec![left_side_of_line.clone()];
+				spans.extend(self.highlighted_content_spans(
+					width,
+					line.line_type,
+					selected,
+					scrolled_right,
+					segments,
+					&content,
+				));
+				return Line::from(spans);
+			}
+		}
+
 		let content = trim_offset(&content, scrolled_right);
 
 		let filled = if selected {
@@ -475,6 +599,86 @@ impl DiffComponent {
 				theme.diff_line(line.line_type, selected),
 			),
 		])
+	}
+
+	/// Builds the syntect-highlighted content spans (sign glyph,
+	/// per-token foreground spans, optional row tint/pad) for one
+	/// diff line, honouring the active [`DiffHighlightStyle`]. The
+	/// caller prepends the left gutter span.
+	fn highlighted_content_spans(
+		&self,
+		width: u16,
+		line_type: DiffLineType,
+		selected: bool,
+		scrolled_right: usize,
+		segments: &[(Range<usize>, Style)],
+		content: &str,
+	) -> Vec<Span<'static>> {
+		let theme = &self.theme;
+		let hl_style = self.options.borrow().diff_highlight_style();
+		let mut spans: Vec<Span<'static>> = Vec::new();
+
+		if hl_style.shows_sign() {
+			let (sign, sign_style) = match line_type {
+				DiffLineType::Add => {
+					("+", theme.diff_line(DiffLineType::Add, false))
+				}
+				DiffLineType::Delete => (
+					"-",
+					theme.diff_line(DiffLineType::Delete, false),
+				),
+				_ => (" ", theme.diff_hunk_marker(false)),
+			};
+			spans.push(Span::styled(sign, sign_style));
+		}
+
+		let visible = trim_offset(content, scrolled_right);
+		let start = content.len() - visible.len();
+		let bg = if hl_style.shows_tint() {
+			theme.diff_line_tint(line_type, selected)
+		} else {
+			theme.diff_line_highlight_bg(selected)
+		};
+		let mut last = start;
+		for (range, seg_style) in segments {
+			let seg_start = range.start.max(start);
+			let seg_end = range.end.min(content.len());
+			if seg_end <= seg_start {
+				continue;
+			}
+			if seg_start > last {
+				if let Some(t) = content.get(last..seg_start) {
+					spans.push(Span::styled(t.to_string(), bg));
+				}
+			}
+			if let Some(t) = content.get(seg_start..seg_end) {
+				spans.push(Span::styled(
+					t.to_string(),
+					seg_style.patch(bg),
+				));
+			}
+			last = seg_end;
+		}
+		if last < content.len() {
+			if let Some(t) = content.get(last..) {
+				spans.push(Span::styled(t.to_string(), bg));
+			}
+		}
+
+		let tint_row = hl_style.shows_tint()
+			&& matches!(
+				line_type,
+				DiffLineType::Add | DiffLineType::Delete
+			);
+		if selected || tint_row {
+			let used = UnicodeWidthStr::width(visible);
+			let pad = (width as usize).saturating_sub(used);
+			spans.push(Span::styled(format!("{:pad$}\n", ""), bg));
+		} else {
+			spans.push(Span::raw("\n"));
+		}
+
+		spans
 	}
 
 	const fn hunk_visible(
@@ -684,6 +888,8 @@ impl DiffComponent {
 
 impl DrawableComponent for DiffComponent {
 	fn draw(&self, f: &mut Frame, r: Rect) -> Result<()> {
+		self.poll_highlight();
+
 		self.current_size.set((
 			r.width.saturating_sub(2),
 			r.height.saturating_sub(2),
@@ -824,6 +1030,12 @@ impl Component for DiffComponent {
 			self.focused(),
 		));
 
+		out.push(CommandInfo::new(
+			strings::commands::diff_toggle_syntax(&self.key_config),
+			true,
+			self.focused(),
+		));
+
 		CommandBlocking::PassingOn
 	}
 
@@ -943,6 +1155,24 @@ impl Component for DiffComponent {
 				} else if key_match(e, self.key_config.keys.copy) {
 					self.copy_selection();
 					Ok(EventState::Consumed)
+				} else if key_match(
+					e,
+					self.key_config.keys.diff_toggle_syntax,
+				) {
+					self.options.borrow_mut().diff_cycle_highlight();
+					let style =
+						self.options.borrow().diff_highlight_style();
+					if !style.is_on() {
+						self.syntax_highlight.borrow_mut().clear();
+						self.highlight_job.cancel();
+					} else if self
+						.syntax_highlight
+						.borrow()
+						.is_empty()
+					{
+						self.spawn_highlight();
+					}
+					Ok(EventState::Consumed)
 				} else {
 					Ok(EventState::NotConsumed)
 				};
@@ -981,16 +1211,21 @@ mod tests {
 
 		{
 			let default_theme = Rc::new(Theme::default());
+			let mut env = Environment::test_env();
+			env.theme = default_theme.clone();
+			let diff = DiffComponent::new(&env, false);
 
 			assert_eq!(
-				DiffComponent::get_line_to_add(
+				diff.get_line_to_add(
 					4,
 					&diff_line,
 					false,
-					false,
-					false,
-					&default_theme,
-					0
+					HunkLineFlags {
+						selected_hunk: false,
+						end_of_hunk: false,
+					},
+					0,
+					None,
 				)
 				.spans
 				.last()
@@ -1018,10 +1253,21 @@ mod tests {
 
 			let theme =
 				Rc::new(Theme::init(&file.path().to_path_buf()));
+			let mut env = Environment::test_env();
+			env.theme = theme.clone();
+			let diff = DiffComponent::new(&env, false);
 
 			assert_eq!(
-				DiffComponent::get_line_to_add(
-					4, &diff_line, false, false, false, &theme, 0
+				diff.get_line_to_add(
+					4,
+					&diff_line,
+					false,
+					HunkLineFlags {
+						selected_hunk: false,
+						end_of_hunk: false,
+					},
+					0,
+					None,
 				)
 				.spans
 				.last()
