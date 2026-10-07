@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* new `--only-this-dir` (`-x`) flag to restrict the status, log and files tabs to the directory gitui is started in, while still opening the repository it belongs to
 * support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
 
 ### Changed

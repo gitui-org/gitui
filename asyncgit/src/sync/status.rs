@@ -168,10 +168,14 @@ impl From<ShowUntrackedFilesConfig> for gix::status::UntrackedFiles {
 }
 
 /// guarantees sorting
+///
+/// `pathspec` limits the result to a path relative to the root of the
+/// repository, `None` covers the whole repository
 pub fn get_status(
 	repo_path: &RepoPath,
 	status_type: StatusType,
 	show_untracked: Option<ShowUntrackedFilesConfig>,
+	pathspec: Option<&str>,
 ) -> Result<Vec<StatusItem>> {
 	scope_time!("get_status");
 
@@ -195,11 +199,18 @@ pub fn get_status(
 		.status(gix::progress::Discard)?
 		.untracked_files(show_untracked.into());
 
+	// `gix` resolves patterns relative to the current directory,
+	// `:(top)` makes them relative to the root of the repository,
+	// which is what `pathspec` is
+	let patterns: Vec<gix::bstr::BString> = pathspec
+		.map(|pathspec| vec![format!(":(top){pathspec}").into()])
+		.unwrap_or_default();
+
 	let mut res = Vec::new();
 
 	match status_type {
 		StatusType::WorkingDir => {
-			let iter = status.into_index_worktree_iter(Vec::new())?;
+			let iter = status.into_index_worktree_iter(patterns)?;
 
 			for item in iter {
 				let Ok(item) = item else {
@@ -227,7 +238,7 @@ pub fn get_status(
 
 			let mut pathspec = repo.pathspec(
 				false, /* empty patterns match prefix */
-				None::<&str>,
+				patterns.iter(),
 				true, /* inherit ignore case */
 				&gix::index::State::new(repo.object_hash()),
 				gix::worktree::stack::state::attributes::Source::WorktreeThenIdMapping
@@ -255,7 +266,7 @@ pub fn get_status(
 			)?;
 		}
 		StatusType::Both => {
-			let iter = status.into_iter(Vec::new())?;
+			let iter = status.into_iter(patterns)?;
 
 			for item in iter {
 				let item = item?;
@@ -300,15 +311,102 @@ mod tests {
 	use super::*;
 	use crate::{
 		sync::{
-			commit, stage_add_file,
+			commit, stage_add_all, stage_add_file,
 			status::{get_status, StatusType},
 			tests::{repo_init, repo_init_bare},
 			RepoPath,
 		},
 		StatusItem, StatusItemType,
 	};
-	use std::{fs::File, io::Write, path::Path};
+	use std::{
+		fs::{self, File},
+		io::Write,
+		path::Path,
+	};
 	use tempfile::TempDir;
+
+	fn paths(items: &[StatusItem]) -> Vec<&str> {
+		items.iter().map(|i| i.path.as_str()).collect()
+	}
+
+	#[test]
+	fn test_status_pathspec() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		fs::create_dir(root.join("sub")).unwrap();
+		File::create(root.join("sub/a.txt"))
+			.unwrap()
+			.write_all(b"a")
+			.unwrap();
+		File::create(root.join("b.txt"))
+			.unwrap()
+			.write_all(b"b")
+			.unwrap();
+
+		let all = get_status(
+			repo_path,
+			StatusType::WorkingDir,
+			Some(ShowUntrackedFilesConfig::All),
+			None,
+		)
+		.unwrap();
+		assert_eq!(paths(&all), vec!["b.txt", "sub/a.txt"]);
+
+		let scoped = get_status(
+			repo_path,
+			StatusType::WorkingDir,
+			Some(ShowUntrackedFilesConfig::All),
+			Some("sub"),
+		)
+		.unwrap();
+		assert_eq!(paths(&scoped), vec!["sub/a.txt"]);
+
+		stage_add_all(repo_path, "*", None).unwrap();
+
+		let scoped = get_status(
+			repo_path,
+			StatusType::Stage,
+			Some(ShowUntrackedFilesConfig::All),
+			Some("sub"),
+		)
+		.unwrap();
+		assert_eq!(paths(&scoped), vec!["sub/a.txt"]);
+
+		let scoped = get_status(
+			repo_path,
+			StatusType::Both,
+			Some(ShowUntrackedFilesConfig::All),
+			Some("sub"),
+		)
+		.unwrap();
+		assert_eq!(paths(&scoped), vec!["sub/a.txt"]);
+	}
+
+	/// a pathspec that matches nothing is not the same as no pathspec
+	#[test]
+	fn test_status_pathspec_without_match() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		File::create(root.join("b.txt"))
+			.unwrap()
+			.write_all(b"b")
+			.unwrap();
+
+		let scoped = get_status(
+			repo_path,
+			StatusType::WorkingDir,
+			Some(ShowUntrackedFilesConfig::All),
+			Some("sub"),
+		)
+		.unwrap();
+		assert!(scoped.is_empty());
+	}
 
 	#[test]
 	fn test_discard_status() {
@@ -327,14 +425,14 @@ mod tests {
 		writeln!(file, "Test for discard_status").unwrap();
 
 		let statuses =
-			get_status(repo_path, StatusType::WorkingDir, None)
+			get_status(repo_path, StatusType::WorkingDir, None, None)
 				.unwrap();
 		assert_eq!(statuses.len(), 1);
 
 		discard_status(repo_path).unwrap();
 
 		let statuses =
-			get_status(repo_path, StatusType::WorkingDir, None)
+			get_status(repo_path, StatusType::WorkingDir, None, None)
 				.unwrap();
 		assert_eq!(statuses.len(), 0);
 	}
@@ -356,9 +454,13 @@ mod tests {
 			workdir: separate_workdir.path().into(),
 		};
 
-		let status =
-			get_status(&repo_path, StatusType::WorkingDir, None)
-				.unwrap();
+		let status = get_status(
+			&repo_path,
+			StatusType::WorkingDir,
+			None,
+			None,
+		)
+		.unwrap();
 
 		assert_eq!(
 			status,

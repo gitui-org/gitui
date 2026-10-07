@@ -9,6 +9,7 @@ use crate::{
 	keys::{key_match, SharedKeyConfig},
 	options::SharedOptions,
 	queue::{Action, InternalEvent, NeedsUpdate, Queue, ResetItem},
+	scope::PathScope,
 	strings, try_or_popup,
 };
 use anyhow::Result;
@@ -23,6 +24,7 @@ use std::path::Path;
 ///
 pub struct ChangesComponent {
 	repo: RepoPathRef,
+	scope: PathScope,
 	files: StatusTreeComponent,
 	is_working_dir: bool,
 	queue: Queue,
@@ -45,6 +47,7 @@ impl ChangesComponent {
 			key_config: env.key_config.clone(),
 			options: env.options.clone(),
 			repo: env.repo.clone(),
+			scope: env.scope.clone(),
 		}
 	}
 
@@ -131,7 +134,11 @@ impl ChangesComponent {
 	fn index_add_all(&self) -> Result<()> {
 		let config = self.options.borrow().status_show_untracked();
 
-		sync::stage_add_all(&self.repo.borrow(), "*", config)?;
+		sync::stage_add_all(
+			&self.repo.borrow(),
+			self.scope.pathspec(),
+			config,
+		)?;
 
 		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
 
@@ -139,7 +146,10 @@ impl ChangesComponent {
 	}
 
 	fn stage_remove_all(&self) -> Result<()> {
-		sync::reset_stage(&self.repo.borrow(), "*")?;
+		sync::reset_stage(
+			&self.repo.borrow(),
+			self.scope.pathspec(),
+		)?;
 
 		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
 

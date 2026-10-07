@@ -26,6 +26,7 @@ use crate::{
 		Action, AppTabs, InternalEvent, NeedsUpdate, Queue,
 		StackablePopupOpen,
 	},
+	scope::PathScope,
 	setup_popups,
 	strings::{self, ellipsis_trim_start, order},
 	tabs::{FilesTab, Revlog, StashList, Stashing, Status},
@@ -126,6 +127,8 @@ pub struct Environment {
 	pub theme: SharedTheme,
 	pub key_config: SharedKeyConfig,
 	pub repo: RepoPathRef,
+	/// the directory of the repository the ui is restricted to
+	pub scope: PathScope,
 	pub options: SharedOptions,
 	pub sender_git: Sender<AsyncGitNotification>,
 	pub sender_app: Sender<AsyncAppNotification>,
@@ -141,6 +144,7 @@ impl Environment {
 			theme: Default::default(),
 			key_config: Default::default(),
 			repo: RefCell::new(RepoPath::Path(Default::default())),
+			scope: PathScope::everything(),
 			options: Rc::new(RefCell::new(Options::test_env())),
 			sender_git: unbounded().0,
 			sender_app: unbounded().0,
@@ -154,6 +158,7 @@ impl App {
 	#[allow(clippy::too_many_lines)]
 	pub fn new(
 		cliargs: CliArgs,
+		scope: PathScope,
 		sender_git: Sender<AsyncGitNotification>,
 		sender_app: Sender<AsyncAppNotification>,
 		input: Input,
@@ -163,8 +168,15 @@ impl App {
 		let repo = RefCell::new(cliargs.repo_path.clone());
 		log::trace!("open repo at: {repo:?}");
 
-		let repo_path_text =
-			repo_work_dir(&repo.borrow()).unwrap_or_default();
+		let repo_path_text = scope.path().map_or_else(
+			|| repo_work_dir(&repo.borrow()).unwrap_or_default(),
+			|scope| {
+				format!(
+					"{} [{scope}]",
+					repo_work_dir(&repo.borrow()).unwrap_or_default()
+				)
+			},
+		);
 
 		let env = Environment {
 			queue: Queue::new(),
@@ -172,6 +184,7 @@ impl App {
 			key_config: Rc::new(key_config),
 			options: Options::new(repo.clone()),
 			repo,
+			scope,
 			sender_git,
 			sender_app,
 		};

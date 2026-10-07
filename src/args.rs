@@ -19,6 +19,7 @@ const THEME_FLAG_ID: &str = "theme";
 const WORKDIR_FLAG_ID: &str = "workdir";
 const FILE_FLAG_ID: &str = "file";
 const GIT_DIR_FLAG_ID: &str = "directory";
+const ONLY_THIS_DIR_FLAG_ID: &str = "only-this-dir";
 const WATCHER_FLAG_ID: &str = "watcher";
 const KEY_BINDINGS_FLAG_ID: &str = "key_bindings";
 const KEY_SYMBOLS_FLAG_ID: &str = "key_symbols";
@@ -30,6 +31,7 @@ pub struct CliArgs {
 	pub theme: PathBuf,
 	pub select_file: Option<PathBuf>,
 	pub repo_path: RepoPath,
+	pub only_this_dir: bool,
 	pub notify_watcher: bool,
 	pub key_bindings_path: Option<PathBuf>,
 	pub key_symbols_path: Option<PathBuf>,
@@ -68,6 +70,8 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		RepoPath::Path(gitdir)
 	};
 
+	let only_this_dir = arg_matches.get_flag(ONLY_THIS_DIR_FLAG_ID);
+
 	let arg_theme = arg_matches
 		.get_one::<String>(THEME_FLAG_ID)
 		.map_or_else(|| PathBuf::from(DEFAULT_THEME), PathBuf::from);
@@ -96,6 +100,7 @@ pub fn process_cmdline() -> Result<CliArgs> {
 		theme,
 		select_file,
 		repo_path,
+		only_this_dir,
 		notify_watcher,
 		key_bindings_path,
 		key_symbols_path,
@@ -183,6 +188,13 @@ fn app() -> ClapApp {
 				.num_args(1),
 		)
 		.arg(
+			Arg::new(ONLY_THIS_DIR_FLAG_ID)
+				.help("Restrict the status, log and files tabs to the current directory (the repository is still opened from any parent directory)")
+				.short('x')
+				.long("only-this-dir")
+				.action(clap::ArgAction::SetTrue),
+		)
+		.arg(
 			Arg::new(WORKDIR_FLAG_ID)
 				.help("Set the working directory")
 				.short('w')
@@ -238,7 +250,30 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 	Ok(path)
 }
 
-#[test]
-fn verify_app() {
-	app().debug_assert();
+#[cfg(test)]
+mod tests {
+	use super::{app, ONLY_THIS_DIR_FLAG_ID};
+
+	#[test]
+	fn verify_app() {
+		app().debug_assert();
+	}
+
+	#[test]
+	fn test_only_this_dir_flag() {
+		let matches = app()
+			.try_get_matches_from(["gitui"])
+			.expect("no args must parse");
+		assert!(!matches.get_flag(ONLY_THIS_DIR_FLAG_ID));
+
+		let matches = app()
+			.try_get_matches_from(["gitui", "--only-this-dir"])
+			.expect("`--only-this-dir` must parse");
+		assert!(matches.get_flag(ONLY_THIS_DIR_FLAG_ID));
+
+		let matches = app()
+			.try_get_matches_from(["gitui", "-x"])
+			.expect("`-x` must parse");
+		assert!(matches.get_flag(ONLY_THIS_DIR_FLAG_ID));
+	}
 }

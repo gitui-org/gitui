@@ -586,6 +586,7 @@ impl BranchListPopup {
 			&self.repo.borrow(),
 			StatusType::WorkingDir,
 			None,
+			None,
 		)
 		.expect("Could not get status");
 

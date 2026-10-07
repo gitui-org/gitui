@@ -8,6 +8,7 @@ use crate::{
 	keys::{key_match, SharedKeyConfig},
 	popups::{BlameFileOpen, FileRevOpen},
 	queue::{InternalEvent, Queue, StackablePopupOpen},
+	scope::PathScope,
 	strings::{self, order, symbol},
 	try_or_popup,
 	ui::{self, common_nav, style::SharedTheme},
@@ -44,6 +45,7 @@ enum Focus {
 
 pub struct RevisionFilesComponent {
 	repo: RepoPathRef,
+	scope: PathScope,
 	queue: Queue,
 	theme: SharedTheme,
 	//TODO: store TreeFiles in `tree`
@@ -79,6 +81,7 @@ impl RevisionFilesComponent {
 			focus: Focus::Tree,
 			key_config: env.key_config.clone(),
 			repo: env.repo.clone(),
+			scope: env.scope.clone(),
 			select_file,
 			visible: false,
 		}
@@ -131,6 +134,10 @@ impl RevisionFilesComponent {
 					.is_some_and(|commit| commit.id == result.commit)
 				{
 					if let Ok(last) = result.result {
+						let last: Vec<TreeFile> = last
+							.into_iter()
+							.filter(|f| self.scope.contains(&f.path))
+							.collect();
 						let filenames: Vec<&Path> = last
 							.iter()
 							.map(|f| f.path.as_path())

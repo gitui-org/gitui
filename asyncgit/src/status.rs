@@ -49,6 +49,8 @@ pub struct AsyncStatus {
 	sender: Sender<AsyncGitNotification>,
 	pending: Arc<AtomicUsize>,
 	repo: RepoPath,
+	/// limits the status to this repo relative path (see `PathScope`)
+	pathspec: Option<String>,
 	/// Counter that increments after each completed fetch.
 	generation: Arc<AtomicU64>,
 }
@@ -58,9 +60,11 @@ impl AsyncStatus {
 	pub fn new(
 		repo: RepoPath,
 		sender: Sender<AsyncGitNotification>,
+		pathspec: Option<String>,
 	) -> Self {
 		Self {
 			repo,
+			pathspec,
 			current: Arc::new(Mutex::new(Request(0, None))),
 			last: Arc::new(Mutex::new(Status::default())),
 			sender,
@@ -119,6 +123,7 @@ impl AsyncStatus {
 		let status_type = params.status_type;
 		let config = params.config;
 		let repo = self.repo.clone();
+		let pathspec = self.pathspec.clone();
 
 		self.pending.fetch_add(1, Ordering::Relaxed);
 
@@ -127,6 +132,7 @@ impl AsyncStatus {
 				&repo,
 				status_type,
 				config,
+				pathspec.as_deref(),
 				hash_request,
 				&arc_current,
 				&arc_last,
@@ -151,11 +157,13 @@ impl AsyncStatus {
 		repo: &RepoPath,
 		status_type: StatusType,
 		config: Option<ShowUntrackedFilesConfig>,
+		pathspec: Option<&str>,
 		hash_request: u64,
 		arc_current: &Arc<Mutex<Request<u64, Status>>>,
 		arc_last: &Arc<Mutex<Status>>,
 	) -> Result<()> {
-		let res = Self::get_status(repo, status_type, config)?;
+		let res =
+			Self::get_status(repo, status_type, config, pathspec)?;
 		log::trace!(
 			"status fetched: {hash_request} (type: {status_type:?})",
 		);
@@ -179,12 +187,14 @@ impl AsyncStatus {
 		repo: &RepoPath,
 		status_type: StatusType,
 		config: Option<ShowUntrackedFilesConfig>,
+		pathspec: Option<&str>,
 	) -> Result<Status> {
 		Ok(Status {
 			items: sync::status::get_status(
 				repo,
 				status_type,
 				config,
+				pathspec,
 			)?,
 		})
 	}

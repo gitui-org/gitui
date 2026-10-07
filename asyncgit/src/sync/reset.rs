@@ -107,8 +107,9 @@ mod tests {
 		let repo_path: &RepoPath =
 			&root.as_os_str().to_str().unwrap().into();
 
-		let res = get_status(repo_path, StatusType::WorkingDir, None)
-			.unwrap();
+		let res =
+			get_status(repo_path, StatusType::WorkingDir, None, None)
+				.unwrap();
 		assert_eq!(res.len(), 0);
 
 		let file_path = root.join("bar.txt");

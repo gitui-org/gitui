@@ -187,10 +187,12 @@ impl Status {
 			git_status_workdir: AsyncStatus::new(
 				repo_clone.clone(),
 				env.sender_git.clone(),
+				env.scope.path().map(String::from),
 			),
 			git_status_stage: AsyncStatus::new(
 				repo_clone,
 				env.sender_git.clone(),
+				env.scope.path().map(String::from),
 			),
 			git_action_executed: false,
 			git_branch_state: None,
