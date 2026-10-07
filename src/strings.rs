@@ -864,6 +864,16 @@ pub mod commands {
 			CMD_GROUP_GENERAL,
 		)
 	}
+	pub fn back_popup(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Back [{}]",
+				key_config.get_hint(key_config.keys.exit_popup),
+			),
+			"return to previous view",
+			CMD_GROUP_GENERAL,
+		)
+	}
 	pub fn scroll_popup(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(

@@ -112,7 +112,7 @@ impl Component for InspectCommitPopup {
 				CommandInfo::new(
 					strings::commands::close_popup(&self.key_config),
 					true,
-					true,
+					!self.diff.focused() || force_all,
 				)
 				.order(1),
 			);
@@ -123,11 +123,14 @@ impl Component for InspectCommitPopup {
 				!self.diff.focused() || force_all,
 			));
 
-			out.push(CommandInfo::new(
-				strings::commands::close_popup(&self.key_config),
-				true,
-				self.diff.focused() || force_all,
-			));
+			out.push(
+				CommandInfo::new(
+					strings::commands::back_popup(&self.key_config),
+					true,
+					self.diff.focused() || force_all,
+				)
+				.order(1),
+			);
 
 			out.push(CommandInfo::new(
 				strings::commands::inspect_file_tree(
