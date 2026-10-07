@@ -649,6 +649,21 @@ pub mod commands {
 			CMD_GROUP_GENERAL,
 		)
 	}
+	pub fn diff_scroll(key_config: &SharedKeyConfig) -> CommandText {
+		CommandText::new(
+			format!(
+				"Scroll [{}{}{}{}{}{}]",
+				key_config.get_hint(key_config.keys.move_up),
+				key_config.get_hint(key_config.keys.move_down),
+				key_config.get_hint(key_config.keys.page_up),
+				key_config.get_hint(key_config.keys.page_down),
+				key_config.get_hint(key_config.keys.page_left),
+				key_config.get_hint(key_config.keys.page_right)
+			),
+			"scroll vertically or horizontally in diff",
+			CMD_GROUP_DIFF,
+		)
+	}
 	pub fn commit_list_mark(
 		key_config: &SharedKeyConfig,
 		marked: bool,

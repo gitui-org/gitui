@@ -49,6 +49,34 @@ impl HorizontalScroll {
 		true
 	}
 
+	pub fn move_page(
+		&self,
+		move_type: HorizontalScrollType,
+		page_width: usize,
+	) -> bool {
+		let old = self.right.get();
+		let max = self.max_right.get();
+		let page_width = page_width.saturating_sub(1).max(1);
+
+		let new_scroll_right = match move_type {
+			HorizontalScrollType::Left => {
+				old.saturating_sub(page_width)
+			}
+			HorizontalScrollType::Right => {
+				old.saturating_add(page_width)
+			}
+		};
+
+		let new_scroll_right = new_scroll_right.clamp(0, max);
+
+		if new_scroll_right == old {
+			return false;
+		}
+
+		self.right.set(new_scroll_right);
+
+		true
+	}
 	pub fn update(
 		&self,
 		selection: usize,
@@ -129,5 +157,16 @@ mod tests {
 	#[test]
 	fn test_scroll_zero_width() {
 		assert_eq!(calc_scroll_right(4, 0, 4, 3), 0);
+	}
+
+	#[test]
+	fn test_scroll_page_left_right() {
+		let scroll = HorizontalScroll::new();
+		scroll.update_no_selection(100, 20);
+
+		assert!(scroll.move_page(HorizontalScrollType::Right, 20));
+		assert_eq!(scroll.get_right(), 19);
+		assert!(scroll.move_page(HorizontalScrollType::Left, 20));
+		assert_eq!(scroll.get_right(), 0);
 	}
 }

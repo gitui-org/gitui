@@ -750,8 +750,8 @@ impl Component for DiffComponent {
 		_force_all: bool,
 	) -> CommandBlocking {
 		out.push(CommandInfo::new(
-			strings::commands::scroll(&self.key_config),
-			self.can_scroll(),
+			strings::commands::diff_scroll(&self.key_config),
+			self.can_scroll() || self.max_scroll_right() > 0,
 			self.focused(),
 		));
 		out.push(CommandInfo::new(
@@ -860,6 +860,22 @@ impl Component for DiffComponent {
 				} else if key_match(e, self.key_config.keys.page_down)
 				{
 					self.move_selection(ScrollType::PageDown);
+					Ok(EventState::Consumed)
+				} else if key_match(
+					e,
+					self.key_config.keys.page_right,
+				) {
+					self.horizontal_scroll.move_page(
+						HorizontalScrollType::Right,
+						self.current_size.get().0.into(),
+					);
+					Ok(EventState::Consumed)
+				} else if key_match(e, self.key_config.keys.page_left)
+				{
+					self.horizontal_scroll.move_page(
+						HorizontalScrollType::Left,
+						self.current_size.get().0.into(),
+					);
 					Ok(EventState::Consumed)
 				} else if key_match(
 					e,

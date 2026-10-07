@@ -19,6 +19,14 @@ Create a `key_bindings.ron` file like this:
 )
 ```
 
+Horizontal diff paging defaults to `Ctrl+Left` and `Ctrl+Right`. Override
+`page_left` and `page_right` to use different bindings:
+```
+(
+    page_left: Some(( code: Left, modifiers: "ALT")),
+    page_right: Some(( code: Right, modifiers: "ALT")),
+)
+
 The config file format based on the [Ron file format](https://github.com/ron-rs/ron).
 The location of the file depends on your OS:
 * `$HOME/.config/gitui/key_bindings.ron` (mac)
