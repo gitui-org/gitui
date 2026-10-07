@@ -101,7 +101,7 @@ mod test {
 		branch_compare_upstream,
 		remotes::{fetch, push::push_branch},
 		tests::{
-			debug_cmd_print, get_commit_ids, repo_clone,
+			debug_cmd_print, get_commit_ids, repo_clone, repo_init,
 			repo_init_bare, write_commit_file, write_commit_file_at,
 		},
 		RepoState,
@@ -277,5 +277,112 @@ mod test {
 		//check that we still only have the first commit
 		let commits = get_commit_ids(&clone1, 10);
 		assert_eq!(commits.len(), 1);
+	}
+
+	/// Verify that the walker preserves topology order. This means that
+	/// no parent is visited before any of its children.
+	#[test]
+	fn test_topology_order() {
+		/* Test case
+			a diamon shaped graph, where the common ancestor is younger than
+			one of its children.
+
+			GP--P1--M
+			  \    /
+			   --P2
+
+		*/
+
+		let (_repo_dir, repo) = repo_init().unwrap();
+
+		// 1. Grandparent (GP) - Newest
+		let gp = write_commit_file_at(
+			&repo,
+			"gp.txt",
+			"gp",
+			"gp",
+			Time::new(1000, 0),
+		);
+
+		// 2. Parent 1 (P1) - Older
+		let p1 = write_commit_file_at(
+			&repo,
+			"p1.txt",
+			"p1",
+			"p1",
+			Time::new(500, 0),
+		);
+
+		// 3. Parent 2 (P2) - Older (diverging from GP)
+		// Reset HEAD to GP so P2 becomes a child of GP
+		repo.reset(
+			repo.find_object(gp.into(), None)
+				.unwrap()
+				.as_commit()
+				.unwrap()
+				.as_object(),
+			git2::ResetType::Hard,
+			None,
+		)
+		.unwrap();
+		let p2 = write_commit_file_at(
+			&repo,
+			"p2.txt",
+			"p2",
+			"p2",
+			Time::new(400, 0),
+		);
+
+		// 4. Merge commit (M) - The starting point of our walk
+		// The heap now contains [p1, p2].
+		// If we pop p1, we add gp. The heap is [gp, p2].
+		// Because gp(1000) > p2(400), the walker returns gp before p2.
+		// This is a violation: p2 is a child of gp and must be visited first.
+		let p1_commit = repo.find_commit(p1.into()).unwrap();
+		let p2_commit = repo.find_commit(p2.into()).unwrap();
+		let tree = repo
+			.find_tree(repo.index().unwrap().write_tree().unwrap())
+			.unwrap();
+		let sig = repo.signature().unwrap();
+		let m = repo
+			.commit(
+				Some("HEAD"),
+				&sig,
+				&sig,
+				"Merge p1 into p2",
+				&tree,
+				&[&p2_commit, &p1_commit],
+			)
+			.unwrap();
+		let m = CommitId::new(m);
+
+		// Expected Topological Order: [M, P1, P2, GP] or [M, P2, P1, GP]
+		// Actual Defective Order: [M, P1, GP, P2]
+		// (GP jumps ahead of P2 because 1000 > 400)
+
+		let commits = get_commit_ids(&repo, 14);
+		for (i, id) in commits.iter().enumerate() {
+			println!("DEBUG: commits[{}] = {:?}", i, id);
+			// Print the message of the commit to identify it
+			let repo_path = &repo.path().to_path_buf().into();
+			let details =
+				crate::sync::get_commit_details(repo_path, *id)
+					.unwrap();
+			println!(
+				"DEBUG:    Message: {:?}",
+				details.message.map(|m| m.combine())
+			);
+		}
+		println!("DEBUG: Expected M is {:?}", m);
+		println!("DEBUG:   P1 is {:?}", &p1);
+		println!("DEBUG:   P2 is {:?}", &p2);
+		println!("DEBUG:   GP is {:?}", &gp);
+		assert_eq!(commits[0], m);
+		assert!(commits.contains(&p1));
+		assert!(commits.contains(&p2));
+		assert_eq!(
+			commits[3], gp,
+			"Violation: Grandparent must be the last commit"
+		);
 	}
 }

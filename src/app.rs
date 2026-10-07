@@ -416,7 +416,7 @@ impl App {
 		Ok(())
 	}
 
-	///
+	/// Distribute async notification to all children
 	pub fn update_async(
 		&mut self,
 		ev: AsyncNotification,

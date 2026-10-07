@@ -13,8 +13,10 @@
 //!   - [components] for visual elements used on tabs
 //!   - [popups] for temporary dialogs
 //!   - [ui] for tooling like scrollbars
+//!   - [gleisbau] (crate) for rendering the branch graph
 //! - Git Interface
 //!   - [asyncgit] (crate) for async operations on repository
+//!   - [gleisbau] (crate) repo traits
 //! - Distribution and Documentation
 //!   - Project files
 //!   - Github CI
@@ -27,6 +29,7 @@
 //!   - git2-hooks (used by asyncgit).
 //!     - git2-testing (used by git2-hooks).
 //!   - invalidstring used by asyncgit for testing with invalid strings.
+//! - [gleisbau] for rendering the branch graph
 //! - [filetreelist] for a tree view of files.
 //! - [scopetime] for measuring execution time.
 //!

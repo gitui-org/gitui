@@ -58,9 +58,9 @@ pub use revision_files::RevisionFilesComponent;
 pub use syntax_text::SyntaxTextComponent;
 pub use textinput::{InputType, TextInputComponent};
 pub use utils::{
-	filetree::FileTreeItemKind, logitems::ItemBatch,
-	scroll_vertical::VerticalScroll, string_width_align,
-	time_to_string,
+	filetree::FileTreeItemKind, graph_cache::GraphCache,
+	logitems::ItemBatch, scroll_vertical::VerticalScroll,
+	string_width_align, time_to_string,
 };
 
 use crate::ui::style::Theme;

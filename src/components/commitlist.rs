@@ -1,9 +1,15 @@
+/*!
+The [`CommitList`] shows a list of commits. It is used by
+the [revlog](crate::tabs::Revlog) tab
+and the [stashlist](crate::tabs::StashList) tab.
+*/
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
 	app::Environment,
 	components::{
 		utils::string_width_align, CommandBlocking, CommandInfo,
-		Component, DrawableComponent, EventState, ScrollType,
+		Component, DrawableComponent, EventState, GraphCache,
+		ScrollType,
 	},
 	keys::{key_match, SharedKeyConfig},
 	queue::{InternalEvent, Queue},
@@ -29,7 +35,11 @@ use ratatui::{
 	Frame,
 };
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
+	borrow::Cow,
+	cell::{Cell, RefCell},
+	cmp,
+	collections::BTreeMap,
+	rc::Rc,
 	time::Instant,
 };
 
@@ -38,13 +48,32 @@ const SLICE_SIZE: usize = 1200;
 
 ///
 pub struct CommitList {
+	//
+	//  Information about the repository
+	//
+
+	// ---- rustfmt, please preserve blank line above ----
+	/// Location of repository
 	repo: RepoPathRef,
+
+	/// Sequence of commit id for commits loaded from git
+	commits: IndexSet<CommitId>,
+
+	/// Commit information loaded from git
+	items: ItemBatch,
+
+	/// Commit graph related to [items]
+	graph_cache: RefCell<GraphCache>,
+
+	//
+	//  User interface
+	//
+
+	// ---- rustfmt, please preserve blank line above ----
 	title: Box<str>,
 	selection: usize,
 	highlighted_selection: Option<usize>,
-	items: ItemBatch,
 	highlights: Option<Rc<IndexSet<CommitId>>>,
-	commits: IndexSet<CommitId>,
 	/// The marked commits.
 	/// `self.marked[].0` holds the commit index into `self.items.items` - used for ordering the list.
 	/// `self.marked[].1` is the commit id of the marked commit.
@@ -64,6 +93,9 @@ impl CommitList {
 	///
 	pub fn new(env: &Environment, title: &str) -> Self {
 		Self {
+			graph_cache: RefCell::new(GraphCache::new(
+				env.repo.clone(),
+			)),
 			repo: env.repo.clone(),
 			items: ItemBatch::default(),
 			marked: Vec::with_capacity(2),
@@ -205,7 +237,7 @@ impl CommitList {
 		}
 	}
 
-	///
+	/// Clear self.items and fetch the commits indicated
 	pub fn set_commits(&mut self, commits: IndexSet<CommitId>) {
 		if commits != self.commits {
 			self.items.clear();
@@ -214,7 +246,7 @@ impl CommitList {
 		}
 	}
 
-	///
+	/// Extend self.commits with the provided commits. Fetch commit info
 	pub fn refresh_extend_data(&mut self, commits: Vec<CommitId>) {
 		let new_commits = !commits.is_empty();
 		self.commits.extend(commits);
@@ -439,6 +471,7 @@ impl CommitList {
 		}
 	}
 
+	/// Format one commit for drawing
 	#[allow(clippy::too_many_arguments)]
 	fn get_entry_to_add<'a>(
 		&self,
@@ -565,6 +598,7 @@ impl CommitList {
 		Line::from(txt)
 	}
 
+	/// Format commits visible inside the component, at the current scroll
 	fn get_text(&self, height: usize, width: usize) -> Vec<Line<'_>> {
 		let selection = self.relative_selection();
 
@@ -572,17 +606,12 @@ impl CommitList {
 
 		let now = Local::now();
 
-		let any_marked = !self.marked.is_empty();
-
-		for (idx, e) in self
-			.items
-			.iter()
-			.skip(self.scroll_top.get())
-			.take(height)
-			.enumerate()
-		{
+		fn tags_branches_marked(
+			this: &CommitList,
+			e: &LogEntry,
+		) -> (Option<String>, Option<String>, Option<bool>) {
 			let tags =
-				self.tags.as_ref().and_then(|t| t.get(&e.id)).map(
+				this.tags.as_ref().and_then(|t| t.get(&e.id)).map(
 					|tags| {
 						tags.iter()
 							.map(|t| format!("<{}>", t.name))
@@ -591,7 +620,7 @@ impl CommitList {
 				);
 
 			let local_branches =
-				self.local_branches.get(&e.id).map(|local_branch| {
+				this.local_branches.get(&e.id).map(|local_branch| {
 					local_branch
 						.iter()
 						.map(|local_branch| {
@@ -600,24 +629,59 @@ impl CommitList {
 						.join(" ")
 				});
 
+			let any_marked = !this.marked.is_empty();
 			let marked = if any_marked {
-				self.is_marked(&e.id)
+				this.is_marked(&e.id)
 			} else {
 				None
 			};
 
-			txt.push(self.get_entry_to_add(
-				e,
-				idx + self.scroll_top.get() == selection,
-				tags,
-				local_branches,
-				self.remote_branches_string(e),
-				&self.theme,
-				width,
-				now,
-				marked,
-			));
+			(tags, local_branches, marked)
 		}
+
+		for (idx, e) in self
+			.items
+			.iter()
+			.skip(self.scroll_top.get())
+			.take(height)
+			.enumerate()
+		{
+			// Loop over graph lines pr commit. There may be more than one
+			let commit_height =
+				self.graph_cache.borrow().layout_commit_height(idx);
+			for ofs in 0..commit_height {
+				let current_line = txt.len();
+				let graph_column: Line = self
+					.graph_cache
+					.borrow()
+					.get_graph_line(current_line);
+				let text_column: Line = if ofs == 0 {
+					let (tags, local_branches, marked) =
+						tags_branches_marked(self, e);
+					self.get_entry_to_add(
+						e,
+						idx + self.scroll_top.get() == selection,
+						tags,
+						local_branches,
+						self.remote_branches_string(e),
+						&self.theme,
+						width,
+						now,
+						marked,
+					)
+				} else {
+					Line::from("")
+				};
+				txt.push(
+					graph_column
+						.into_iter()
+						.chain(text_column)
+						.collect::<Line>(),
+				);
+			}
+		}
+		// Apply internal scroll to get selection into the visible area
+		txt.drain(0..self.graph_cache.borrow().row_scroll());
 
 		txt
 	}
@@ -760,6 +824,7 @@ impl CommitList {
 			);
 
 			if let Ok(commits) = commits {
+				self.graph_cache.borrow_mut().add_commits(&commits);
 				self.items.set_items(
 					want_min,
 					commits,
@@ -786,6 +851,15 @@ impl DrawableComponent for CommitList {
 			height_in_lines,
 			selection,
 		));
+
+		// Update commit graph
+		{
+			let top = self.scroll_top.get();
+			let visible_range = top..top + height_in_lines;
+			self.graph_cache
+				.borrow_mut()
+				.compute_layout(visible_range, self.selection);
+		}
 
 		let title = format!(
 			"{} {}/{}",
@@ -902,6 +976,11 @@ mod tests {
 
 	impl Default for CommitList {
 		fn default() -> Self {
+			let repo = RepoPathRef::new(sync::RepoPath::Path(
+				std::path::PathBuf::default(),
+			));
+			let graph_cache =
+				RefCell::new(GraphCache::new(repo.clone()));
 			Self {
 				title: String::new().into_boxed_str(),
 				selection: 0,
@@ -909,6 +988,7 @@ mod tests {
 				highlights: Option::None,
 				tags: Option::None,
 				items: ItemBatch::default(),
+				graph_cache,
 				commits: IndexSet::default(),
 				marked: Vec::default(),
 				scroll_top: Cell::default(),
@@ -918,9 +998,7 @@ mod tests {
 				key_config: SharedKeyConfig::default(),
 				scroll_state: (Instant::now(), 0.0),
 				current_size: Cell::default(),
-				repo: RepoPathRef::new(sync::RepoPath::Path(
-					std::path::PathBuf::default(),
-				)),
+				repo,
 				queue: Queue::default(),
 			}
 		}
@@ -956,6 +1034,7 @@ mod tests {
 			time: 0,
 			author: String::default(),
 			id: CommitId::default(),
+			parents: vec![],
 		};
 		// This just creates a sequence of fake ordered ids
 		// 0000000000000000000000000000000000000000
