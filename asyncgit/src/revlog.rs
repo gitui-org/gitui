@@ -176,14 +176,25 @@ impl AsyncLog {
 		rayon_core::spawn(move || {
 			scope_time!("async::revlog");
 
-			Self::fetch_helper(
+			if let Err(e) = Self::fetch_helper(
 				&repo_path,
 				&arc_current,
 				&arc_background,
 				&sender,
 				filter,
-			)
-			.expect("failed to fetch");
+			) {
+				// The log walker runs on a rayon worker thread. A
+				// panic here aborts the whole process (rayon panics
+				// are unwound, then re-aborted). The most reachable
+				// trigger is the unfiltered Log tab when the process
+				// cwd has been deleted (e.g. stashing untracked files
+				// from inside the now-removed subdirectory), where
+				// `gix` discovery reads the cwd unconditionally and
+				// fails with `CurrentDir(NotFound)`. Log the fetch
+				// error and degrade the tab instead of aborting, in
+				// line with `asyncgit::status`, `blame` and `diff`.
+				log::error!("fetch_helper revlog: {e}");
+			}
 
 			arc_pending.store(false, Ordering::Relaxed);
 
