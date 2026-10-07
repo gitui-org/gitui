@@ -1,66 +1,51 @@
 use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
-use git2::{Commit, Oid, Repository};
-use gix::revision::Walk;
-use std::{
-	cmp::Ordering,
-	collections::{BinaryHeap, HashSet},
-};
+use git2::{Repository, Revwalk, Sort};
+use gix::traverse::commit::topo;
+use gix::traverse::commit::Topo;
 
-struct TimeOrderedCommit<'a>(Commit<'a>);
-
-impl Eq for TimeOrderedCommit<'_> {}
-
-impl PartialEq for TimeOrderedCommit<'_> {
-	fn eq(&self, other: &Self) -> bool {
-		self.0.time().eq(&other.0.time())
-	}
-}
-
-impl PartialOrd for TimeOrderedCommit<'_> {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl Ord for TimeOrderedCommit<'_> {
-	fn cmp(&self, other: &Self) -> Ordering {
-		self.0.time().cmp(&other.0.time())
-	}
-}
-
-///
+/// Visit commits in topological order, and date order where possible.
+/// If a filter is provided, only commits that pass the filter are returned.
 pub struct LogWalker<'a> {
-	commits: BinaryHeap<TimeOrderedCommit<'a>>,
-	visited: HashSet<Oid>,
+	/// Revision walk engine
+	walk: Revwalk<'a>,
+	/// Total number of commits that have been visited
+	visited_count: usize,
+	/// Upper limit on buffer size
 	limit: usize,
+	/// The source of commits
 	repo: &'a Repository,
+	/// Filter on which commits will be returned when reading
 	filter: Option<SharedCommitFilterFn>,
 }
 
 impl<'a> LogWalker<'a> {
-	///
+	/// Create a new log walker
+	/// with an upper limit on number of commits visited in one batch.
 	pub fn new(repo: &'a Repository, limit: usize) -> Result<Self> {
-		let c = repo.head()?.peel_to_commit()?;
+		let head = repo.head()?.peel_to_commit()?;
 
-		let mut commits = BinaryHeap::with_capacity(10);
-		commits.push(TimeOrderedCommit(c));
+		let mut walk = repo.revwalk()?;
+		// TOPOLOGICAL + TIME guarantees parents come after children,
+		// and ties/independent branches are ordered by timestamp (--date-order).
+		walk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME)?;
+		walk.push(head.id())?;
 
 		Ok(Self {
-			commits,
+			walk,
+			visited_count: 0,
 			limit,
-			visited: HashSet::with_capacity(1000),
 			repo,
 			filter: None,
 		})
 	}
 
-	///
-	pub fn visited(&self) -> usize {
-		self.visited.len()
+	/// Number of visited commits
+	pub const fn visited(&self) -> usize {
+		self.visited_count
 	}
 
-	///
+	/// Add a filter to use when reading commits
 	#[must_use]
 	pub fn filter(
 		self,
@@ -69,16 +54,14 @@ impl<'a> LogWalker<'a> {
 		Self { filter, ..self }
 	}
 
-	///
+	/// Get a batch of commits
 	pub fn read(&mut self, out: &mut Vec<CommitId>) -> Result<usize> {
 		let mut count = 0_usize;
 
-		while let Some(c) = self.commits.pop() {
-			for p in c.0.parents() {
-				self.visit(p);
-			}
+		for oid_result in self.walk.by_ref() {
+			let oid = oid_result?;
+			let id: CommitId = oid.into();
 
-			let id: CommitId = c.0.id().into();
 			let commit_should_be_included =
 				if let Some(ref filter) = self.filter {
 					filter(self.repo, &id)?
@@ -90,6 +73,7 @@ impl<'a> LogWalker<'a> {
 				out.push(id);
 			}
 
+			self.visited_count += 1;
 			count += 1;
 			if count == self.limit {
 				break;
@@ -97,13 +81,6 @@ impl<'a> LogWalker<'a> {
 		}
 
 		Ok(count)
-	}
-
-	//
-	fn visit(&mut self, c: Commit<'a>) {
-		if self.visited.insert(c.id()) {
-			self.commits.push(TimeOrderedCommit(c));
-		}
 	}
 }
 
@@ -118,7 +95,7 @@ impl<'a> LogWalker<'a> {
 /// A more long-term option is to refactor filtering to work with a `gix::Repository` and to remove
 /// `LogWalker` once this is done, but this is a larger effort.
 pub struct LogWalkerWithoutFilter<'a> {
-	walk: Walk<'a>,
+	walk: Topo<&'a gix::Repository, fn(&gix::hash::oid) -> bool>,
 	limit: usize,
 	visited: usize,
 }
@@ -137,12 +114,12 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 
 		let tips = [commit.id];
 
-		let platform = repo
-			.rev_walk(tips)
-			.sorting(gix::revision::walk::Sorting::ByCommitTime(gix::traverse::commit::simple::CommitTimeOrder::NewestFirst))
-			.use_commit_graph(false);
-
-		let walk = platform.all()?;
+		let walk = topo::Builder::new(&*repo)
+			// Show no parents before all of its children are shown,
+			// but otherwise show commits in the commit timestamp order.
+			.sorting(topo::Sorting::DateOrder)
+			.with_tips(tips)
+			.build()?;
 
 		Ok(Self {
 			walk,

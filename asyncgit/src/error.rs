@@ -74,6 +74,10 @@ pub enum GixError {
 	StatusTreeIndex(#[from] Box<gix::status::tree_index::Error>),
 
 	///
+	#[error("gix::traverse::commit::topo error: {0}")]
+	Topo(#[from] gix::traverse::commit::topo::Error),
+
+	///
 	#[error("gix::worktree::open_index::Error error: {0}")]
 	WorktreeOpenIndex(#[from] Box<gix::worktree::open_index::Error>),
 }
@@ -329,6 +333,12 @@ impl From<gix::status::tree_index::Error> for GixError {
 
 impl From<gix::status::tree_index::Error> for Error {
 	fn from(error: gix::status::tree_index::Error) -> Self {
+		Self::Gix(GixError::from(error))
+	}
+}
+
+impl From<gix::traverse::commit::topo::Error> for Error {
+	fn from(error: gix::traverse::commit::topo::Error) -> Self {
 		Self::Gix(GixError::from(error))
 	}
 }
