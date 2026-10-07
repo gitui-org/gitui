@@ -178,14 +178,11 @@ impl App {
 
 		let mut select_file: Option<PathBuf> = None;
 		let tab = if let Some(file) = cliargs.select_file {
-			// convert to relative git path
-			if let Ok(abs) = file.canonicalize() {
-				if let Ok(path) = abs.strip_prefix(
-					env.repo.borrow().gitpath().canonicalize()?,
-				) {
-					select_file = Some(Path::new(".").join(path));
-				}
-			}
+			select_file = normalize_select_file(
+				&env.repo.borrow(),
+				&file,
+				&std::env::current_dir()?,
+			)?;
 			2
 		} else {
 			env.options.borrow().current_tab()
@@ -487,6 +484,72 @@ impl App {
 		} else {
 			false
 		}
+	}
+}
+
+fn normalize_select_file(
+	repo_path: &RepoPath,
+	file: &Path,
+	cwd: &Path,
+) -> Result<Option<PathBuf>> {
+	let repo_root =
+		PathBuf::from(repo_work_dir(repo_path)?).canonicalize()?;
+	let candidates = if file.is_absolute() {
+		vec![file.to_path_buf()]
+	} else {
+		vec![cwd.join(file), repo_root.join(file)]
+	};
+
+	for candidate in candidates {
+		if let Ok(abs) = candidate.canonicalize() {
+			if let Ok(path) = abs.strip_prefix(&repo_root) {
+				return Ok(Some(Path::new(".").join(path)));
+			}
+		}
+	}
+
+	Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::normalize_select_file;
+	use asyncgit::sync::RepoPath;
+	use git2_testing::repo_init;
+	use pretty_assertions::assert_eq;
+	use std::path::Path;
+
+	#[test]
+	fn select_file_is_relative_to_repo_when_started_from_subdir() {
+		let (temp_dir, _repo) = repo_init();
+		let root = temp_dir.path();
+		let file = root.join("frontend/src/index.html");
+		std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+		std::fs::write(&file, "<main></main>\n").unwrap();
+
+		let repo_path = RepoPath::Path(root.to_path_buf());
+		let cwd = root.join("frontend");
+		let expected =
+			Some(Path::new(".").join("frontend/src/index.html"));
+
+		assert_eq!(
+			normalize_select_file(
+				&repo_path,
+				Path::new("src/index.html"),
+				&cwd,
+			)
+			.unwrap(),
+			expected
+		);
+		assert_eq!(
+			normalize_select_file(
+				&repo_path,
+				Path::new("frontend/src/index.html"),
+				&cwd,
+			)
+			.unwrap(),
+			expected
+		);
 	}
 }
 
