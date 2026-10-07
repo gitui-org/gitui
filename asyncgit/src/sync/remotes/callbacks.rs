@@ -71,7 +71,7 @@ impl Callbacks {
 
 		let this = self.clone();
 		callbacks.pack_progress(move |stage, current, total| {
-			this.pack_progress(stage, total, current);
+			this.pack_progress(stage, current, total);
 		});
 
 		let this = self.clone();
@@ -118,8 +118,8 @@ impl Callbacks {
 	fn pack_progress(
 		&self,
 		stage: git2::PackBuilderStage,
-		total: usize,
 		current: usize,
+		total: usize,
 	) {
 		log::debug!("packing: {stage:?} - {current}/{total}");
 		self.sender.clone().map(|sender| {
