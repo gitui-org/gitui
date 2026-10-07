@@ -163,6 +163,8 @@ fn main() -> Result<()> {
 
 	let cliargs = process_cmdline()?;
 
+	asyncgit::sync::sanitize_snap_config_search_path();
+
 	asyncgit::register_tracing_logging();
 	ensure_valid_path(&cliargs.repo_path)?;
 
