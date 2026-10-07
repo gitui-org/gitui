@@ -393,14 +393,35 @@ pub fn checkout_remote_branch(
 		return Err(Error::UncommittedChanges);
 	}
 
-	let name = branch.name.find('/').map_or_else(
-		|| branch.name.clone(),
-		|pos| branch.name[pos..].to_string(),
+	// `<remote>/HEAD` is a symbolic reference pointing at the remote's
+	// default branch. Resolve it, otherwise we would create a local
+	// branch literally named `HEAD`.
+	let remote_ref =
+		repo.find_reference(&branch.reference)?.resolve()?;
+	let remote_name = bytes2string(remote_ref.shorthand_bytes())?;
+
+	let name = remote_name.find('/').map_or_else(
+		|| remote_name.clone(),
+		|pos| remote_name[pos..].to_string(),
 	);
 
 	let commit = repo.find_commit(branch.top_commit.into())?;
-	let mut new_branch = repo.branch(&name, &commit, false)?;
-	new_branch.set_upstream(Some(&branch.name))?;
+	// resolving `<remote>/HEAD` usually lands on a branch whose local
+	// counterpart was created at clone time, so switch to it rather than
+	// failing. Only when it points at the same commit: a diverged local
+	// branch is not what the user asked to check out.
+	let existing = repo
+		.find_branch(&name, BranchType::Local)
+		.ok()
+		.filter(|local| local.get().target() == Some(commit.id()));
+
+	let new_branch = if let Some(local) = existing {
+		local
+	} else {
+		let mut new_branch = repo.branch(&name, &commit, false)?;
+		new_branch.set_upstream(Some(&remote_name))?;
+		new_branch
+	};
 
 	repo.set_head(
 		bytes2string(new_branch.into_reference().name_bytes())?
@@ -1075,6 +1096,95 @@ mod test_remote_branches {
 			&get_branch_name(&clone2_dir.into()).unwrap(),
 			branch_name
 		);
+	}
+
+	#[test]
+	fn test_checkout_remote_head() {
+		let (r1_dir, _repo) = repo_init_bare().unwrap();
+
+		let (clone1_dir, clone1) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone1_dir = clone1_dir.path().to_str().unwrap();
+
+		write_commit_file(&clone1, "test.txt", "test", "commit1");
+		push_branch(
+			&clone1_dir.into(),
+			"origin",
+			"master",
+			false,
+			false,
+			None,
+			None,
+		)
+		.unwrap();
+
+		let (clone2_dir, _clone2) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone2_dir = clone2_dir.path().to_str().unwrap();
+
+		let branches =
+			get_branches_info(&clone2_dir.into(), false).unwrap();
+		assert_eq!(&branches[0].name, "origin/HEAD");
+
+		// checking out `origin/HEAD` must not create a branch named `HEAD`
+		checkout_remote_branch(&clone2_dir.into(), &branches[0])
+			.unwrap();
+
+		assert_eq!(
+			&get_branch_name(&clone2_dir.into()).unwrap(),
+			"master"
+		);
+
+		let local_branches =
+			get_branches_info(&clone2_dir.into(), true).unwrap();
+		assert!(!local_branches.iter().any(|b| b.name == "HEAD"));
+	}
+
+	#[test]
+	fn test_checkout_remote_branch_diverged_local() {
+		let (r1_dir, _repo) = repo_init_bare().unwrap();
+
+		let (clone1_dir, clone1) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone1_dir = clone1_dir.path().to_str().unwrap();
+
+		write_commit_file(&clone1, "test.txt", "test", "commit1");
+		push_branch(
+			&clone1_dir.into(),
+			"origin",
+			"master",
+			false,
+			false,
+			None,
+			None,
+		)
+		.unwrap();
+
+		let (clone2_dir, clone2) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone2_dir = clone2_dir.path().to_str().unwrap();
+
+		// move the local master away from what origin/master points at
+		write_commit_file(
+			&clone2,
+			"local.txt",
+			"local",
+			"local only",
+		);
+
+		let branches =
+			get_branches_info(&clone2_dir.into(), false).unwrap();
+		let remote_master = branches
+			.iter()
+			.find(|b| b.name == "origin/master")
+			.unwrap();
+
+		// a diverged local branch must not be silently substituted
+		assert!(checkout_remote_branch(
+			&clone2_dir.into(),
+			remote_master
+		)
+		.is_err());
 	}
 
 	#[test]
