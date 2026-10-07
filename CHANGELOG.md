@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * support rewording non-HEAD commits when `commit.gpgsign` is enabled (gpg format only) [[@guerinoni](https://github.com/guerinoni)] ([#2959](https://github.com/gitui-org/gitui/pull/2959))
 
 ### Fixes
+* allow entering AltGr-bound characters in text inputs on Windows ([#2848](https://github.com/gitui-org/gitui/issues/2848))
 * crash when opening submodule ([#2895](https://github.com/gitui-org/gitui/issues/2895))
 * when staging the last file in a directory, the first item after the directory is no longer skipped [[@Tillerino](https://github.com/Tillerino)] ([#2748](https://github.com/gitui-org/gitui/issues/2748))
 * index-out-of-bounds panic when unstaging lines near the end of a diff ([#2953](https://github.com/gitui-org/gitui/issues/2953))

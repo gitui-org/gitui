@@ -610,6 +610,17 @@ impl TextInputComponent {
 				ta.scroll(Scrolling::PageUp);
 				true
 			}
+			// On Windows, AltGr is reported as Ctrl+Alt. Handle any characters
+			// not reserved for existing Ctrl+Alt editing shortcuts as text input.
+			Input {
+				key: Key::Char(c),
+				ctrl: true,
+				alt: true,
+				..
+			} => {
+				ta.insert_char(*c);
+				true
+			}
 			_ => false,
 		}
 	}
@@ -733,6 +744,54 @@ impl Component for TextInputComponent {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+	#[test]
+	fn test_altgr_character_input() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+
+		comp.event(&Event::Key(KeyEvent::new(
+			KeyCode::Char('{'),
+			KeyModifiers::CONTROL | KeyModifiers::ALT,
+		)))
+		.unwrap();
+
+		assert_eq!(comp.get_text(), "{");
+	}
+
+	#[test]
+	fn test_alt_character_input_is_not_inserted() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+
+		comp.event(&Event::Key(KeyEvent::new(
+			KeyCode::Char('{'),
+			KeyModifiers::ALT,
+		)))
+		.unwrap();
+
+		assert_eq!(comp.get_text(), "");
+	}
+
+	#[test]
+	fn test_ctrl_alt_editor_shortcut_is_preserved() {
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", false);
+		comp.show_inner_textarea();
+		comp.set_text("text".to_string());
+		comp.textarea.as_mut().unwrap().move_cursor(CursorMove::End);
+
+		comp.event(&Event::Key(KeyEvent::new(
+			KeyCode::Char('b'),
+			KeyModifiers::CONTROL | KeyModifiers::ALT,
+		)))
+		.unwrap();
+
+		assert_eq!(comp.textarea.as_ref().unwrap().cursor(), (0, 0));
+	}
 
 	#[test]
 	fn test_smoke() {
