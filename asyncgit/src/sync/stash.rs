@@ -135,7 +135,28 @@ mod tests {
 		},
 		utils::{repo_read_file, repo_write_file},
 	};
-	use std::{fs::File, io::Write, path::Path};
+	use std::{fs, fs::File, io::Write, path::Path};
+
+	#[test]
+	fn test_stash_untracked_removes_stored_repo_path() -> Result<()> {
+		let (_td, repo) = repo_init()?;
+		let root = repo.path().parent().unwrap();
+
+		let sub_dir = root.join("untracked_sub");
+		fs::create_dir(&sub_dir)?;
+		File::create(sub_dir.join("foo.txt"))?.write_all(b"foo")?;
+
+		// gitui stores the startup path and reopens from it on every call, so a
+		// path inside the untracked dir is the same trap as a relative "." there
+		let repo_path = RepoPath::Path(sub_dir).resolve_root()?;
+
+		stash_save(&repo_path, None, true, false)?;
+
+		// stashing deleted that dir, further operations must still work
+		assert_eq!(get_stashes(&repo_path)?.len(), 1);
+
+		Ok(())
+	}
 
 	#[test]
 	fn test_smoke() {
