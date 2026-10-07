@@ -1,6 +1,6 @@
 use super::{CommitId, SharedCommitFilterFn};
 use crate::error::Result;
-use git2::{Commit, Oid, Repository};
+use git2::{BranchType, Commit, Oid, Repository};
 use gix::revision::Walk;
 use std::{
 	cmp::Ordering,
@@ -41,10 +41,28 @@ pub struct LogWalker<'a> {
 impl<'a> LogWalker<'a> {
 	///
 	pub fn new(repo: &'a Repository, limit: usize) -> Result<Self> {
-		let c = repo.head()?.peel_to_commit()?;
+		let head = repo.head()?.peel_to_commit()?;
+		let mut start = None;
+
+		if repo.head_detached()? {
+			for branch in repo.branches(Some(BranchType::Local))? {
+				let (branch, _) = branch?;
+				let Some(branch_tip) = branch.get().target() else {
+					continue;
+				};
+
+				if branch_tip != head.id()
+					&& repo
+						.graph_descendant_of(branch_tip, head.id())?
+				{
+					start = Some(repo.find_commit(branch_tip)?);
+					break;
+				}
+			}
+		}
 
 		let mut commits = BinaryHeap::with_capacity(10);
-		commits.push(TimeOrderedCommit(c));
+		commits.push(TimeOrderedCommit(start.unwrap_or(head)));
 
 		Ok(Self {
 			commits,
@@ -133,9 +151,34 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 		// reason this is 2^14, so benchmarking might reveal that there’s better values.
 		repo.object_cache_size_if_unset(2_usize.pow(14));
 
-		let commit = repo.head()?.peel_to_commit()?;
+		let (head_id, detached) = {
+			let mut head = repo.head()?;
+			let detached = head.is_detached();
+			(head.peel_to_commit()?.id, detached)
+		};
+		let mut tip = head_id;
 
-		let tips = [commit.id];
+		if detached {
+			let references = repo.references()?;
+			for reference in references.local_branches()?.flatten() {
+				let Some(branch_tip) =
+					reference.try_id().map(gix::Id::detach)
+				else {
+					continue;
+				};
+
+				if branch_tip != head_id
+					&& repo
+						.merge_base(head_id, branch_tip)
+						.is_ok_and(|base| base.detach() == head_id)
+				{
+					tip = branch_tip;
+					break;
+				}
+			}
+		}
+
+		let tips = [tip];
 
 		let platform = repo
 			.rev_walk(tips)
@@ -282,6 +325,53 @@ mod tests {
 		assert!(matches!(walk.read(&mut items), Ok(0)));
 
 		assert_eq!(items.len(), 0);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_logwalker_starts_from_descendant_branch_tip_when_head_is_detached(
+	) -> Result<()> {
+		let (_td, repo) = repo_init_empty()?;
+
+		write_commit_file(&repo, "foo", "1", "commit1");
+		let detached_head =
+			write_commit_file(&repo, "foo", "2", "commit2");
+		let branch_tip =
+			write_commit_file(&repo, "foo", "3", "commit3");
+		repo.set_head_detached(detached_head.get_oid())?;
+
+		let mut items = Vec::new();
+		LogWalker::new(&repo, 100)?.read(&mut items)?;
+
+		assert_eq!(items[0], branch_tip);
+		assert!(items.contains(&detached_head));
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_logwalker_without_filter_starts_from_descendant_branch_tip_when_head_is_detached(
+	) -> Result<()> {
+		let (_td, repo) = repo_init_empty()?;
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		write_commit_file(&repo, "foo", "1", "commit1");
+		let detached_head =
+			write_commit_file(&repo, "foo", "2", "commit2");
+		let branch_tip =
+			write_commit_file(&repo, "foo", "3", "commit3");
+		repo.set_head_detached(detached_head.get_oid())?;
+
+		let mut repo = gix_repo(repo_path)?;
+		let mut items = Vec::new();
+		LogWalkerWithoutFilter::new(&mut repo, 100)?
+			.read(&mut items)?;
+
+		assert_eq!(items[0], branch_tip);
+		assert!(items.contains(&detached_head));
 
 		Ok(())
 	}
