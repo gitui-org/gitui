@@ -118,7 +118,7 @@ pub struct App {
 
 	// "Flags"
 	requires_redraw: Cell<bool>,
-	file_to_open: Option<String>,
+	file_to_open: Option<(String, Option<u32>)>,
 }
 
 pub struct Environment {
@@ -371,17 +371,19 @@ impl App {
 		} else if let InputEvent::State(polling_state) = ev {
 			self.external_editor_popup.hide();
 			if matches!(polling_state, InputState::Paused) {
-				let result =
-					if let Some(path) = self.file_to_open.take() {
-						ExternalEditorPopup::open_file_in_editor(
-							&self.repo.borrow(),
-							Path::new(&path),
-						)
-					} else {
-						let changes =
-							self.status_tab.get_files_changes()?;
-						self.commit_popup.show_editor(changes)
-					};
+				let result = if let Some((path, line)) =
+					self.file_to_open.take()
+				{
+					ExternalEditorPopup::open_file_in_editor(
+						&self.repo.borrow(),
+						Path::new(&path),
+						line,
+					)
+				} else {
+					let changes =
+						self.status_tab.get_files_changes()?;
+					self.commit_popup.show_editor(changes)
+				};
 
 				if let Err(e) = result {
 					let msg =
@@ -815,10 +817,10 @@ impl App {
 					flags.insert(NeedsUpdate::ALL);
 				}
 			}
-			InternalEvent::OpenExternalEditor(path) => {
+			InternalEvent::OpenExternalEditor(path, line) => {
 				self.input.set_polling(false);
 				self.external_editor_popup.show()?;
-				self.file_to_open = path;
+				self.file_to_open = path.map(|path| (path, line));
 				flags.insert(NeedsUpdate::COMMANDS);
 			}
 			InternalEvent::Push(branch, push_type, force, delete) => {

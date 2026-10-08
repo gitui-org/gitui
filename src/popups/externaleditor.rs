@@ -27,6 +27,20 @@ use scopeguard::defer;
 use std::ffi::OsStr;
 use std::{env, io, path::Path, process::Command};
 
+const EDITORS_WITH_LINE_ARGUMENT: [&str; 7] =
+	["vim", "nvim", "nano", "emacs", "emacsclient", "hx", "helix"];
+
+fn editor_line_argument(
+	command: &str,
+	line: Option<u32>,
+) -> Option<String> {
+	let line = line?;
+	let editor = Path::new(command).file_stem()?.to_str()?;
+	EDITORS_WITH_LINE_ARGUMENT
+		.contains(&editor)
+		.then(|| format!("+{line}"))
+}
+
 ///
 pub struct ExternalEditorPopup {
 	visible: bool,
@@ -48,6 +62,7 @@ impl ExternalEditorPopup {
 	pub fn open_file_in_editor(
 		repo: &RepoPath,
 		path: &Path,
+		line: Option<u32>,
 	) -> Result<()> {
 		let work_dir = repo_work_dir(repo)?;
 
@@ -104,9 +119,12 @@ impl ExternalEditorPopup {
 		let remainder_str = echars.collect::<String>();
 		let remainder = remainder_str.split_whitespace();
 
+		let line_argument = editor_line_argument(&command, line);
+
 		let mut args: Vec<&OsStr> =
 			remainder.map(OsStr::new).collect();
 
+		args.extend(line_argument.as_deref().map(OsStr::new));
 		args.push(path.as_os_str());
 
 		Command::new(command.clone())
@@ -183,5 +201,34 @@ impl Component for ExternalEditorPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::editor_line_argument;
+
+	#[test]
+	fn line_argument_for_known_editor() {
+		assert_eq!(
+			editor_line_argument("hx", Some(12)),
+			Some(String::from("+12"))
+		);
+		assert_eq!(
+			editor_line_argument("/usr/bin/nvim", Some(3)),
+			Some(String::from("+3"))
+		);
+	}
+
+	// busybox vi and VS Code read `+12` as a file name.
+	#[test]
+	fn no_line_argument_for_other_editor() {
+		assert_eq!(editor_line_argument("vi", Some(12)), None);
+		assert_eq!(editor_line_argument("code", Some(12)), None);
+	}
+
+	#[test]
+	fn no_line_argument_without_line() {
+		assert_eq!(editor_line_argument("hx", None), None);
 	}
 }

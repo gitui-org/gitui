@@ -108,6 +108,8 @@ impl From<DiffHunk<'_>> for HunkHeader {
 pub struct Hunk {
 	/// hash of the hunk header
 	pub header_hash: u64,
+	/// start line of the hunk in the new file, as in the hunk header
+	pub new_start: u32,
 	/// list of `DiffLine`s
 	pub lines: Vec<DiffLine>,
 }
@@ -269,6 +271,7 @@ fn raw_diff_to_file_diff(
 			let mut res = res_cell.borrow_mut();
 			res.hunks.push(Hunk {
 				header_hash: hash(header),
+				new_start: header.new_start,
 				lines: lines.clone(),
 			});
 			res.lines += lines.len();
@@ -553,6 +556,8 @@ mod tests {
 			get_diff(repo_path, "bar.txt", false, None).unwrap();
 
 		assert_eq!(res.hunks.len(), 2);
+		assert_eq!(res.hunks[0].new_start, 1);
+		assert_eq!(res.hunks[1].new_start, 8);
 	}
 
 	#[test]
