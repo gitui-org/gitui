@@ -121,7 +121,7 @@ pub enum InternalEvent {
 	///
 	SelectBranch,
 	///
-	OpenExternalEditor(Option<String>),
+	OpenExternalEditor(Option<String>, Option<u32>),
 	///
 	Push(String, PushType, bool, bool),
 	///

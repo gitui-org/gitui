@@ -615,6 +615,27 @@ impl DiffComponent {
 			.unwrap_or_default()
 	}
 
+	fn cursor_line_in_new_file(&self) -> Option<u32> {
+		let diff = self.diff.as_ref()?;
+		let mut row_in_hunk = self.selection.get_end();
+
+		for hunk in &diff.hunks {
+			if row_in_hunk < hunk.lines.len() {
+				let new_file_rows_before = hunk.lines[..row_in_hunk]
+					.iter()
+					.filter(|line| line.position.new_lineno.is_some())
+					.count();
+				let line = hunk.new_start.saturating_add(
+					u32::try_from(new_file_rows_before).ok()?,
+				);
+				return Some(line.max(1));
+			}
+			row_in_hunk -= hunk.lines.len();
+		}
+
+		None
+	}
+
 	fn reset_untracked(&self) {
 		self.queue.push(InternalEvent::ConfirmAction(Action::Reset(
 			ResetItem {
@@ -889,9 +910,10 @@ impl Component for DiffComponent {
 					&& self.can_edit_file()
 				{
 					self.queue.push(
-						InternalEvent::OpenExternalEditor(Some(
-							self.current.path.clone(),
-						)),
+						InternalEvent::OpenExternalEditor(
+							Some(self.current.path.clone()),
+							self.cursor_line_in_new_file(),
+						),
 					);
 					Ok(EventState::Consumed)
 				} else if key_match(
@@ -966,6 +988,7 @@ mod tests {
 	use crate::{
 		app::Environment, queue::InternalEvent, ui::style::Theme,
 	};
+	use asyncgit::sync::diff::Hunk;
 	use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 	use std::io::Write;
 	use std::rc::Rc;
@@ -1055,8 +1078,158 @@ mod tests {
 		let event = env.queue.pop();
 		assert!(matches!(
 			event,
-			Some(InternalEvent::OpenExternalEditor(Some(path)))
+			Some(InternalEvent::OpenExternalEditor(Some(path), None))
 				if path == "src/main.rs"
 		));
+	}
+
+	fn diff_line(
+		line_type: DiffLineType,
+		old_lineno: Option<u32>,
+		new_lineno: Option<u32>,
+	) -> DiffLine {
+		DiffLine {
+			content: "".into(),
+			line_type,
+			position: DiffLinePosition {
+				old_lineno,
+				new_lineno,
+			},
+		}
+	}
+
+	// @@ -4,3 +4,3 @@ and @@ -20,2 +20,3 @@
+	fn two_hunk_diff() -> FileDiff {
+		let hunks = vec![
+			Hunk {
+				header_hash: 0,
+				new_start: 4,
+				lines: vec![
+					diff_line(DiffLineType::Header, None, None),
+					diff_line(DiffLineType::None, Some(4), Some(4)),
+					diff_line(DiffLineType::Delete, Some(5), None),
+					diff_line(DiffLineType::Add, None, Some(5)),
+					diff_line(DiffLineType::None, Some(6), Some(6)),
+				],
+			},
+			Hunk {
+				header_hash: 1,
+				new_start: 20,
+				lines: vec![
+					diff_line(DiffLineType::Header, None, None),
+					diff_line(DiffLineType::None, Some(20), Some(20)),
+					diff_line(DiffLineType::Add, None, Some(21)),
+					diff_line(DiffLineType::None, Some(21), Some(22)),
+				],
+			},
+		];
+
+		FileDiff {
+			lines: 9,
+			hunks,
+			..FileDiff::default()
+		}
+	}
+
+	fn editor_line_on_edit(
+		file_diff: FileDiff,
+		selection: Selection,
+	) -> Option<u32> {
+		let env = Environment::test_env();
+		let mut diff = DiffComponent::new(&env, false);
+
+		diff.focus(true);
+		diff.current.path = String::from("src/main.rs");
+		diff.diff = Some(file_diff);
+		diff.selection = selection;
+
+		diff.event(&Event::Key(KeyEvent::new(
+			KeyCode::Char('e'),
+			KeyModifiers::empty(),
+		)))
+		.unwrap();
+
+		let Some(InternalEvent::OpenExternalEditor(Some(_), line)) =
+			env.queue.pop()
+		else {
+			panic!("editor not opened");
+		};
+		line
+	}
+
+	#[test]
+	fn diff_component_opens_editor_at_line_of_kept_row() {
+		let line_at = |row| {
+			editor_line_on_edit(
+				two_hunk_diff(),
+				Selection::Single(row),
+			)
+		};
+
+		assert_eq!(line_at(1), Some(4));
+		assert_eq!(line_at(3), Some(5));
+		assert_eq!(line_at(4), Some(6));
+		assert_eq!(line_at(7), Some(21));
+		assert_eq!(line_at(8), Some(22));
+	}
+
+	// A deleted row is not in the file on disk. The editor must show
+	// the place where it was.
+	#[test]
+	fn diff_component_opens_editor_where_deleted_row_was() {
+		assert_eq!(
+			editor_line_on_edit(
+				two_hunk_diff(),
+				Selection::Single(2)
+			),
+			Some(5)
+		);
+	}
+
+	#[test]
+	fn diff_component_opens_editor_at_hunk_start_from_header() {
+		let line_at = |row| {
+			editor_line_on_edit(
+				two_hunk_diff(),
+				Selection::Single(row),
+			)
+		};
+
+		assert_eq!(line_at(0), Some(4));
+		assert_eq!(line_at(5), Some(20));
+	}
+
+	#[test]
+	fn diff_component_opens_editor_at_cursor_end_of_range() {
+		let line_of = |selection| {
+			editor_line_on_edit(two_hunk_diff(), selection)
+		};
+
+		assert_eq!(line_of(Selection::Multiple(1, 7)), Some(21));
+		assert_eq!(line_of(Selection::Multiple(7, 1)), Some(4));
+	}
+
+	// git writes `+0,0` for a file with no lines left. Editors have no
+	// line 0.
+	#[test]
+	fn diff_component_opens_editor_at_first_line_of_emptied_file() {
+		let emptied = FileDiff {
+			lines: 3,
+			hunks: vec![Hunk {
+				header_hash: 0,
+				new_start: 0,
+				lines: vec![
+					diff_line(DiffLineType::Header, None, None),
+					diff_line(DiffLineType::Delete, Some(1), None),
+					diff_line(DiffLineType::Delete, Some(2), None),
+				],
+			}],
+			..FileDiff::default()
+		};
+
+		assert_eq!(
+			editor_line_on_edit(emptied, Selection::Single(2)),
+			Some(1)
+		);
 	}
 }
