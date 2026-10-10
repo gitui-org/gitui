@@ -24,6 +24,7 @@ mod rebase;
 pub mod remotes;
 mod repository;
 mod reset;
+pub mod revwalk;
 mod reword;
 pub mod sign;
 mod staging;
