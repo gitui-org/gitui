@@ -503,10 +503,13 @@ impl BranchListPopup {
 			let mut commit_message =
 				displaybranch.top_commit_message.clone();
 			if commit_message.len() > commit_message_length {
-				commit_message.unicode_truncate(
-					commit_message_length
-						.saturating_sub(THREE_DOTS_LENGTH),
-				);
+				commit_message = commit_message
+					.unicode_truncate(
+						commit_message_length
+							.saturating_sub(THREE_DOTS_LENGTH),
+					)
+					.0
+					.to_string();
 				commit_message += THREE_DOTS;
 			}
 
