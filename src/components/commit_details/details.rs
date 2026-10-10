@@ -8,6 +8,7 @@ use crate::{
 		EventState, ScrollType,
 	},
 	keys::{key_match, SharedKeyConfig},
+	string_utils::tabs_to_spaces,
 	strings::{self, order},
 	ui::style::SharedTheme,
 };
@@ -81,15 +82,17 @@ impl DetailsComponent {
 		width: usize,
 	) -> WrappedCommitMessage<'_> {
 		let width = width.max(1);
-		let wrapped_title = bwrap::wrap!(&message.subject, width)
+		let subject = tabs_to_spaces(message.subject.clone());
+		let wrapped_title = bwrap::wrap!(&subject, width)
 			.lines()
 			.map(String::from)
 			.map(Cow::from)
 			.collect();
 
 		if let Some(ref body) = message.body {
+			let body = tabs_to_spaces(body.clone());
 			let wrapped_message: Vec<Cow<'_, str>> =
-				bwrap::wrap!(body, width)
+				bwrap::wrap!(&body, width)
 					.lines()
 					.map(String::from)
 					.map(Cow::from)
@@ -484,6 +487,16 @@ mod tests {
 				"Commit", "message", "First", "line", "Second",
 				"line"
 			]
+		);
+	}
+
+	#[test]
+	fn test_textwrap_tabs() {
+		let message = CommitMessage::from("subj\tx\n\nPR:\t123");
+
+		assert_eq!(
+			get_wrapped_lines(&message, 50),
+			vec!["subj  x", "", "PR:  123"]
 		);
 	}
 }

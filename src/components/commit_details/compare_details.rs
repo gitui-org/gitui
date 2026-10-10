@@ -9,6 +9,7 @@ use crate::{
 		CommandBlocking, CommandInfo, Component, DrawableComponent,
 		EventState,
 	},
+	string_utils::tabs_to_spaces,
 	strings::{self},
 	ui::style::SharedTheme,
 };
@@ -88,7 +89,9 @@ impl CompareDetailsComponent {
 				Cow::from(
 					data.message
 						.as_ref()
-						.map(|msg| msg.subject.clone())
+						.map(|msg| {
+							tabs_to_spaces(msg.subject.clone())
+						})
 						.unwrap_or_default(),
 				),
 				self.theme.text(true, false),

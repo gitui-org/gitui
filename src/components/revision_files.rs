@@ -8,6 +8,7 @@ use crate::{
 	keys::{key_match, SharedKeyConfig},
 	popups::{BlameFileOpen, FileRevOpen},
 	queue::{InternalEvent, Queue, StackablePopupOpen},
+	string_utils::tabs_to_spaces,
 	strings::{self, order, symbol},
 	try_or_popup,
 	ui::{self, common_nav, style::SharedTheme},
@@ -357,7 +358,10 @@ impl RevisionFilesComponent {
 			let _ignore =
 				write!(title, " {{{}}}", c.id.get_short_string());
 
-			c.message.lines().next()
+			c.message
+				.lines()
+				.next()
+				.map(|m| tabs_to_spaces(m.to_string()))
 		});
 
 		if let Some(message) = message {

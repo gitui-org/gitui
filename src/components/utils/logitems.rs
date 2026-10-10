@@ -1,3 +1,4 @@
+use crate::string_utils::tabs_to_spaces;
 use asyncgit::sync::{CommitId, CommitInfo};
 use chrono::{DateTime, Duration, Local, Utc};
 use indexmap::IndexSet;
@@ -41,7 +42,7 @@ impl From<CommitInfo> for LogEntry {
 		};
 
 		let author = c.author;
-		let msg = c.message;
+		let msg = tabs_to_spaces(c.message);
 
 		// Replace markdown emojis with Unicode equivalent
 		#[cfg(feature = "ghemoji")]
