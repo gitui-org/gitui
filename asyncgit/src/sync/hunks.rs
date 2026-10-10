@@ -59,7 +59,8 @@ pub fn reset_hunk(
 			res
 		});
 
-		let diff = get_diff_raw(&repo, file_path, false, true, None)?;
+		let diff =
+			get_diff_raw(&repo, file_path, false, true, options)?;
 
 		repo.apply(&diff, ApplyLocation::WorkDir, Some(&mut opt))?;
 
