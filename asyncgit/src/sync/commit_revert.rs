@@ -20,6 +20,8 @@ pub fn revert_commit(
 
 	repo.revert(&commit, None)?;
 
+	crate::sync::lfs::record_smudge(&repo, "revert_commit");
+
 	Ok(())
 }
 

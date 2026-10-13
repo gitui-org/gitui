@@ -7,7 +7,7 @@ use crate::{
 	error::{Error, Result},
 	sync::config::untracked_files_config_repo,
 };
-use git2::{IndexAddOption, Repository, RepositoryOpenFlags};
+use git2::{Index, IndexAddOption, Repository, RepositoryOpenFlags};
 use scopetime::scope_time;
 use std::{
 	fs::File,
@@ -100,46 +100,126 @@ pub fn stage_add_file(
 	scope_time!("stage_add_file");
 
 	let repo = repo(repo_path)?;
-
 	let mut index = repo.index()?;
 
-	index.add_path(path)?;
-	index.write()?;
+	if super::lfs::filter_for(&repo, path).is_lfs() {
+		super::lfs::clean_and_stage(&repo, &mut index, path)?;
+	} else {
+		index.add_path(path)?;
+	}
 
+	index.write()?;
 	Ok(())
 }
 
 /// like `stage_add_file` but uses a pattern to match/glob multiple files/folders
-pub fn stage_add_all(
-	repo_path: &RepoPath,
-	pattern: &str,
-	stage_untracked: Option<ShowUntrackedFilesConfig>,
+pub fn stage_add_all_files(
+	repository_path: &RepoPath,
+	search_pattern: &str,
+	optional_untracked_configuration: Option<
+		ShowUntrackedFilesConfig,
+	>,
 ) -> Result<()> {
-	scope_time!("stage_add_all");
+	scope_time!("stage_add_all_files");
 
-	let repo = repo(repo_path)?;
+	let repository = repo(repository_path)?;
+	let mut git_index = repository.index()?;
 
-	let mut index = repo.index()?;
-
-	let stage_untracked = if let Some(config) = stage_untracked {
-		config
-	} else {
-		untracked_files_config_repo(&repo)?
-	};
-
-	if stage_untracked.include_untracked() {
-		index.add_all(
-			vec![pattern],
-			IndexAddOption::DEFAULT,
-			None,
+	let untracked_configuration = optional_untracked_configuration
+		.map_or_else(
+			|| untracked_files_config_repo(&repository),
+			Ok,
 		)?;
-	} else {
-		index.update_all(vec![pattern], None)?;
-	}
 
-	index.write()?;
+	let large_storage_files =
+		stage_standard_files_and_collect_large_files(
+			&repository,
+			&mut git_index,
+			search_pattern,
+			untracked_configuration.include_untracked(),
+		)?;
+
+	stage_large_storage_files(
+		&repository,
+		&mut git_index,
+		&large_storage_files,
+	);
+
+	git_index.write()?;
 
 	Ok(())
+}
+
+/// Stages normal files directly into the git index and diverts large storage files for special handling.
+fn stage_standard_files_and_collect_large_files(
+	repository: &Repository,
+	git_index: &mut Index,
+	search_pattern: &str,
+	include_untracked_files: bool,
+) -> Result<Vec<PathBuf>> {
+	let mut large_storage_files = Vec::new();
+
+	let mut divert_large_files_callback =
+		|file_path: &Path, _: &[u8]| -> i32 {
+			let is_large_storage_file =
+				is_existing_large_storage_file(repository, file_path);
+
+			if is_large_storage_file {
+				large_storage_files.push(file_path.to_path_buf());
+			}
+
+			// Cast boolean
+			i32::from(is_large_storage_file)
+		};
+
+	// Just to satisfy the bounds
+	let search_patterns = [search_pattern];
+
+	if include_untracked_files {
+		git_index.add_all(
+			search_patterns,
+			IndexAddOption::DEFAULT,
+			Some(&mut divert_large_files_callback),
+		)?;
+	} else {
+		git_index.update_all(
+			search_patterns,
+			Some(&mut divert_large_files_callback),
+		)?;
+	}
+
+	Ok(large_storage_files)
+}
+
+/// Determines if a path points to an existing file in the working directory that is tracked via Large File Storage.
+fn is_existing_large_storage_file(
+	repository: &Repository,
+	file_path: &Path,
+) -> bool {
+	let is_existing_file = repository
+		.workdir()
+		.is_some_and(|directory| directory.join(file_path).is_file());
+
+	is_existing_file
+		&& super::lfs::filter_for(repository, file_path).is_lfs()
+}
+
+/// Cleans and stages collected Large File Storage files, logging warnings on failure.
+fn stage_large_storage_files(
+	repository: &Repository,
+	git_index: &mut Index,
+	large_storage_files: &[PathBuf],
+) {
+	for file_path in large_storage_files {
+		if let Err(error) = super::lfs::clean_and_stage(
+			repository, git_index, file_path,
+		) {
+			log::warn!(
+				"Large file storage clean failed for {file_path:?}: \
+                 {error}; leaving previous index entry unchanged"
+			);
+		}
+	}
 }
 
 /// Undo last commit in repo
@@ -338,7 +418,7 @@ mod tests {
 
 		assert_eq!(status_count(StatusType::WorkingDir), 3);
 
-		stage_add_all(repo_path, "a/d", None).unwrap();
+		stage_add_all_files(repo_path, "a/d", None).unwrap();
 
 		assert_eq!(status_count(StatusType::WorkingDir), 1);
 		assert_eq!(status_count(StatusType::Stage), 2);
@@ -406,7 +486,7 @@ mod tests {
 
 		assert_eq!(get_statuses(repo_path), (0, 0));
 
-		stage_add_all(repo_path, "*", None).unwrap();
+		stage_add_all_files(repo_path, "*", None).unwrap();
 
 		assert_eq!(get_statuses(repo_path), (0, 0));
 
@@ -477,7 +557,7 @@ mod tests {
 		assert_eq!(status_count(StatusType::WorkingDir), 1);
 
 		//expect to fail
-		assert!(stage_add_all(repo_path, "sub", None).is_err());
+		assert!(stage_add_all_files(repo_path, "sub", None).is_err());
 
 		Ok(())
 	}
@@ -504,5 +584,44 @@ mod tests {
 		assert!(get_head(repo_path).is_ok());
 
 		Ok(())
+	}
+
+	#[test]
+	fn test_stage_add_all_lfs() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		// Configure .gitattributes to track *.dat with LFS filter.
+		std::fs::write(
+			root.join(".gitattributes"),
+			"*.dat filter=lfs\n",
+		)
+		.unwrap();
+
+		let file_path = Path::new("data.dat");
+		let raw_content = b"large binary data to clean";
+		std::fs::write(root.join(file_path), raw_content).unwrap();
+
+		stage_add_all_files(
+			repo_path,
+			"data.dat",
+			Some(ShowUntrackedFilesConfig::All),
+		)
+		.unwrap();
+
+		// Re-open the repo to get a fresh index; stage_add_all uses
+		// its own Repository handle, so the original `repo`'s cached
+		// index is stale.
+		let repo = Repository::open(root).unwrap();
+		let index = repo.index().unwrap();
+		let entry = index.get_path(file_path, 0).unwrap();
+		let pointer_blob = repo.find_blob(entry.id).unwrap();
+		let pointer_text =
+			String::from_utf8(pointer_blob.content().to_vec())
+				.unwrap();
+		assert!(pointer_text
+			.starts_with("version https://git-lfs.github.com"));
 	}
 }

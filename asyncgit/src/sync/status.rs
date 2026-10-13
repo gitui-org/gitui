@@ -101,6 +101,8 @@ pub struct StatusItem {
 	pub path: String,
 	///
 	pub status: StatusItemType,
+	///
+	pub is_lfs: bool,
 }
 
 ///
@@ -168,6 +170,7 @@ impl From<ShowUntrackedFilesConfig> for gix::status::UntrackedFiles {
 }
 
 /// guarantees sorting
+#[allow(clippy::too_many_lines)]
 pub fn get_status(
 	repo_path: &RepoPath,
 	status_type: StatusType,
@@ -177,11 +180,11 @@ pub fn get_status(
 
 	let repo: gix::Repository = gix_repo(repo_path)?;
 
+	let git2_repo = crate::sync::repository::repo(repo_path)?;
+
 	let show_untracked = if let Some(config) = show_untracked {
 		config
 	} else {
-		let git2_repo = crate::sync::repository::repo(repo_path)?;
-
 		// Calling `untracked_files_config_repo` ensures compatibility with `gitui` <= 0.27.
 		// `untracked_files_config_repo` defaults to `All` while both `libgit2` and `gix` default to
 		// `Normal`. According to [show-untracked-files], `normal` is the default value that `git`
@@ -212,8 +215,17 @@ pub fn get_status(
 
 				if let Some(status) = status {
 					let path = item.rela_path().to_string();
+					let is_lfs = super::lfs::filter_for(
+						&git2_repo,
+						Path::new(&path),
+					)
+					.is_lfs();
 
-					res.push(StatusItem { path, status });
+					res.push(StatusItem {
+						path,
+						status,
+						is_lfs,
+					});
 				}
 			}
 		}
@@ -240,8 +252,17 @@ pub fn get_status(
 				 -> Result<gix::diff::index::Action> {
 					let path = change_ref.fields().0.to_string();
 					let status = change_ref.into();
+					let is_lfs = super::lfs::filter_for(
+						&git2_repo,
+						Path::new(&path),
+					)
+					.is_lfs();
 
-					res.push(StatusItem { path, status });
+					res.push(StatusItem {
+						path,
+						status,
+						is_lfs,
+					});
 
 					Ok(gix::diff::index::Action::Continue(()))
 				};
@@ -272,7 +293,16 @@ pub fn get_status(
 				};
 
 				if let Some(status) = status {
-					res.push(StatusItem { path, status });
+					let is_lfs = super::lfs::filter_for(
+						&git2_repo,
+						Path::new(&path),
+					)
+					.is_lfs();
+					res.push(StatusItem {
+						path,
+						status,
+						is_lfs,
+					});
 				}
 			}
 		}
@@ -364,8 +394,43 @@ mod tests {
 			status,
 			vec![StatusItem {
 				path: "foo".into(),
-				status: StatusItemType::New
+				status: StatusItemType::New,
+				is_lfs: false
 			}]
 		);
+	}
+
+	#[test]
+	fn test_get_status_lfs() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		// Configure .gitattributes to track *.dat with LFS filter.
+		std::fs::write(
+			root.join(".gitattributes"),
+			"*.dat filter=lfs\n",
+		)
+		.unwrap();
+
+		let file_path = Path::new("large.dat");
+		File::create(root.join(file_path))
+			.unwrap()
+			.write_all(b"large binary data")
+			.unwrap();
+
+		let status = get_status(
+			repo_path,
+			StatusType::WorkingDir,
+			Some(ShowUntrackedFilesConfig::All),
+		)
+		.unwrap();
+
+		// We expect .gitattributes and large.dat to be in status
+		let lfs_item =
+			status.iter().find(|s| s.path == "large.dat").unwrap();
+		assert!(lfs_item.is_lfs);
+		assert_eq!(lfs_item.status, StatusItemType::New);
 	}
 }

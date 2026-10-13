@@ -98,7 +98,7 @@ impl ChangesComponent {
 						self.options.borrow().status_show_untracked();
 
 					//TODO: check if we can handle the one file case with it as well
-					sync::stage_add_all(
+					sync::stage_add_all_files(
 						&self.repo.borrow(),
 						tree_item.info.full_path.as_str(),
 						config,
@@ -131,7 +131,7 @@ impl ChangesComponent {
 	fn index_add_all(&self) -> Result<()> {
 		let config = self.options.borrow().status_show_untracked();
 
-		sync::stage_add_all(&self.repo.borrow(), "*", config)?;
+		sync::stage_add_all_files(&self.repo.borrow(), "*", config)?;
 
 		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
 

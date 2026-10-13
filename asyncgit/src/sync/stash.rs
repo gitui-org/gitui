@@ -52,6 +52,8 @@ pub fn stash_pop(
 
 	repo.stash_pop(index, None)?;
 
+	super::lfs::record_smudge(&repo, "stash_pop");
+
 	Ok(())
 }
 
@@ -73,6 +75,8 @@ pub fn stash_apply(
 	let mut opt = StashApplyOptions::default();
 	opt.checkout_options(checkout);
 	repo.stash_apply(index, Some(&mut opt))?;
+
+	super::lfs::record_smudge(&repo, "stash_apply");
 
 	Ok(())
 }
