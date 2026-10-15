@@ -11,6 +11,10 @@ use super::{
 };
 use crate::error::{Error, Result};
 use git2::CredentialHelper;
+use std::path::{Path, PathBuf};
+
+const DEFAULT_SSH_PRIVATE_KEY_NAMES: [&str; 3] =
+	["id_ed25519", "id_ecdsa", "id_rsa"];
 
 /// basic Authentication Credentials
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -33,6 +37,22 @@ impl BasicAuthCredential {
 	) -> Self {
 		Self { username, password }
 	}
+}
+
+/// Existing private keys from the conventional OpenSSH locations.
+pub(crate) fn default_ssh_private_keys(home: &Path) -> Vec<PathBuf> {
+	let ssh_dir = home.join(".ssh");
+	DEFAULT_SSH_PRIVATE_KEY_NAMES
+		.into_iter()
+		.map(|name| ssh_dir.join(name))
+		.filter(|path| path.is_file())
+		.collect()
+}
+
+/// Existing private keys from the current user's home directory.
+pub(crate) fn default_ssh_private_keys_from_home() -> Vec<PathBuf> {
+	dirs::home_dir()
+		.map_or_else(Vec::new, |home| default_ssh_private_keys(&home))
 }
 
 /// know if username and password are needed for this url
@@ -196,14 +216,16 @@ pub fn extract_cred_from_url(url: &str) -> BasicAuthCredential {
 mod tests {
 	use crate::sync::{
 		cred::{
-			extract_cred_from_url, extract_username_password,
-			need_username_password, BasicAuthCredential,
+			default_ssh_private_keys, extract_cred_from_url,
+			extract_username_password, need_username_password,
+			BasicAuthCredential,
 		},
 		remotes::DEFAULT_REMOTE_NAME,
 		tests::repo_init,
 		RepoPath,
 	};
 	use serial_test::serial;
+	use std::fs::File;
 
 	#[test]
 	fn test_credential_complete() {
@@ -227,6 +249,28 @@ mod tests {
 		)
 		.is_complete());
 		assert!(!BasicAuthCredential::new(None, None).is_complete());
+	}
+
+	#[test]
+	fn test_default_ssh_private_keys_returns_existing_keys_in_preference_order(
+	) {
+		let home = tempfile::tempdir().unwrap();
+		let ssh_dir = home.path().join(".ssh");
+		std::fs::create_dir(&ssh_dir).unwrap();
+		File::create(ssh_dir.join("id_rsa")).unwrap();
+		File::create(ssh_dir.join("id_ecdsa")).unwrap();
+		File::create(ssh_dir.join("id_ed25519")).unwrap();
+		File::create(ssh_dir.join("id_ed25519.pub")).unwrap();
+		File::create(ssh_dir.join("custom_key")).unwrap();
+
+		assert_eq!(
+			default_ssh_private_keys(home.path()),
+			vec![
+				ssh_dir.join("id_ed25519"),
+				ssh_dir.join("id_ecdsa"),
+				ssh_dir.join("id_rsa"),
+			]
+		);
 	}
 
 	#[test]
