@@ -772,6 +772,14 @@ mod tests {
 
 		let key = home.join("key.pem");
 		let cert = home.join("cert.pem");
+		let cert_config = home.join("openssl.cnf");
+		// LibreSSL and OpenSSL ship different default extensions. Make
+		// this self-signed trust root a CA explicitly so gpgsm can
+		// validate it with either tool's default configuration.
+		std::fs::write(
+			&cert_config,
+			"[req]\ndistinguished_name=dn\n[dn]\n[extensions]\nbasicConstraints=critical,CA:TRUE\n",
+		)?;
 		run(
 			"openssl",
 			&[
@@ -788,6 +796,10 @@ mod tests {
 				"3650",
 				"-subj",
 				&format!("/CN=gitui test/emailAddress={email}"),
+				"-config",
+				cert_config.to_str().unwrap(),
+				"-extensions",
+				"extensions",
 			],
 		);
 		// gpgsm's PKCS#12 reader accepts different ciphers across versions, so

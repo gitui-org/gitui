@@ -138,9 +138,9 @@ impl Environment {
 		use crossbeam_channel::unbounded;
 		Self {
 			queue: Queue::new(),
-			theme: Default::default(),
-			key_config: Default::default(),
-			repo: RefCell::new(RepoPath::Path(Default::default())),
+			theme: Rc::default(),
+			key_config: Rc::default(),
+			repo: RefCell::new(RepoPath::Path(PathBuf::default())),
 			options: Rc::new(RefCell::new(Options::test_env())),
 			sender_git: unbounded().0,
 			sender_app: unbounded().0,
