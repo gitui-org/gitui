@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest, ubuntu-22.04]
+        os: [ubuntu-latest, macos-latest, windows-latest, ubuntu-22.04, ubuntu-24.04-riscv]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -101,6 +101,11 @@ jobs:
         env:
           GITUI_RELEASE: 1
         run: make release-linux-arm
+      - name: Build Release Linux RISCV64
+        if: matrix.os == 'ubuntu-24.04-riscv'
+        env:
+          GITUI_RELEASE: 1
+        run: make release-linux-riscv64
 
       - name: Set SHA
         if: matrix.os == 'macos-latest'
