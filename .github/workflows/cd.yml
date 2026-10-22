@@ -2,13 +2,13 @@ name: CD
 
 on:
   push:
-   tags:
-     - '*'
+    tags:
+      - "*"
   workflow_dispatch:
-    
+
 permissions:
   contents: write
-  
+
 jobs:
   release:
     strategy:
@@ -18,115 +18,117 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Get version
-      id: get_version
-      run: echo "version=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
 
-    - name: Restore cargo cache
-      uses: Swatinem/rust-cache@v2
-      env:
-        cache-name: ci
-      with:
-        shared-key: ${{ matrix.os }}-${{ env.cache-name }}-stable
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+        env:
+          cache-name: ci
+        with:
+          shared-key: ${{ matrix.os }}-${{ env.cache-name }}-stable
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
-    - name: Build
-      if: matrix.os != 'ubuntu-22.04'
-      env:
-        GITUI_RELEASE: 1
-      run: cargo build
-    - name: Run tests
-      if: matrix.os != 'ubuntu-22.04'
-      run: make test
-    - name: Run clippy
-      if: matrix.os != 'ubuntu-22.04'
-      run: |
-        cargo clean
-        make clippy
+      - uses: taiki-e/install-action@nextest
 
-    - name: Setup MUSL
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        rustup target add x86_64-unknown-linux-musl
-        sudo apt-get -qq install musl-tools
+      - name: Build
+        if: matrix.os != 'ubuntu-22.04'
+        env:
+          GITUI_RELEASE: 1
+        run: cargo build
+      - name: Run tests
+        if: matrix.os != 'ubuntu-22.04'
+        run: make test
+      - name: Run clippy
+        if: matrix.os != 'ubuntu-22.04'
+        run: |
+          cargo clean
+          make clippy
 
-    - name: Setup ARM toolchain
-      if: matrix.os == 'ubuntu-22.04'
-      run: |
-        rustup target add aarch64-unknown-linux-gnu
-        rustup target add armv7-unknown-linux-gnueabihf
-        rustup target add arm-unknown-linux-gnueabihf
+      - name: Setup MUSL
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get -qq install musl-tools
 
-        curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
-        curl -o $GITHUB_WORKSPACE/arm.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf.tar.xz
+      - name: Setup ARM toolchain
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+          rustup target add arm-unknown-linux-gnueabihf
 
-        tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
-        tar xf $GITHUB_WORKSPACE/arm.tar.xz
+          curl -o $GITHUB_WORKSPACE/aarch64.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu.tar.xz
+          curl -o $GITHUB_WORKSPACE/arm.tar.xz https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-a/8.2-2018.08/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf.tar.xz
 
-        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
-        echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
+          tar xf $GITHUB_WORKSPACE/aarch64.tar.xz
+          tar xf $GITHUB_WORKSPACE/arm.tar.xz
 
-    - name: Build Release Mac
-      if: matrix.os == 'macos-latest'
-      env:
-        GITUI_RELEASE: 1
-      run: make release-mac
-    - name: Build Release Mac x86
-      if: matrix.os == 'macos-latest'
-      env:
-        GITUI_RELEASE: 1
-      run: |
-        rustup target add x86_64-apple-darwin
-        make release-mac-x86
-    - name: Build Release Linux
-      if: matrix.os == 'ubuntu-latest'
-      env:
-        GITUI_RELEASE: 1
-      run: make release-linux-musl
-    - name: Build Release Win
-      if: matrix.os == 'windows-latest'
-      env:
-        GITUI_RELEASE: 1
-      run: make release-win
-    - name: Build Release Linux ARM
-      if: matrix.os == 'ubuntu-22.04'
-      env:
-        GITUI_RELEASE: 1
-      run: make release-linux-arm
+          echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-aarch64-linux-gnu/bin" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/bin" >> $GITHUB_PATH
 
-    - name: Set SHA
-      if: matrix.os == 'macos-latest'
-      id: shasum
-      run: |
-        echo sha="$(shasum -a 256 ./release/gitui-mac.tar.gz | awk '{printf $1}')" >> $GITHUB_OUTPUT
+      - name: Build Release Mac
+        if: matrix.os == 'macos-latest'
+        env:
+          GITUI_RELEASE: 1
+        run: make release-mac
+      - name: Build Release Mac x86
+        if: matrix.os == 'macos-latest'
+        env:
+          GITUI_RELEASE: 1
+        run: |
+          rustup target add x86_64-apple-darwin
+          make release-mac-x86
+      - name: Build Release Linux
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GITUI_RELEASE: 1
+        run: make release-linux-musl
+      - name: Build Release Win
+        if: matrix.os == 'windows-latest'
+        env:
+          GITUI_RELEASE: 1
+        run: make release-win
+      - name: Build Release Linux ARM
+        if: matrix.os == 'ubuntu-22.04'
+        env:
+          GITUI_RELEASE: 1
+        run: make release-linux-arm
 
-    - name: Extract release notes
-      if: matrix.os == 'ubuntu-latest'
-      id: release_notes
-      uses: ffurrer2/extract-release-notes@v2
-      
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      with:
-        body: ${{ steps.release_notes.outputs.release_notes }}
-        prerelease: ${{ contains(github.ref, '-') }}
-        files: |
-          ./release/*.tar.gz
-          ./release/*.zip
-          ./release/*.msi
+      - name: Set SHA
+        if: matrix.os == 'macos-latest'
+        id: shasum
+        run: |
+          echo sha="$(shasum -a 256 ./release/gitui-mac.tar.gz | awk '{printf $1}')" >> $GITHUB_OUTPUT
 
-    - name: Bump homebrew-core formula
-      uses: mislav/bump-homebrew-formula-action@v3
-      if: "matrix.os == 'macos-latest' && !contains(github.ref, '-')" # skip prereleases
-      env:
-        COMMITTER_TOKEN: ${{ secrets.BREW_TOKEN }}
-      with:
-        formula-name: gitui
-        # https://github.com/mislav/bump-homebrew-formula-action/issues/58
-        formula-path: Formula/g/gitui.rb
+      - name: Extract release notes
+        if: matrix.os == 'ubuntu-latest'
+        id: release_notes
+        uses: ffurrer2/extract-release-notes@v2
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.release_notes.outputs.release_notes }}
+          prerelease: ${{ contains(github.ref, '-') }}
+          files: |
+            ./release/*.tar.gz
+            ./release/*.zip
+            ./release/*.msi
+
+      - name: Bump homebrew-core formula
+        uses: mislav/bump-homebrew-formula-action@v3
+        if: "matrix.os == 'macos-latest' && !contains(github.ref, '-')" # skip prereleases
+        env:
+          COMMITTER_TOKEN: ${{ secrets.BREW_TOKEN }}
+        with:
+          formula-name: gitui
+          # https://github.com/mislav/bump-homebrew-formula-action/issues/58
+          formula-path: Formula/g/gitui.rb

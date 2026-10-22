@@ -134,7 +134,7 @@ impl OptionsPopup {
 		]));
 	}
 
-	fn move_selection(&mut self, up: bool) {
+	const fn move_selection(&mut self, up: bool) {
 		if up {
 			self.selection = match self.selection {
 				AppOption::StatusShowUntracked => {

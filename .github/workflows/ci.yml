@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.rust == 'nightly' }}
 
@@ -47,9 +47,20 @@ jobs:
       - name: Rustup Show
         run: rustup show
 
+      - uses: taiki-e/install-action@nextest
+
       - name: Build Debug
         run: |
           cargo build
+
+      # gpgsm: needed by the x509 signing e2e test (unix-only)
+      - name: Install commit-signing tools (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y gpgsm
+
+      - name: Install commit-signing tools (macos)
+        if: matrix.os == 'macos-latest'
+        run: brew install gnupg
 
       - name: Run tests
         run: make test
@@ -92,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -121,9 +132,14 @@ jobs:
       - name: Rustup Show
         run: rustup show
 
+      - uses: taiki-e/install-action@nextest
+
       - name: Setup MUSL
         run: |
           sudo apt-get -qq install musl-tools
+      # gpgsm: needed by the x509 signing e2e test
+      - name: Install commit-signing tools
+        run: sudo apt-get -qq install gpgsm
       - name: Build Debug
         run: |
           make build-linux-musl-debug
@@ -144,7 +160,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -163,6 +179,14 @@ jobs:
 
       - name: Override rust toolchain
         run: rustup override set ${{ matrix.rust }}
+
+      - uses: taiki-e/install-action@nextest
+
+      # qemu runs the cross-compiled aarch64 test binaries; the aarch64 cross
+      # runtime provides the sysroot qemu loads guest libs from; gpgsm is needed
+      # by the x509 signing e2e test (ssh-keygen/gpg/openssl are preinstalled).
+      - name: Install emulation and signing tools
+        run: sudo apt-get update && sudo apt-get install -y qemu-user-static libc6-arm64-cross libgcc-s1-arm64-cross gpgsm
 
       - name: Setup ARM toolchain
         run: |
@@ -185,6 +209,16 @@ jobs:
       - name: Build Debug
         run: |
           make build-linux-arm-debug
+
+      # Run the suite for aarch64 under emulation. qemu emulates the aarch64
+      # test binary (loading its libs from the cross sysroot via -L) while
+      # passing native x86 child processes (git, gpg, ssh-keygen, ...) straight
+      # through to the host, so the signing e2e tests exercise the real tools.
+      - name: Run tests (aarch64, emulated)
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64-static -L /usr/aarch64-linux-gnu
+        run: make test-linux-arm
+
       - name: Build Release
         run: |
           make build-linux-arm-release
@@ -195,7 +229,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable, "1.82"]
+        rust: [nightly, stable, "1.88"]
     continue-on-error: ${{ matrix.rust == 'nightly' }}
     steps:
       - uses: actions/checkout@v4
@@ -249,10 +283,16 @@ jobs:
 
       - run: cargo fmt -- --check
 
-      - name: cargo-sort
+      - name: tombi install
+        uses: tombi-toml/setup-tombi@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: '0.9.0'
+      
+      - name: tombi check
         run: |
-          cargo install cargo-sort --force
-          cargo sort -c -w
+          tombi format --check
 
       - name: cargo-deny install
         run: |
@@ -304,7 +344,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install stable Rust
         uses: actions-rs/toolchain@v1

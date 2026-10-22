@@ -46,7 +46,7 @@ impl GotoLinePopup {
 		}
 	}
 
-	pub fn open(&mut self, max_line: usize) {
+	pub const fn open(&mut self, max_line: usize) {
 		self.visible = true;
 		self.max_line = max_line;
 	}

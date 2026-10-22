@@ -225,7 +225,7 @@ impl LogSearchPopupPopup {
 				),
 			)]),
 			Line::from(vec![Span::styled(
-				format!("[{x_summary}] summary",),
+				format!("[{x_summary}] summary"),
 				self.theme.text(
 					matches!(
 						self.selection,
@@ -235,7 +235,7 @@ impl LogSearchPopupPopup {
 				),
 			)]),
 			Line::from(vec![Span::styled(
-				format!("[{x_body}] message body",),
+				format!("[{x_body}] message body"),
 				self.theme.text(
 					matches!(
 						self.selection,
@@ -245,7 +245,7 @@ impl LogSearchPopupPopup {
 				),
 			)]),
 			Line::from(vec![Span::styled(
-				format!("[{x_files}] committed files",),
+				format!("[{x_files}] committed files"),
 				self.theme.text(
 					matches!(
 						self.selection,
@@ -255,7 +255,7 @@ impl LogSearchPopupPopup {
 				),
 			)]),
 			Line::from(vec![Span::styled(
-				format!("[{x_authors}] authors",),
+				format!("[{x_authors}] authors"),
 				self.theme.text(
 					matches!(
 						self.selection,
@@ -315,7 +315,7 @@ impl LogSearchPopupPopup {
 		}
 	}
 
-	fn move_selection(&mut self, arg: bool) {
+	const fn move_selection(&mut self, arg: bool) {
 		if arg {
 			//up
 			self.selection = match self.selection {

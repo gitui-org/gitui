@@ -20,13 +20,18 @@ pub fn repo_init_empty() -> (TempDir, Repository) {
 	(td, repo)
 }
 
-/// initialize test repo in temp path with an empty first commit
-pub fn repo_init() -> (TempDir, Repository) {
+/// initialize test repo in temp path with given suffix and an empty first commit
+pub fn repo_init_suffix<T: AsRef<std::ffi::OsStr>>(
+	suffix: Option<T>,
+) -> (TempDir, Repository) {
 	init_log();
 
 	sandbox_config_files();
 
-	let td = TempDir::new().unwrap();
+	let td = match suffix {
+		Some(suffix) => TempDir::with_suffix(suffix).unwrap(),
+		None => TempDir::new().unwrap(),
+	};
 	let repo = Repository::init(td.path()).unwrap();
 	{
 		let mut config = repo.config().unwrap();
@@ -43,6 +48,11 @@ pub fn repo_init() -> (TempDir, Repository) {
 	}
 
 	(td, repo)
+}
+
+/// initialize test repo in temp path with an empty first commit
+pub fn repo_init() -> (TempDir, Repository) {
+	repo_init_suffix::<&std::ffi::OsStr>(None)
 }
 
 // init log

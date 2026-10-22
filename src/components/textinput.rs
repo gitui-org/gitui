@@ -18,9 +18,9 @@ use ratatui::{
 	widgets::{Clear, Paragraph},
 	Frame,
 };
+use ratatui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 use std::cell::Cell;
 use std::cell::OnceCell;
-use tui_textarea::{CursorMove, Input, Key, Scrolling, TextArea};
 
 ///
 #[derive(PartialEq, Eq)]
@@ -122,17 +122,17 @@ impl TextInputComponent {
 	}
 
 	/// screen area (last time we got drawn)
-	pub fn get_area(&self) -> Rect {
+	pub const fn get_area(&self) -> Rect {
 		self.current_area.get()
 	}
 
 	/// embed into parent draw area
-	pub fn embed(&mut self) {
+	pub const fn embed(&mut self) {
 		self.embed = true;
 	}
 
 	///
-	pub fn enabled(&mut self, enable: bool) {
+	pub const fn enabled(&mut self, enable: bool) {
 		self.selected = Some(enable);
 	}
 

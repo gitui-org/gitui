@@ -116,7 +116,7 @@ impl Options {
 		self.save();
 	}
 
-	pub fn has_commit_msg_history(&self) -> bool {
+	pub const fn has_commit_msg_history(&self) -> bool {
 		!self.data.commit_msgs.is_empty()
 	}
 

@@ -18,7 +18,7 @@ impl HorizontalScroll {
 		}
 	}
 
-	pub fn get_right(&self) -> usize {
+	pub const fn get_right(&self) -> usize {
 		self.right.get()
 	}
 

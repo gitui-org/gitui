@@ -108,7 +108,7 @@ macro_rules! any_popup_visible {
 #[macro_export]
 macro_rules! draw_popups {
     ($self:ident, [$($element:ident),+]) => {
-        fn draw_popups(& $self, mut f: &mut Frame) -> Result<()>{
+        fn draw_popups(& $self, f: &mut Frame) -> Result<()>{
             //TODO: move the layout part out and feed it into `draw_popups`
             let size = Layout::default()
             .direction(Direction::Vertical)
@@ -121,7 +121,7 @@ macro_rules! draw_popups {
             )
             .split(f.area())[0];
 
-            ($($self.$element.draw(&mut f, size)?) , +);
+            ($($self.$element.draw(&mut *f, size)?) , +);
 
             return Ok(());
         }

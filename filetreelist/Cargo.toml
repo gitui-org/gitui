@@ -1,6 +1,6 @@
 [package]
 name = "filetreelist"
-version = "0.5.3"
+version = "0.6.0"
 authors = ["extrawurst <mail@rusticorn.com>"]
 edition = "2021"
 description = "filetree abstraction based on a sorted path list, supports key based navigation events, folding, scrolling and more"
@@ -9,7 +9,7 @@ repository = "https://github.com/gitui-org/gitui"
 readme = "README.md"
 license = "MIT"
 categories = ["command-line-utilities"]
-keywords = ["gui", "cli", "terminal", "ui", "tui"]
+keywords = ["cli", "gui", "terminal", "tui", "ui"]
 exclude = ["/demo.gif"]
 
 [dependencies]

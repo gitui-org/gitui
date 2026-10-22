@@ -44,7 +44,7 @@ impl<'a> LineComposer<'a> for WordWrapper<'a, '_> {
 			return None;
 		}
 		std::mem::swap(&mut self.current_line, &mut self.next_line);
-		self.next_line.truncate(0);
+		self.next_line.clear();
 
 		let mut current_line_width = self
 			.current_line
@@ -161,7 +161,10 @@ impl<'a, 'b> LineTruncator<'a, 'b> {
 		}
 	}
 
-	pub fn set_horizontal_offset(&mut self, horizontal_offset: u16) {
+	pub const fn set_horizontal_offset(
+		&mut self,
+		horizontal_offset: u16,
+	) {
 		self.horizontal_offset = horizontal_offset;
 	}
 }
@@ -172,7 +175,7 @@ impl<'a> LineComposer<'a> for LineTruncator<'a, '_> {
 			return None;
 		}
 
-		self.current_line.truncate(0);
+		self.current_line.clear();
 		let mut current_line_width = 0;
 
 		let mut skip_rest = false;

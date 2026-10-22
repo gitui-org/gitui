@@ -438,6 +438,13 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 	}
 }
 
+pub const fn normalize_branch_name_char(c: char) -> char {
+	match c {
+		' ' => '-',
+		c => c,
+	}
+}
+
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum CheckoutOptions {
 	KeepLocalChanges,
@@ -1932,5 +1939,21 @@ pub mod commands {
 			"Go to the given line",
 			CMD_GROUP_GENERAL,
 		)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_spaces_are_replaced_by_dashes_in_branch_name() {
+		let input = "feature/auto replace spaces in branch name";
+		let output: String =
+			input.chars().map(normalize_branch_name_char).collect();
+		assert_eq!(
+			output,
+			"feature/auto-replace-spaces-in-branch-name"
+		);
 	}
 }

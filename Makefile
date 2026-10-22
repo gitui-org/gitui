@@ -59,7 +59,15 @@ build-linux-musl-release:
 	cargo build --release --target=x86_64-unknown-linux-musl --locked
 
 test-linux-musl:
-	cargo test --workspace --target=x86_64-unknown-linux-musl
+	cargo nextest run --workspace --target=x86_64-unknown-linux-musl
+
+# aarch64 test binaries are cross-compiled, so CI runs them under qemu via a
+# CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER (see .github/workflows/ci.yml).
+# Exclude test_hook_with_missing_shebang: it needs the kernel's ENOEXEC (so
+# gitui retries the hook via `sh`), which qemu-user doesn't emulate — the exec
+# just exits 127. It passes on real aarch64 hardware.
+test-linux-arm:
+	cargo nextest run --workspace --target=aarch64-unknown-linux-gnu -E 'not test(test_hook_with_missing_shebang)'
 
 release-linux-arm: build-linux-arm-release
 	mkdir -p release
@@ -83,7 +91,7 @@ build-linux-arm-release:
 	cargo build --release --target=arm-unknown-linux-gnueabihf --locked
 
 test:
-	cargo test --workspace
+	cargo nextest run --workspace
 
 fmt:
 	cargo fmt -- --check
@@ -94,7 +102,7 @@ clippy:
 clippy-nightly:
 	cargo +nightly clippy --workspace --all-features
 
-check: fmt clippy test sort
+check: fmt clippy test sort deny
 
 check-nightly:
 	cargo +nightly c
@@ -105,7 +113,7 @@ deny:
 	cargo deny check
 
 sort:
-	cargo sort -c -w "."
+	tombi format --check
 
 install:
 	cargo install --path "." --offline --locked

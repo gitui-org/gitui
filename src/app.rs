@@ -161,7 +161,7 @@ impl App {
 		key_config: KeyConfig,
 	) -> Result<Self> {
 		let repo = RefCell::new(cliargs.repo_path.clone());
-		log::trace!("open repo at: {:?}", &repo);
+		log::trace!("open repo at: {repo:?}");
 
 		let repo_path_text =
 			repo_work_dir(&repo.borrow()).unwrap_or_default();
@@ -1097,7 +1097,7 @@ impl App {
 			Err(e) => {
 				log::error!("delete remote: {e:?}");
 				self.queue.push(InternalEvent::ShowErrorMsg(
-					format!("delete remote error:\n{e}",),
+					format!("delete remote error:\n{e}"),
 				));
 			}
 		}

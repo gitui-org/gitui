@@ -160,7 +160,9 @@ pub fn get_branches_info(
 				.branch_upstream_remote(&reference)
 				.ok()
 				.as_ref()
-				.and_then(git2::Buf::as_str)
+				.and_then(|upstream_remote| {
+					git2::Buf::as_str(upstream_remote).ok()
+				})
 				.map(String::from);
 
 			let name_bytes = branch.name_bytes()?;
@@ -332,7 +334,7 @@ pub fn checkout_branch(
 		Some(&mut git2::build::CheckoutBuilder::new()),
 	)?;
 
-	let branch_ref = branch_ref.name().ok_or_else(|| {
+	let branch_ref = branch_ref.name().map_err(|_| {
 		Error::Generic(String::from("branch ref not found"))
 	});
 
