@@ -244,6 +244,7 @@ mod tests {
 			notify_watcher: false,
 			key_bindings_path: None,
 			key_symbols_path: None,
+			no_terminal_title: false,
 		};
 
 		let theme = Theme::init(&PathBuf::new());
