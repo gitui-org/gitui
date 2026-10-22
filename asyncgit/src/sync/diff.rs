@@ -39,10 +39,13 @@ impl From<git2::DiffLineType> for DiffLineType {
 	fn from(line_type: git2::DiffLineType) -> Self {
 		match line_type {
 			git2::DiffLineType::HunkHeader => Self::Header,
-			git2::DiffLineType::DeleteEOFNL
-			| git2::DiffLineType::Deletion => Self::Delete,
-			git2::DiffLineType::AddEOFNL
-			| git2::DiffLineType::Addition => Self::Add,
+			git2::DiffLineType::Deletion => Self::Delete,
+			git2::DiffLineType::Addition => Self::Add,
+			// `AddEOFNL`/`DeleteEOFNL` are the "\ No newline at end
+			// of file" marker. It is not a change of its own and it
+			// follows the line of the *other* side (e.g. `AddEOFNL`
+			// comes after the deleted line), so show it like git
+			// does: as a plain line.
 			_ => Self::None,
 		}
 	}
@@ -415,7 +418,7 @@ fn new_file_content(path: &Path) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-	use super::{get_diff, get_diff_commit};
+	use super::{get_diff, get_diff_commit, DiffLineType};
 	use crate::{
 		error::Result,
 		sync::{
@@ -663,6 +666,66 @@ mod tests {
 		dbg!(&diff);
 		assert_eq!(diff.sizes, (1, 2));
 		assert_eq!(diff.size_delta, 1);
+
+		Ok(())
+	}
+
+	fn no_newline_marker_line_type(
+		old: &[u8],
+		new: &[u8],
+	) -> Result<DiffLineType> {
+		let file_path = Path::new("bar.txt");
+		let (_td, repo) = repo_init_empty().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		File::create(root.join(file_path))?.write_all(old)?;
+		stage_add_file(repo_path, file_path).unwrap();
+		commit(repo_path, "commit").unwrap();
+
+		File::create(root.join(file_path))?.write_all(new)?;
+
+		let diff = get_diff(
+			repo_path,
+			file_path.to_str().unwrap(),
+			false,
+			None,
+		)
+		.unwrap();
+
+		let markers = diff
+			.hunks
+			.iter()
+			.flat_map(|hunk| hunk.lines.iter())
+			.filter(|line| line.content.starts_with('\\'))
+			.collect::<Vec<_>>();
+		dbg!(&diff);
+		assert_eq!(markers.len(), 1);
+
+		Ok(markers[0].line_type)
+	}
+
+	#[test]
+	fn test_no_newline_marker_when_adding_newline() -> Result<()> {
+		// the marker belongs to the old side here, so it must not be
+		// shown as an added line
+		assert_eq!(
+			no_newline_marker_line_type(b"foo", b"foo\n")?,
+			DiffLineType::None
+		);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_no_newline_marker_when_removing_newline() -> Result<()> {
+		// the marker belongs to the new side here, so it must not be
+		// shown as a deleted line
+		assert_eq!(
+			no_newline_marker_line_type(b"foo\n", b"foo")?,
+			DiffLineType::None
+		);
 
 		Ok(())
 	}

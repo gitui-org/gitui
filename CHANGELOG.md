@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * crash when opening submodule ([#2895](https://github.com/gitui-org/gitui/issues/2895))
 * when staging the last file in a directory, the first item after the directory is no longer skipped [[@Tillerino](https://github.com/Tillerino)] ([#2748](https://github.com/gitui-org/gitui/issues/2748))
 * index-out-of-bounds panic when unstaging lines near the end of a diff ([#2953](https://github.com/gitui-org/gitui/issues/2953))
+* show the "\ No newline at end of file" marker as a plain line in diffs instead of colouring it as an addition/deletion of the wrong side [[@b84330808](https://github.com/b84330808)] ([#2223](https://github.com/gitui-org/gitui/issues/2223))
 
 ## [0.28.1] - 2026-03-21
 
