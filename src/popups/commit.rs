@@ -18,7 +18,6 @@ use asyncgit::{
 		self, get_config_string, CommitId, HookResult,
 		PrepareCommitMsgSource, RepoPathRef, RepoState,
 	},
-	StatusItem, StatusItemType,
 };
 use crossterm::event::Event;
 use easy_cast::Cast;
@@ -28,10 +27,11 @@ use ratatui::{
 	Frame,
 };
 
+use std::process::Command;
 use std::{
 	fmt::Write as _,
 	fs::{read_to_string, File},
-	io::{Read, Write},
+	io::Read,
 	path::PathBuf,
 	str::FromStr,
 };
@@ -144,47 +144,18 @@ impl CommitPopup {
 		}
 	}
 
-	const fn item_status_char(
-		item_type: StatusItemType,
-	) -> &'static str {
-		match item_type {
-			StatusItemType::Modified => "modified",
-			StatusItemType::New => "new file",
-			StatusItemType::Deleted => "deleted",
-			StatusItemType::Renamed => "renamed",
-			StatusItemType::Typechange => " ",
-			StatusItemType::Conflicted => "conflicted",
-		}
-	}
+	pub fn show_editor(&mut self) -> Result<()> {
+		let git_dir = sync::repo_dir(&self.repo.borrow())?;
+		let work_dir = sync::repo_work_dir(&self.repo.borrow())?;
+		let file_path = git_dir.join("COMMIT_EDITMSG");
 
-	pub fn show_editor(
-		&mut self,
-		changes: Vec<StatusItem>,
-	) -> Result<()> {
-		let file_path = sync::repo_dir(&self.repo.borrow())?
-			.join("COMMIT_EDITMSG");
-
-		{
-			let mut file = File::create(&file_path)?;
-			file.write_fmt(format_args!(
-				"{}\n",
-				self.input.get_text()
-			))?;
-			file.write_all(
-				strings::commit_editor_msg(&self.key_config)
-					.as_bytes(),
-			)?;
-
-			file.write_all(b"\n#\n# Changes to be committed:")?;
-
-			for change in changes {
-				let status_char =
-					Self::item_status_char(change.status);
-				let message =
-					format!("\n#\t{status_char}: {}", change.path);
-				file.write_all(message.as_bytes())?;
-			}
-		}
+		Command::new("git")
+			.arg("commit")
+			.arg("--verbose")
+			.env("EDITOR", "false")
+			.env("GIT_DIR", git_dir)
+			.env("GIT_WORK_TREE", work_dir)
+			.output()?;
 
 		ExternalEditorPopup::open_file_in_editor(
 			&self.repo.borrow(),
@@ -199,7 +170,7 @@ impl CommitPopup {
 		std::fs::remove_file(&file_path)?;
 
 		message =
-			commit_message_prettify(&self.repo.borrow(), message)?;
+			commit_message_prettify(&self.repo.borrow(), &message)?;
 		self.input.set_text(message);
 		self.input.show()?;
 
@@ -210,7 +181,7 @@ impl CommitPopup {
 		let msg = self.input.get_text().to_string();
 
 		if matches!(
-			self.commit_with_msg(msg)?,
+			self.commit_with_msg(&msg)?,
 			CommitResult::CommitDone
 		) {
 			self.options
@@ -227,10 +198,7 @@ impl CommitPopup {
 		Ok(())
 	}
 
-	fn commit_with_msg(
-		&mut self,
-		msg: String,
-	) -> Result<CommitResult> {
+	fn commit_with_msg(&mut self, msg: &str) -> Result<CommitResult> {
 		// on exit verify should always be on
 		let verify = self.verify;
 		self.verify = true;
