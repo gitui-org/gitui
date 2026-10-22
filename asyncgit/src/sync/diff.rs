@@ -8,18 +8,30 @@ use super::{
 	CommitId, RepoPath,
 };
 use crate::{
-	error::Error,
-	error::Result,
+	error::{Error, Result},
 	hash,
-	sync::{get_stashes, repository::repo},
+	sync::{get_stashes, gix_repo, repository::repo},
 };
 use easy_cast::Conv;
 use git2::{
 	Delta, Diff, DiffDelta, DiffFormat, DiffHunk, Patch, Repository,
 };
+use gix::{
+	bstr::ByteSlice,
+	diff::blob::{
+		unified_diff::{ConsumeHunk, ContextSize, DiffLineKind},
+		UnifiedDiff,
+	},
+	ObjectId,
+};
 use scopetime::scope_time;
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, fs, path::Path, rc::Rc};
+use std::{
+	cell::RefCell,
+	fs,
+	path::{Path, PathBuf},
+	rc::Rc,
+};
 
 /// type of diff of a single line
 #[derive(Copy, Clone, Default, PartialEq, Eq, Hash, Debug)]
@@ -44,6 +56,16 @@ impl From<git2::DiffLineType> for DiffLineType {
 			git2::DiffLineType::AddEOFNL
 			| git2::DiffLineType::Addition => Self::Add,
 			_ => Self::None,
+		}
+	}
+}
+
+impl From<DiffLineKind> for DiffLineType {
+	fn from(value: DiffLineKind) -> Self {
+		match value {
+			DiffLineKind::Context => Self::None,
+			DiffLineKind::Add => Self::Add,
+			DiffLineKind::Remove => Self::Delete,
 		}
 	}
 }
@@ -195,6 +217,133 @@ pub(crate) fn get_diff_raw<'a>(
 	Ok(diff)
 }
 
+pub(crate) fn tokens_for_diffing(
+	data: &[u8],
+) -> impl gix::diff::blob::intern::TokenSource<Token = &[u8]> {
+	gix::diff::blob::sources::byte_lines(data)
+}
+
+impl ConsumeHunk for FileDiff {
+	type Out = Self;
+
+	fn consume_hunk(
+		&mut self,
+		header: gix::diff::blob::unified_diff::HunkHeader,
+		hunk_lines: &[(DiffLineKind, &[u8])],
+	) -> std::io::Result<()> {
+		let mut lines = vec![DiffLine {
+			content: header.to_string().into(),
+			line_type: DiffLineType::Header,
+			position: DiffLinePosition {
+				old_lineno: None,
+				new_lineno: None,
+			},
+		}];
+		lines.extend(hunk_lines.iter().enumerate().map(
+			|(i, (kind, line))| {
+				DiffLine {
+					content: line
+						.to_str_lossy()
+						.trim_matches(is_newline)
+						.into(),
+					line_type: (*kind).into(),
+					position: DiffLinePosition {
+						old_lineno: Some(
+							header.before_hunk_start
+								+ u32::try_from(i).unwrap(),
+						),
+						new_lineno: Some(
+							header.after_hunk_start
+								+ u32::try_from(i).unwrap(),
+						),
+					},
+				}
+			},
+		));
+
+		let hunk_header = HunkHeader {
+			old_start: header.before_hunk_start,
+			old_lines: header.before_hunk_len,
+			new_start: header.after_hunk_start,
+			new_lines: header.after_hunk_len,
+		};
+
+		self.lines += lines.len();
+
+		self.hunks.push(Hunk {
+			header_hash: hash(&hunk_header),
+			lines,
+		});
+
+		Ok(())
+	}
+
+	fn finish(self) -> Self::Out {
+		self
+	}
+}
+
+fn id_and_root_in_head(
+	gix_repo: &gix::Repository,
+	p: &str,
+) -> (ObjectId, Option<PathBuf>) {
+	let id = gix_repo
+		.head_tree()
+		.map_or(None, |head_tree| {
+			head_tree
+				.lookup_entry_by_path(p)
+				.ok()
+				.flatten()
+				.map(|entry| entry.object_id())
+		})
+		.unwrap_or(ObjectId::null(gix::hash::Kind::Sha1));
+
+	(id, None)
+}
+
+fn id_and_root_in_index(
+	gix_repo: &gix::Repository,
+	p: &str,
+) -> (ObjectId, Option<PathBuf>) {
+	let id = gix_repo
+		.index()
+		.map_or(None, |index| {
+			index.entry_by_path(p.into()).map(|entry| entry.id)
+		})
+		.unwrap_or(ObjectId::null(gix::hash::Kind::Sha1));
+
+	(id, None)
+}
+
+fn file_diff_for_binary_files(
+	old_data: gix::diff::blob::platform::resource::Data,
+	new_data: gix::diff::blob::platform::resource::Data,
+) -> FileDiff {
+	use gix::diff::blob::platform::resource::Data;
+
+	let mut file_diff = FileDiff::default();
+
+	let old_size = match old_data {
+		Data::Missing => 0,
+		Data::Buffer { buf, .. } => u64::conv(buf.len()),
+		Data::Binary { size } => size,
+	};
+	let new_size = match new_data {
+		Data::Missing => 0,
+		Data::Buffer { buf, .. } => u64::conv(buf.len()),
+		Data::Binary { size } => size,
+	};
+
+	let sizes = (old_size, new_size);
+	let size_delta =
+		(i64::conv(new_size)).saturating_sub(i64::conv(old_size));
+
+	file_diff.sizes = sizes;
+	file_diff.size_delta = size_delta;
+
+	file_diff
+}
+
 /// returns diff of a specific file either in `stage` or workdir
 pub fn get_diff(
 	repo_path: &RepoPath,
@@ -204,11 +353,91 @@ pub fn get_diff(
 ) -> Result<FileDiff> {
 	scope_time!("get_diff");
 
-	let repo = repo(repo_path)?;
-	let work_dir = work_dir(&repo)?;
-	let diff = get_diff_raw(&repo, p, stage, false, options)?;
+	let mut gix_repo = gix_repo(repo_path)?;
+	gix_repo.object_cache_size_if_unset(
+		gix_repo.compute_object_cache_size_for_tree_diffs(
+			&**gix_repo.index_or_empty()?,
+		),
+	);
 
-	raw_diff_to_file_diff(&diff, work_dir)
+	// TODO:
+	// The lower tree is `stage == true`, the upper tree is `stage == false`.
+	let (old_blob_id, old_root) = if stage {
+		id_and_root_in_head(&gix_repo, p)
+	} else {
+		id_and_root_in_index(&gix_repo, p)
+	};
+	let (new_blob_id, new_root) = if stage {
+		id_and_root_in_index(&gix_repo, p)
+	} else {
+		(
+			ObjectId::null(gix::hash::Kind::Sha1),
+			gix_repo.workdir().map(ToOwned::to_owned),
+		)
+	};
+
+	let worktree_roots = gix::diff::blob::pipeline::WorktreeRoots {
+		old_root,
+		new_root,
+	};
+
+	let mut resource_cache = gix_repo.diff_resource_cache(gix::diff::blob::pipeline::Mode::ToGitUnlessBinaryToTextIsPresent, worktree_roots)?;
+
+	resource_cache.set_resource(
+		old_blob_id,
+		gix::object::tree::EntryKind::Blob,
+		p.as_ref(),
+		gix::diff::blob::ResourceKind::OldOrSource,
+		&gix_repo.objects,
+	)?;
+	resource_cache.set_resource(
+		new_blob_id,
+		gix::object::tree::EntryKind::Blob,
+		p.as_ref(),
+		gix::diff::blob::ResourceKind::NewOrDestination,
+		&gix_repo.objects,
+	)?;
+
+	let outcome = resource_cache.prepare_diff()?;
+
+	let diff_algorithm = {
+		use gix::diff::blob::platform::prepare_diff::Operation;
+
+		match outcome.operation {
+			Operation::InternalDiff { algorithm } => algorithm,
+			Operation::ExternalCommand { .. } => {
+				unreachable!("We disabled that")
+			}
+			Operation::SourceOrDestinationIsBinary => {
+				return Ok(file_diff_for_binary_files(
+					outcome.old.data,
+					outcome.new.data,
+				));
+			}
+		}
+	};
+
+	let input = gix::diff::blob::intern::InternedInput::new(
+		tokens_for_diffing(
+			outcome.old.data.as_slice().unwrap_or_default(),
+		),
+		tokens_for_diffing(
+			outcome.new.data.as_slice().unwrap_or_default(),
+		),
+	);
+
+	let context_size = options.map_or(3, |opts| opts.context);
+
+	let unified_diff = UnifiedDiff::new(
+		&input,
+		FileDiff::default(),
+		ContextSize::symmetrical(context_size),
+	);
+
+	let file_diff =
+		gix::diff::blob::diff(diff_algorithm, &input, unified_diff)?;
+
+	Ok(file_diff)
 }
 
 /// returns diff of a specific file inside a commit
