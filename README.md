@@ -133,6 +133,20 @@ sudo emerge dev-vcs/gitui::dm9pZCAq
 sudo zypper install gitui
 ```
 
+##### Debian / Ubuntu
+
+GitUI is not in the official Debian or Ubuntu repositories yet ([ITP #1041509](https://bugs.debian.org/1041509)). The x86_64 [release binary](#release-binaries) is statically linked, so it works on any version:
+
+```sh
+curl -sSLO https://github.com/gitui-org/gitui/releases/latest/download/gitui-linux-x86_64.tar.gz
+tar -xzf gitui-linux-x86_64.tar.gz
+sudo install -m 755 gitui /usr/local/bin/
+```
+
+On ARM use `gitui-linux-aarch64.tar.gz` (64 bit) or `gitui-linux-armv7.tar.gz` (armhf) instead. These need glibc 2.28 or newer (Debian 10, Ubuntu 20.04 or later).
+
+To build from source, install a C toolchain with `sudo apt install build-essential` and Rust via [rustup](https://rustup.rs) (the distro `rustc` may be older than the [minimum supported version](#build)), then run `cargo install gitui --locked`.
+
 ##### Homebrew (macOS)
 
 ```sh

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* add Debian/Ubuntu installation instructions [[@saimskywalker](https://github.com/saimskywalker)] ([#1018](https://github.com/gitui-org/gitui/issues/1018))
 * support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
 
 ### Changed
