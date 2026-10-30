@@ -111,20 +111,21 @@ impl KeyConfig {
 					u
 				)
 			}
-			KeyCode::Null => {
-				self.get_modifier_hint(ev.modifiers).into()
-			}
+			KeyCode::Null => self.get_modifier_hint(ev.modifiers),
 			_ => String::new(),
 		}
 	}
 
-	fn get_modifier_hint(&self, modifier: KeyModifiers) -> &str {
-		match modifier {
-			KeyModifiers::CONTROL => &self.symbols.control,
-			KeyModifiers::SHIFT => &self.symbols.shift,
-			KeyModifiers::ALT => &self.symbols.alt,
-			_ => "",
-		}
+	fn get_modifier_hint(&self, modifier: KeyModifiers) -> String {
+		[
+			(KeyModifiers::CONTROL, &self.symbols.control),
+			(KeyModifiers::SHIFT, &self.symbols.shift),
+			(KeyModifiers::ALT, &self.symbols.alt),
+		]
+		.into_iter()
+		.filter(|(flag, _)| modifier.contains(*flag))
+		.map(|(_, symbol)| symbol.as_str())
+		.collect()
 	}
 }
 
@@ -143,6 +144,24 @@ mod tests {
 			KeyModifiers::CONTROL,
 		));
 		assert_eq!(h, "^c");
+	}
+
+	#[test]
+	fn test_get_hint_combined_modifiers() {
+		let config = KeyConfig::default();
+		let h = config.get_hint(GituiKeyEvent::new(
+			KeyCode::Char('c'),
+			KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+		));
+		assert_eq!(h, "^\u{21e7}c");
+
+		let h = config.get_hint(GituiKeyEvent::new(
+			KeyCode::Up,
+			KeyModifiers::CONTROL
+				| KeyModifiers::SHIFT
+				| KeyModifiers::ALT,
+		));
+		assert_eq!(h, "^\u{21e7}\u{2325}\u{2191}");
 	}
 
 	#[test]
