@@ -1,4 +1,4 @@
-use super::apply_selection;
+use super::{apply_selection, NEWLINE};
 use crate::{
 	error::{Error, Result},
 	sync::{
@@ -42,7 +42,9 @@ pub fn stage_lines(
 			get_file_diff_patch(&repo, file_path, is_stage, false)?;
 		let hunks = patch_get_hunklines(&patch)?;
 
-		let old_lines = indexed_content.lines().collect::<Vec<_>>();
+		let old_lines = indexed_content
+			.split_terminator(NEWLINE)
+			.collect::<Vec<_>>();
 
 		apply_selection(lines, &hunks, &old_lines, is_stage, false)?
 	};
@@ -187,5 +189,36 @@ c = 4";
 		let diff = get_diff(path, "test.txt", true, None).unwrap();
 
 		assert_eq!(diff.lines, 4);
+	}
+
+	#[test]
+	fn test_stage_keeps_crlf() {
+		static FILE_1: &str = "a\r\nb\r\nc\r\n";
+		static FILE_2: &str = "a\r\nb\r\nc\r\nX\r\n";
+
+		let (path, repo) = repo_init().unwrap();
+		let path: &RepoPath = &path.path().to_str().unwrap().into();
+
+		write_commit_file(&repo, "test.txt", FILE_1, "c1");
+
+		repo_write_file(&repo, "test.txt", FILE_2).unwrap();
+
+		stage_lines(
+			path,
+			"test.txt",
+			false,
+			&[DiffLinePosition {
+				old_lineno: None,
+				new_lineno: Some(4),
+			}],
+		)
+		.unwrap();
+
+		let mut index = repo.index().unwrap();
+		index.read(true).unwrap();
+		let entry = index.get_path(Path::new("test.txt"), 0).unwrap();
+		let blob = repo.find_blob(entry.id).unwrap();
+
+		assert_eq!(blob.content(), FILE_2.as_bytes());
 	}
 }
