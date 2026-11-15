@@ -1,4 +1,4 @@
-use super::{apply_selection, load_file};
+use super::{apply_selection, load_file, NEWLINE};
 use crate::{
 	error::Result,
 	sync::{
@@ -32,7 +32,9 @@ pub fn discard_lines(
 		let hunks = patch_get_hunklines(&patch)?;
 
 		let working_content = load_file(&repo, file_path)?;
-		let old_lines = working_content.lines().collect::<Vec<_>>();
+		let old_lines = working_content
+			.split_terminator(NEWLINE)
+			.collect::<Vec<_>>();
 
 		apply_selection(lines, &hunks, &old_lines, false, true)?
 	};
@@ -342,5 +344,32 @@ end
 		let result_file = load_file(&repo, "test.txt").unwrap();
 
 		assert_eq!(result_file.as_str(), FILE_3);
+	}
+
+	#[test]
+	fn test_discard_keeps_crlf() {
+		static FILE_1: &str = "a\r\nb\r\nc\r\n";
+		static FILE_2: &str = "a\r\nb\r\nc\r\nX\r\n";
+
+		let (path, repo) = repo_init().unwrap();
+		let path: &RepoPath = &path.path().to_str().unwrap().into();
+
+		write_commit_file(&repo, "test.txt", FILE_1, "c1");
+
+		repo_write_file(&repo, "test.txt", FILE_2).unwrap();
+
+		discard_lines(
+			path,
+			"test.txt",
+			&[DiffLinePosition {
+				old_lineno: None,
+				new_lineno: Some(4),
+			}],
+		)
+		.unwrap();
+
+		let result_file = load_file(&repo, "test.txt").unwrap();
+
+		assert_eq!(result_file.as_str(), FILE_1);
 	}
 }
