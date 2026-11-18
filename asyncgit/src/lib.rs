@@ -59,6 +59,7 @@ mod push_tags;
 pub mod remote_progress;
 pub mod remote_tags;
 mod revlog;
+mod stash_save_job;
 mod status;
 pub mod sync;
 mod tags;
@@ -78,6 +79,7 @@ pub use crate::{
 	push_tags::{AsyncPushTags, PushTagsRequest},
 	remote_progress::{RemoteProgress, RemoteProgressState},
 	revlog::{AsyncLog, FetchStatus},
+	stash_save_job::AsyncStashSaveJob,
 	status::{AsyncStatus, StatusParams},
 	sync::{
 		diff::{DiffLine, DiffLineType, FileDiff},
@@ -114,6 +116,8 @@ pub enum AsyncGitNotification {
 	Push,
 	///
 	PushTags,
+	///
+	StashSave,
 	///
 	Pull,
 	///

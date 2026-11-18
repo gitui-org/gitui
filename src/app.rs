@@ -426,6 +426,7 @@ impl App {
 		if let AsyncNotification::Git(ev) = ev {
 			self.status_tab.update_git(ev)?;
 			self.stashing_tab.update_git(ev)?;
+			self.stashmsg_popup.update_git(ev);
 			self.revlog.update_git(ev)?;
 			self.file_revlog_popup.update_git(ev)?;
 			self.inspect_commit_popup.update_git(ev)?;
@@ -475,6 +476,7 @@ impl App {
 			|| self.push_tags_popup.any_work_pending()
 			|| self.pull_popup.any_work_pending()
 			|| self.fetch_popup.any_work_pending()
+			|| self.stashmsg_popup.any_work_pending()
 			|| self.revision_files_popup.any_work_pending()
 			|| self.tags_popup.any_work_pending()
 	}

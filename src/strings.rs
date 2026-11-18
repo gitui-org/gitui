@@ -143,6 +143,9 @@ pub fn stash_popup_title(_key_config: &SharedKeyConfig) -> String {
 pub fn stash_popup_msg(_key_config: &SharedKeyConfig) -> String {
 	"type name (optional)".to_string()
 }
+pub fn stash_popup_stashing(_key_config: &SharedKeyConfig) -> String {
+	"Stashing...".to_string()
+}
 pub fn confirm_title_reset() -> String {
 	"Reset".to_string()
 }
