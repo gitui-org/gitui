@@ -113,6 +113,11 @@ impl CommitDetailsComponent {
 	///
 	pub fn any_work_pending(&self) -> bool {
 		self.git_commit_files.is_pending()
+			|| self.single_details.stats_pending()
+	}
+
+	pub fn update_stats(&mut self) {
+		self.single_details.update_stats();
 	}
 
 	///

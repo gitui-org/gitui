@@ -48,6 +48,7 @@ mod blame;
 mod branches;
 pub mod cached;
 mod commit_files;
+mod commit_stats;
 mod diff;
 mod error;
 mod fetch_job;
@@ -68,6 +69,7 @@ pub use crate::{
 	blame::{AsyncBlame, BlameParams},
 	branches::AsyncBranchesJob,
 	commit_files::{AsyncCommitFiles, CommitFilesParams},
+	commit_stats::AsyncCommitStatsJob,
 	diff::{AsyncDiff, DiffParams, DiffType},
 	error::{Error, Result},
 	fetch_job::AsyncFetchJob,
@@ -108,6 +110,8 @@ pub enum AsyncGitNotification {
 	FileLog,
 	///
 	CommitFiles,
+	/// A batch of commit statistics is ready.
+	CommitStats,
 	///
 	Tags,
 	///

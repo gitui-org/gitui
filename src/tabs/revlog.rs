@@ -6,6 +6,7 @@ use crate::{
 		DrawableComponent, EventState,
 	},
 	keys::{key_match, SharedKeyConfig},
+	options::SharedOptions,
 	popups::{FileTreeOpen, InspectCommitOpen},
 	queue::{InternalEvent, Queue, StackablePopupOpen},
 	strings::{self, order},
@@ -64,6 +65,7 @@ pub struct Revlog {
 	repo: RepoPathRef,
 	commit_details: CommitDetailsComponent,
 	list: CommitList,
+	options: SharedOptions,
 	git_log: AsyncLog,
 	search: LogSearch,
 	git_tags: AsyncTags,
@@ -79,14 +81,19 @@ pub struct Revlog {
 impl Revlog {
 	///
 	pub fn new(env: &Environment) -> Self {
+		let list = CommitList::new(
+			env,
+			&strings::log_title(&env.key_config),
+		);
+		list.set_show_diff_stats(
+			env.options.borrow().log_show_diff_stats(),
+		);
 		Self {
 			repo: env.repo.clone(),
 			queue: env.queue.clone(),
 			commit_details: CommitDetailsComponent::new(env),
-			list: CommitList::new(
-				env,
-				&strings::log_title(&env.key_config),
-			),
+			list,
+			options: env.options.clone(),
 			git_log: AsyncLog::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
@@ -118,6 +125,13 @@ impl Revlog {
 			|| self.git_local_branches.is_pending()
 			|| self.git_remote_branches.is_pending()
 			|| self.commit_details.any_work_pending()
+			|| self.list.stats_pending()
+	}
+
+	pub fn update_diff_stats_option(&self) {
+		self.list.set_show_diff_stats(
+			self.options.borrow().log_show_diff_stats(),
+		);
 	}
 
 	const fn is_search_pending(&self) -> bool {
@@ -157,6 +171,9 @@ impl Revlog {
 	) -> Result<()> {
 		if self.visible {
 			match ev {
+				AsyncGitNotification::CommitStats => {
+					self.commit_details.update_stats();
+				}
 				AsyncGitNotification::CommitFiles
 				| AsyncGitNotification::Log => self.update()?,
 				AsyncGitNotification::CommitFilter => {

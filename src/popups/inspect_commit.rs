@@ -253,7 +253,9 @@ impl InspectCommitPopup {
 		ev: AsyncGitNotification,
 	) -> Result<()> {
 		if self.is_visible() {
-			if ev == AsyncGitNotification::CommitFiles {
+			if ev == AsyncGitNotification::CommitStats {
+				self.details.update_stats();
+			} else if ev == AsyncGitNotification::CommitFiles {
 				self.update()?;
 			} else if ev == AsyncGitNotification::Diff {
 				self.update_diff()?;

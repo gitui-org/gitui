@@ -861,6 +861,9 @@ impl App {
 			}
 			InternalEvent::OptionSwitched(o) => {
 				match o {
+					AppOption::LogShowDiffStats => {
+						self.revlog.update_diff_stats_option();
+					}
 					AppOption::StatusShowUntracked => {
 						self.status_tab.update()?;
 					}
@@ -1182,7 +1185,8 @@ impl App {
 			tab_labels.iter().map(Span::width).sum::<usize>()
 				+ tab_labels.len().saturating_sub(1)
 					* (divider.width() + DIVIDER_PAD_SPACES)
-				+ SIDE_PADS + MARGIN_LEFT_AND_RIGHT;
+				+ SIDE_PADS
+				+ MARGIN_LEFT_AND_RIGHT;
 
 		let left_right = Layout::default()
 			.direction(Direction::Horizontal)

@@ -13,7 +13,11 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::sync::{
-	self, CommitDetails, CommitId, CommitMessage, RepoPathRef, Tag,
+	self, CommitDetails, CommitId, CommitMessage, CommitStats,
+	RepoPath, RepoPathRef, Tag,
+};
+use asyncgit::{
+	asyncjob::AsyncSingleJob, AsyncCommitStatsJob, DiffLineType,
 };
 use crossterm::event::Event;
 use ratatui::{
@@ -27,9 +31,19 @@ use sync::CommitTags;
 
 use super::style::Detail;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StatsState {
+	Loading,
+	Ready(CommitStats),
+	Unavailable,
+}
+
 pub struct DetailsComponent {
 	repo: RepoPathRef,
 	data: Option<CommitDetails>,
+	commit: Option<(RepoPath, CommitId)>,
+	stats: StatsState,
+	stats_job: AsyncSingleJob<AsyncCommitStatsJob>,
 	tags: Vec<Tag>,
 	theme: SharedTheme,
 	focused: bool,
@@ -48,6 +62,9 @@ impl DetailsComponent {
 		Self {
 			repo: env.repo.clone(),
 			data: None,
+			commit: None,
+			stats: StatsState::Loading,
+			stats_job: AsyncSingleJob::new(env.sender_git.clone()),
 			tags: Vec::new(),
 			theme: env.theme.clone(),
 			focused,
@@ -63,6 +80,19 @@ impl DetailsComponent {
 		id: Option<CommitId>,
 		tags: Option<CommitTags>,
 	) {
+		let commit = id.map(|id| (self.repo.borrow().clone(), id));
+		if self.commit != commit {
+			self.stats_job.cancel();
+			self.stats = StatsState::Loading;
+			if let Some((repo, id)) = &commit {
+				self.stats_job.spawn(AsyncCommitStatsJob::new(
+					repo.clone(),
+					vec![*id],
+				));
+			}
+			self.commit = commit;
+		}
+		self.update_stats();
 		self.tags.clear();
 
 		self.data = id.and_then(|id| {
@@ -74,6 +104,63 @@ impl DetailsComponent {
 		if let Some(tags) = tags {
 			self.tags.extend(tags);
 		}
+	}
+
+	pub fn update_stats(&mut self) {
+		if let Some(job) = self.stats_job.take_last() {
+			for (id, stats) in job.results {
+				if self.commit.as_ref().is_some_and(
+					|(repo, commit)| {
+						*repo == job.repo && *commit == id
+					},
+				) {
+					self.stats = stats.map_or(
+						StatsState::Unavailable,
+						StatsState::Ready,
+					);
+				}
+			}
+		}
+	}
+
+	pub fn stats_pending(&self) -> bool {
+		self.stats_job.is_pending()
+	}
+
+	fn stats_line(&self) -> Line<'_> {
+		let text = self.theme.text(true, false);
+		let mut line = match self.stats {
+			StatsState::Ready(stats) => {
+				let mut spans = vec![
+					Span::styled(
+						format!("+{}", stats.insertions),
+						self.theme
+							.diff_line(DiffLineType::Add, false),
+					),
+					Span::styled(" ", text),
+					Span::styled(
+						format!("-{}", stats.deletions),
+						self.theme
+							.diff_line(DiffLineType::Delete, false),
+					),
+				];
+				if stats.is_merge {
+					spans.push(Span::styled(" (first parent)", text));
+				}
+				Line::from(spans)
+			}
+			StatsState::Unavailable => {
+				Line::from(Span::styled("Stats unavailable", text))
+			}
+			StatsState::Loading => {
+				Line::from(Span::styled("…", text))
+			}
+		};
+		line.spans.insert(
+			0,
+			Span::styled("Lines: ", self.theme.text(false, false)),
+		);
+		line
 	}
 
 	fn wrap_commit_details(
@@ -217,6 +304,8 @@ impl DetailsComponent {
 				),
 			]));
 
+			res.push(self.stats_line());
+
 			if !self.tags.is_empty() {
 				res.push(Line::from(style_detail(
 					&self.theme,
@@ -261,7 +350,8 @@ impl DrawableComponent for DetailsComponent {
 		let chunks = Layout::default()
 			.direction(Direction::Vertical)
 			.constraints(
-				[Constraint::Length(8), Constraint::Min(10)].as_ref(),
+				[Constraint::Length(10), Constraint::Min(10)]
+					.as_ref(),
 			)
 			.split(rect);
 
@@ -428,6 +518,133 @@ mod tests {
 			DetailsComponent::wrap_commit_details(message, width);
 
 		[&wrapped_title[..], &wrapped_message[..]].concat()
+	}
+
+	#[test]
+	fn stats_survive_refreshes_and_reject_stale_completions() {
+		use std::time::Duration;
+		let (dir, repo) = git2_testing::repo_init();
+		let mut env = Environment::test_env();
+		env.repo.replace(dir.path().to_path_buf().into());
+		let (sender, receiver) = crossbeam_channel::unbounded();
+		env.sender_git = sender;
+		let id = repo.head().unwrap().target().unwrap().into();
+		let mut details = DetailsComponent::new(&env, false);
+		details.set_commit(Some(id), None);
+		assert_eq!(details.stats_line().to_string(), "Lines: …");
+		receiver.recv_timeout(Duration::from_secs(10)).unwrap();
+		for _ in 0..5 {
+			details.set_commit(Some(id), None);
+			assert_eq!(
+				details.stats,
+				StatsState::Ready(CommitStats::default())
+			);
+		}
+		assert!(receiver.is_empty());
+
+		// A result for another repository must not overwrite this commit.
+		details.stats_job.spawn(AsyncCommitStatsJob::new(
+			dir.path().join("other").into(),
+			vec![id],
+		));
+		receiver.recv_timeout(Duration::from_secs(10)).unwrap();
+		details.update_stats();
+		assert_eq!(
+			details.stats,
+			StatsState::Ready(CommitStats::default())
+		);
+		// Nor may a result for a different selection in this repository.
+		details.stats_job.spawn(AsyncCommitStatsJob::new(
+			env.repo.borrow().clone(),
+			vec![CommitId::default()],
+		));
+		receiver.recv_timeout(Duration::from_secs(10)).unwrap();
+		details.update_stats();
+		assert_eq!(
+			details.stats,
+			StatsState::Ready(CommitStats::default())
+		);
+		details.set_commit(None, None);
+		assert_eq!(details.stats, StatsState::Loading);
+	}
+
+	#[test]
+	fn info_stats_placement_colors_and_sizing_with_committer_and_tags(
+	) {
+		use asyncgit::sync::CommitSignature;
+		use ratatui::{backend::TestBackend, Terminal};
+		let env = Environment::test_env();
+		let mut details = DetailsComponent::new(&env, false);
+		details.data = Some(CommitDetails {
+			hash: "abcdef0123456789".into(),
+			author: CommitSignature {
+				name: "作者".into(),
+				email: "a@b".into(),
+				time: 0,
+			},
+			committer: Some(CommitSignature {
+				name: "Committer".into(),
+				email: "c@d".into(),
+				time: 1,
+			}),
+			message: Some(CommitMessage::from("subject")),
+		});
+		details.tags = vec![Tag::new("v1")];
+		details.stats = StatsState::Ready(CommitStats {
+			insertions: 123,
+			deletions: 45,
+			is_merge: true,
+		});
+		let text = details.get_text_info();
+		assert!(text[4].to_string().contains("abcdef"));
+		assert_eq!(
+			text[5].to_string(),
+			"Lines: +123 -45 (first parent)"
+		);
+		assert_eq!(
+			text[5].spans[0].style,
+			env.theme.text(false, false)
+		);
+		assert_eq!(
+			text[5].spans[1].style,
+			env.theme.diff_line(DiffLineType::Add, false)
+		);
+		assert_eq!(
+			text[5].spans[3].style,
+			env.theme.diff_line(DiffLineType::Delete, false)
+		);
+		assert!(text[6].to_string().contains("Tags"));
+		assert_eq!(text[7].to_string(), "v1");
+		let mut terminal =
+			Terminal::new(TestBackend::new(80, 20)).unwrap();
+		terminal
+			.draw(|f| details.draw(f, f.area()).unwrap())
+			.unwrap();
+		let screen = format!("{}", terminal.backend());
+		assert!(screen.contains("Lines: +123 -45 (first parent)"));
+		assert!(screen.contains("v1"));
+		assert!(screen.contains("subject"));
+		for (width, height) in [(28, 12), (10, 4), (1, 1)] {
+			let mut terminal =
+				Terminal::new(TestBackend::new(width, height))
+					.unwrap();
+			terminal
+				.draw(|f| details.draw(f, f.area()).unwrap())
+				.unwrap();
+		}
+		details.stats = StatsState::Unavailable;
+		assert_eq!(
+			details.get_text_info()[5].to_string(),
+			"Lines: Stats unavailable"
+		);
+		assert!(details.get_text_info()[4]
+			.to_string()
+			.contains("abcdef"));
+		details.stats = StatsState::Loading;
+		assert_eq!(
+			details.get_text_info()[5].to_string(),
+			"Lines: …"
+		);
 	}
 
 	#[test]

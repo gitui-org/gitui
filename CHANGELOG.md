@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 * support x509 commit signing [[@kaden-l-nelson](https://github.com/kaden-l-nelson)] ([#2514](https://github.com/gitui-org/gitui/issues/2514))
+* show theme-colored added/deleted line counts (`Lines: +123 -45`) in commit and stash Info panels, using first-parent diffs for merges and including stashed untracked files
+* add an optional diff statistics column after the author in the Log tab, enabled through Options → Log → Show diff stats (off by default and saved per repository)
 
 ### Changed
 * use [tombi](https://github.com/tombi-toml/tombi) for all toml file formatting

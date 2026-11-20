@@ -10,6 +10,7 @@ mod commit_details;
 pub mod commit_files;
 mod commit_filter;
 mod commit_revert;
+mod commit_stats;
 mod commits_info;
 mod config;
 pub mod cred;
@@ -56,6 +57,7 @@ pub use commit_filter::{
 	SharedCommitFilterFn,
 };
 pub use commit_revert::{commit_revert, revert_commit, revert_head};
+pub use commit_stats::{get_commit_stats, CommitStats};
 pub use commits_info::{
 	get_commit_info, get_commits_info, CommitId, CommitInfo,
 };

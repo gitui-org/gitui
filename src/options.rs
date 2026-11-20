@@ -22,6 +22,8 @@ struct OptionsData {
 	pub diff: DiffOptions,
 	pub status_show_untracked: Option<ShowUntrackedFilesConfig>,
 	pub commit_msgs: Vec<String>,
+	#[serde(default)]
+	pub log_show_diff_stats: bool,
 }
 
 const COMMIT_MSG_HISTORY_LENGTH: usize = 20;
@@ -77,6 +79,15 @@ impl Options {
 		value: Option<ShowUntrackedFilesConfig>,
 	) {
 		self.data.status_show_untracked = value;
+		self.save();
+	}
+
+	pub const fn log_show_diff_stats(&self) -> bool {
+		self.data.log_show_diff_stats
+	}
+
+	pub fn set_log_show_diff_stats(&mut self, show: bool) {
+		self.data.log_show_diff_stats = show;
 		self.save();
 	}
 
@@ -167,5 +178,39 @@ impl Options {
 		let dir = repo_dir(&repo.borrow())?;
 		let dir = dir.join("gitui");
 		Ok(dir)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn diff_stats_default_off_and_legacy_options() {
+		assert!(!Options::test_env().log_show_diff_stats());
+		let old = br#"(tab: 2, diff: (context: 7, interhunk_lines: 2, ignore_whitespace: true), status_show_untracked: None, commit_msgs: ["saved message"])"#;
+		let data: OptionsData = from_bytes(old).unwrap();
+		assert!(!data.log_show_diff_stats);
+		assert_eq!(data.tab, 2);
+		assert_eq!(data.diff.context, 7);
+		assert_eq!(data.commit_msgs, ["saved message"]);
+	}
+
+	#[test]
+	fn diff_stats_persist_per_repository() {
+		let (first, _repo) = git2_testing::repo_init();
+		let (second, _other) = git2_testing::repo_init();
+		let path = || RefCell::new(first.path().to_path_buf().into());
+		let options = Options::new(path());
+		assert!(!options.borrow().log_show_diff_stats());
+		options.borrow_mut().set_log_show_diff_stats(true);
+		assert!(Options::new(path()).borrow().log_show_diff_stats());
+		assert!(!Options::new(RefCell::new(
+			second.path().to_path_buf().into()
+		))
+		.borrow()
+		.log_show_diff_stats());
+		options.borrow_mut().set_log_show_diff_stats(false);
+		assert!(!Options::new(path()).borrow().log_show_diff_stats());
 	}
 }

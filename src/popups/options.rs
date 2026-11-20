@@ -24,6 +24,7 @@ use ratatui::{
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum AppOption {
 	StatusShowUntracked,
+	LogShowDiffStats,
 	DiffIgnoreWhitespaces,
 	DiffContextLines,
 	DiffInterhunkLines,
@@ -73,6 +74,16 @@ impl OptionsPopup {
 				Some(ShowUntrackedFilesConfig::All) => "All",
 			},
 			self.is_select(AppOption::StatusShowUntracked),
+		);
+		Self::add_header(txt, "");
+
+		Self::add_header(txt, "Log");
+		self.add_entry(
+			txt,
+			width,
+			"Show diff stats",
+			&self.options.borrow().log_show_diff_stats().to_string(),
+			self.is_select(AppOption::LogShowDiffStats),
 		);
 		Self::add_header(txt, "");
 
@@ -140,8 +151,11 @@ impl OptionsPopup {
 				AppOption::StatusShowUntracked => {
 					AppOption::DiffInterhunkLines
 				}
-				AppOption::DiffIgnoreWhitespaces => {
+				AppOption::LogShowDiffStats => {
 					AppOption::StatusShowUntracked
+				}
+				AppOption::DiffIgnoreWhitespaces => {
+					AppOption::LogShowDiffStats
 				}
 				AppOption::DiffContextLines => {
 					AppOption::DiffIgnoreWhitespaces
@@ -153,6 +167,9 @@ impl OptionsPopup {
 		} else {
 			self.selection = match self.selection {
 				AppOption::StatusShowUntracked => {
+					AppOption::LogShowDiffStats
+				}
+				AppOption::LogShowDiffStats => {
 					AppOption::DiffIgnoreWhitespaces
 				}
 				AppOption::DiffIgnoreWhitespaces => {
@@ -171,6 +188,13 @@ impl OptionsPopup {
 	fn switch_option(&self, right: bool) {
 		if right {
 			match self.selection {
+				AppOption::LogShowDiffStats => {
+					let show =
+						!self.options.borrow().log_show_diff_stats();
+					self.options
+						.borrow_mut()
+						.set_log_show_diff_stats(show);
+				}
 				AppOption::StatusShowUntracked => {
 					let untracked =
 						self.options.borrow().status_show_untracked();
@@ -210,6 +234,13 @@ impl OptionsPopup {
 			}
 		} else {
 			match self.selection {
+				AppOption::LogShowDiffStats => {
+					let show =
+						!self.options.borrow().log_show_diff_stats();
+					self.options
+						.borrow_mut()
+						.set_log_show_diff_stats(show);
+				}
 				AppOption::StatusShowUntracked => {
 					let untracked =
 						self.options.borrow().status_show_untracked();
@@ -257,7 +288,7 @@ impl OptionsPopup {
 impl DrawableComponent for OptionsPopup {
 	fn draw(&self, f: &mut Frame, area: Rect) -> Result<()> {
 		if self.is_visible() {
-			const SIZE: (u16, u16) = (50, 10);
+			const SIZE: (u16, u16) = (50, 13);
 			let area =
 				ui::centered_rect_absolute(SIZE.0, SIZE.1, area);
 
@@ -361,5 +392,46 @@ impl Component for OptionsPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use ratatui::{backend::TestBackend, Terminal};
+
+	#[test]
+	fn log_diff_stats_option_navigation_event_and_size() {
+		let (dir, _repo) = git2_testing::repo_init();
+		let mut env = Environment::test_env();
+		env.options = crate::options::Options::new(
+			std::cell::RefCell::new(dir.path().to_path_buf().into()),
+		);
+		let mut popup = OptionsPopup::new(&env);
+		popup.move_selection(false);
+		assert!(popup.is_select(AppOption::LogShowDiffStats));
+		popup.switch_option(true);
+		assert!(env.options.borrow().log_show_diff_stats());
+		assert!(matches!(
+			env.queue.pop(),
+			Some(InternalEvent::OptionSwitched(
+				AppOption::LogShowDiffStats
+			))
+		));
+		popup.switch_option(false);
+		assert!(!env.options.borrow().log_show_diff_stats());
+		popup.move_selection(false);
+		assert!(popup.is_select(AppOption::DiffIgnoreWhitespaces));
+		popup.move_selection(true);
+		assert!(popup.is_select(AppOption::LogShowDiffStats));
+		popup.move_selection(true);
+		assert!(popup.is_select(AppOption::StatusShowUntracked));
+		popup.show().unwrap();
+		let mut terminal =
+			Terminal::new(TestBackend::new(60, 20)).unwrap();
+		terminal.draw(|f| popup.draw(f, f.area()).unwrap()).unwrap();
+		let screen = format!("{}", terminal.backend());
+		assert!(screen.contains("Show diff stats"));
+		assert!(screen.contains("Inter hunk lines"));
 	}
 }
