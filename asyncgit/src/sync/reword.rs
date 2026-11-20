@@ -32,7 +32,8 @@ pub fn reword(
 			if repo
 				.diff_tree_to_index(Some(&tree), None, None)?
 				.deltas()
-				.len() == 0
+				.len()
+				== 0
 			{
 				undo_last_commit(repo_path)?;
 				return super::commit(repo_path, message);

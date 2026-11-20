@@ -418,7 +418,8 @@ impl BranchListPopup {
 						&& *index == self.selection as usize
 				})
 			})
-			.count() > 0
+			.count()
+			> 0
 	}
 
 	// top commit of selected branch

@@ -1,3 +1,5 @@
+mod stats;
+
 use super::utils::logitems::{ItemBatch, LogEntry};
 use crate::{
 	app::Environment,
@@ -28,8 +30,13 @@ use ratatui::{
 	widgets::{Block, Borders, Paragraph},
 	Frame,
 };
+use stats::ListStats;
 use std::{
-	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
+	borrow::Cow,
+	cell::{Cell, RefCell},
+	cmp,
+	collections::BTreeMap,
+	rc::Rc,
 	time::Instant,
 };
 
@@ -43,6 +50,7 @@ pub struct CommitList {
 	selection: usize,
 	highlighted_selection: Option<usize>,
 	items: ItemBatch,
+	stats: RefCell<ListStats>,
 	highlights: Option<Rc<IndexSet<CommitId>>>,
 	commits: IndexSet<CommitId>,
 	/// The marked commits.
@@ -66,6 +74,10 @@ impl CommitList {
 		Self {
 			repo: env.repo.clone(),
 			items: ItemBatch::default(),
+			stats: RefCell::new(ListStats::new(
+				env.repo.borrow().clone(),
+				env.sender_git.clone(),
+			)),
 			marked: Vec::with_capacity(2),
 			selection: 0,
 			highlighted_selection: None,
@@ -84,6 +96,14 @@ impl CommitList {
 		}
 	}
 
+	pub fn set_show_diff_stats(&self, show: bool) {
+		self.stats.borrow_mut().set_enabled(show);
+	}
+
+	pub fn stats_pending(&self) -> bool {
+		self.stats.borrow().job.is_pending()
+	}
+
 	///
 	pub const fn tags(&self) -> Option<&Tags> {
 		self.tags.as_ref()
@@ -92,6 +112,7 @@ impl CommitList {
 	///
 	pub fn clear(&mut self) {
 		self.items.clear();
+		self.stats.borrow_mut().retain(&self.items);
 		self.commits.clear();
 	}
 
@@ -354,7 +375,8 @@ impl CommitList {
 		self.update_scroll_speed();
 
 		#[allow(clippy::cast_possible_truncation)]
-		let speed_int = usize::try_from(self.scroll_state.1 as i64)?.max(1);
+		let speed_int =
+			usize::try_from(self.scroll_state.1 as i64)?.max(1);
 
 		let page_offset = usize::from(
 			self.current_size.get().unwrap_or_default().1,
@@ -439,7 +461,7 @@ impl CommitList {
 		}
 	}
 
-	#[allow(clippy::too_many_arguments)]
+	#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 	fn get_entry_to_add<'a>(
 		&self,
 		e: &'a LogEntry,
@@ -451,6 +473,7 @@ impl CommitList {
 		width: usize,
 		now: DateTime<Local>,
 		marked: Option<bool>,
+		stats_widths: Option<(usize, usize)>,
 	) -> Line<'a> {
 		let mut txt: Vec<Span> = Vec::with_capacity(
 			ELEMENTS_PER_LINE + if marked.is_some() { 2 } else { 0 },
@@ -526,14 +549,25 @@ impl CommitList {
 
 		txt.push(splitter.clone());
 
+		let stats_width =
+			stats_widths.map_or(0, |(add, del)| add + del + 2);
 		let author_width =
-			(width.saturating_sub(19) / 3).clamp(3, 20);
+			(width.saturating_sub(19 + stats_width) / 3).clamp(3, 20);
 		let author = string_width_align(&e.author, author_width);
 
 		// commit author
 		txt.push(Span::styled(author, style_author));
 
 		txt.push(splitter.clone());
+
+		if let Some(widths) = stats_widths {
+			txt.extend(
+				self.stats
+					.borrow()
+					.spans(e.id, widths, normal, selected, theme),
+			);
+			txt.push(splitter.clone());
+		}
 
 		// commit tags
 		if let Some(tags) = tags {
@@ -552,9 +586,12 @@ impl CommitList {
 
 		txt.push(splitter);
 
-		let message_width = width.saturating_sub(
-			txt.iter().map(|span| span.content.len()).sum(),
-		);
+		let message_width =
+			width.saturating_sub(if stats_widths.is_some() {
+				txt.iter().map(Span::width).sum()
+			} else {
+				txt.iter().map(|span| span.content.len()).sum()
+			});
 
 		// commit msg
 		txt.push(Span::styled(
@@ -573,6 +610,11 @@ impl CommitList {
 		let now = Local::now();
 
 		let any_marked = !self.marked.is_empty();
+		let stats_widths = self.stats.borrow().widths(
+			&self.items,
+			self.scroll_top.get(),
+			height,
+		);
 
 		for (idx, e) in self
 			.items
@@ -616,6 +658,7 @@ impl CommitList {
 				width,
 				now,
 				marked,
+				stats_widths,
 			));
 		}
 
@@ -765,6 +808,7 @@ impl CommitList {
 					commits,
 					self.highlights.as_ref(),
 				);
+				self.stats.borrow_mut().retain(&self.items);
 			}
 		}
 	}
@@ -786,6 +830,13 @@ impl DrawableComponent for CommitList {
 			height_in_lines,
 			selection,
 		));
+
+		self.stats.borrow_mut().update(
+			&self.repo.borrow(),
+			&self.items,
+			self.scroll_top.get(),
+			height_in_lines,
+		);
 
 		let title = format!(
 			"{} {}/{}",
@@ -897,6 +948,7 @@ impl Component for CommitList {
 #[cfg(test)]
 mod tests {
 	use asyncgit::sync::CommitInfo;
+	use asyncgit::DiffLineType;
 
 	use super::*;
 
@@ -909,6 +961,10 @@ mod tests {
 				highlights: Option::None,
 				tags: Option::None,
 				items: ItemBatch::default(),
+				stats: RefCell::new(ListStats::new(
+					sync::RepoPath::Path(Default::default()),
+					crossbeam_channel::unbounded().0,
+				)),
 				commits: IndexSet::default(),
 				marked: Vec::default(),
 				scroll_top: Cell::default(),
@@ -922,6 +978,183 @@ mod tests {
 					std::path::PathBuf::default(),
 				)),
 				queue: Queue::default(),
+			}
+		}
+	}
+
+	#[test]
+	fn stats_column_alignment_colors_and_visible_widths() {
+		use asyncgit::sync::{CommitStats, Tag};
+		let mut list = CommitList::default();
+		let ids: Vec<_> = (1..=5)
+			.map(|id| {
+				CommitId::from_str_unchecked(&format!("{id:040}"))
+					.unwrap()
+			})
+			.collect();
+		list.items.set_items(
+			0,
+			ids.iter()
+				.map(|&id| CommitInfo {
+					id,
+					author: "作者 Å".into(),
+					message: "message".into(),
+					time: 0,
+				})
+				.collect(),
+			None,
+		);
+		list.tags = Some([(ids[0], vec![Tag::new("v1")])].into());
+		assert!(!list.stats.borrow().enabled);
+		assert!(!list.get_text(4, 100)[0].to_string().contains('+'));
+		list.set_show_diff_stats(true);
+		list.stats.borrow_mut().cache.extend([
+			(
+				ids[0],
+				Some(CommitStats {
+					insertions: 123,
+					deletions: 4,
+					is_merge: true,
+				}),
+			),
+			(
+				ids[1],
+				Some(CommitStats {
+					insertions: 1,
+					deletions: 4567,
+					is_merge: false,
+				}),
+			),
+			(ids[2], None),
+			(
+				ids[4],
+				Some(CommitStats {
+					insertions: usize::MAX,
+					deletions: usize::MAX,
+					is_merge: false,
+				}),
+			),
+		]);
+		let lines = list.get_text(4, 100);
+		assert_eq!(lines[0].spans[6].content, "+123");
+		assert_eq!(lines[0].spans[8].content, "   -4");
+		assert_eq!(lines[1].spans[6].content, "  +1");
+		assert_eq!(lines[1].spans[8].content, "-4567");
+		assert_eq!(lines[2].spans[6].content, "—         ");
+		assert_eq!(lines[3].spans[6].content, "…         ");
+		let first = lines[0].to_string();
+		assert!(
+			first.find("作者").unwrap() < first.find("+123").unwrap()
+		);
+		assert!(
+			first.find("-4").unwrap() < first.find("<v1>").unwrap()
+		);
+		assert!(
+			first.find("<v1>").unwrap()
+				< first.find("message").unwrap()
+		);
+		assert!(!first.contains("first parent"));
+		assert_eq!(lines[0].width(), 100);
+		assert_eq!(lines[1].width(), 100);
+		assert_eq!(
+			lines[0].spans[6].style,
+			list.theme.diff_line(DiffLineType::Add, true)
+		);
+		assert_eq!(
+			lines[0].spans[8].style,
+			list.theme.diff_line(DiffLineType::Delete, true)
+		);
+		assert_eq!(
+			lines[1].spans[6].style,
+			list.theme.diff_line(DiffLineType::Add, false)
+		);
+		assert_eq!(
+			lines[1].spans[8].style,
+			list.theme.diff_line(DiffLineType::Delete, false)
+		);
+		let all = list.get_text(5, 140);
+		assert!(all[4].to_string().contains(&format!(
+			"+{} -{}",
+			usize::MAX,
+			usize::MAX
+		)));
+		assert_eq!(all[0].spans[6].width(), all[4].spans[6].width());
+		assert_eq!(all[0].spans[8].width(), all[4].spans[8].width());
+		let row = list
+			.get_entry_to_add(
+				list.items.iter().next().unwrap(),
+				false,
+				Some("<tag>".into()),
+				Some("{branch}".into()),
+				Some("[remote]".into()),
+				&list.theme,
+				120,
+				Local::now(),
+				None,
+				Some((4, 5)),
+			)
+			.to_string();
+		assert!(row.contains("-4  <tag> {branch} [remote] message"));
+		list.set_show_diff_stats(false);
+		assert!(!list.get_text(4, 100)[0]
+			.to_string()
+			.contains("+123"));
+	}
+
+	#[test]
+	fn stats_column_search_highlighting_and_constrained_widths() {
+		use asyncgit::sync::CommitStats;
+		use ratatui::{backend::TestBackend, Terminal};
+		let mut list = build_commit_list_with_some_commits();
+		let ids: Vec<_> = list.items.iter().map(|e| e.id).collect();
+		list.commits = ids.iter().copied().collect();
+		let highlights = Rc::new([ids[0]].into_iter().collect());
+		list.items.set_items(
+			0,
+			ids.iter()
+				.map(|&id| CommitInfo {
+					id,
+					author: "作者".into(),
+					message: "message".into(),
+					time: 0,
+				})
+				.collect(),
+			Some(&highlights),
+		);
+		list.selection = 0;
+		list.set_show_diff_stats(true);
+		list.stats.borrow_mut().cache.extend(ids.iter().map(|&id| {
+			(
+				id,
+				Some(CommitStats {
+					insertions: 1234567,
+					deletions: 12345678,
+					is_merge: false,
+				}),
+			)
+		}));
+		let lines = list.get_text(2, 100);
+		assert_eq!(
+			lines[0].spans[6].style,
+			list.theme.diff_line(DiffLineType::Add, true)
+		);
+		assert_eq!(
+			lines[1].spans[6].style,
+			list.theme.commit_unhighlighted()
+		);
+		assert_eq!(
+			lines[1].spans[8].style,
+			list.theme.commit_unhighlighted()
+		);
+		for width in [80, 50, 30, 12, 1] {
+			let mut terminal =
+				Terminal::new(TestBackend::new(width, 5)).unwrap();
+			terminal
+				.draw(|f| list.draw(f, f.area()).unwrap())
+				.unwrap();
+			if width >= 50 {
+				assert!(format!("{}", terminal.backend())
+					.contains("+1234567 -12345678"));
 			}
 		}
 	}
@@ -949,7 +1182,8 @@ mod tests {
 	}
 
 	/// Build a commit list with a few commits loaded
-	fn build_commit_list_with_some_commits() -> CommitList {
+	pub(super) fn build_commit_list_with_some_commits() -> CommitList
+	{
 		let mut items = ItemBatch::default();
 		let basic_commit_info = CommitInfo {
 			message: String::default(),
