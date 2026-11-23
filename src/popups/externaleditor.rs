@@ -27,6 +27,28 @@ use scopeguard::defer;
 use std::ffi::OsStr;
 use std::{env, io, path::Path, process::Command};
 
+enum EditorGoto {
+	None,
+	PlusLine(u32),
+	FileColon(u32),
+	GotoFlag(u32),
+}
+
+fn editor_goto_style(command: &str, line: Option<u32>) -> EditorGoto {
+	let Some(ln) = line else {
+		return EditorGoto::None;
+	};
+	let cmd = command.to_lowercase();
+	if cmd.ends_with("hx") {
+		EditorGoto::FileColon(ln)
+	} else if cmd.ends_with("code") || cmd.ends_with("code-insiders")
+	{
+		EditorGoto::GotoFlag(ln)
+	} else {
+		EditorGoto::PlusLine(ln)
+	}
+}
+
 ///
 pub struct ExternalEditorPopup {
 	visible: bool,
@@ -44,10 +66,11 @@ impl ExternalEditorPopup {
 		}
 	}
 
-	/// opens file at given `path` in an available editor
+	/// opens file at given `path` in an available editor, optionally at `line`
 	pub fn open_file_in_editor(
 		repo: &RepoPath,
 		path: &Path,
+		line: Option<u32>,
 	) -> Result<()> {
 		let work_dir = repo_work_dir(repo)?;
 
@@ -107,7 +130,32 @@ impl ExternalEditorPopup {
 		let mut args: Vec<&OsStr> =
 			remainder.map(OsStr::new).collect();
 
-		args.push(path.as_os_str());
+		let line_arg: String;
+		let helix_path: std::path::PathBuf;
+		match editor_goto_style(&command, line) {
+			EditorGoto::None => {
+				args.push(path.as_os_str());
+			}
+			EditorGoto::PlusLine(ln) => {
+				line_arg = format!("+{ln}");
+				args.push(OsStr::new(&line_arg));
+				args.push(path.as_os_str());
+			}
+			EditorGoto::FileColon(ln) => {
+				helix_path = path.with_file_name(format!(
+					"{}:{ln}",
+					path.file_name()
+						.unwrap_or_default()
+						.to_string_lossy(),
+				));
+				args.push(helix_path.as_os_str());
+			}
+			EditorGoto::GotoFlag(ln) => {
+				args.push(OsStr::new("--goto"));
+				line_arg = format!("{}:{ln}", path.to_string_lossy());
+				args.push(OsStr::new(&line_arg));
+			}
+		}
 
 		Command::new(command.clone())
 			.current_dir(work_dir)
