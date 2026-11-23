@@ -10,7 +10,7 @@ use crossbeam_channel::Sender;
 use std::{
 	hash::Hash,
 	sync::{
-		atomic::{AtomicU64, AtomicUsize, Ordering},
+		atomic::{AtomicUsize, Ordering},
 		Arc, Mutex,
 	},
 };
@@ -50,7 +50,7 @@ pub struct AsyncStatus {
 	pending: Arc<AtomicUsize>,
 	repo: RepoPath,
 	/// Counter that increments after each completed fetch.
-	generation: Arc<AtomicU64>,
+	generation: Arc<AtomicUsize>,
 }
 
 impl AsyncStatus {
@@ -65,7 +65,7 @@ impl AsyncStatus {
 			last: Arc::new(Mutex::new(Status::default())),
 			sender,
 			pending: Arc::new(AtomicUsize::new(0)),
-			generation: Arc::new(AtomicU64::new(0)),
+			generation: Arc::new(AtomicUsize::new(0)),
 		}
 	}
 
