@@ -114,19 +114,16 @@ pub fn commit(repo_path: &RepoPath, msg: &str) -> Result<CommitId> {
 
 			// manually advance to the new commit ID
 			// repo.commit does that on its own, repo.commit_signed does not
-			// if there is no head, read default branch or default to "master"
-			if let Ok(mut head) = repo.head() {
-				head.set_target(commit_id, msg)?;
-			} else {
-				let default_branch_name = config
-					.get_str("init.defaultBranch")
-					.unwrap_or("master");
-				repo.reference(
-					&format!("refs/heads/{default_branch_name}"),
-					commit_id,
-					true,
-					msg,
-				)?;
+			match repo.head() {
+				Ok(mut head) => {
+					head.set_target(commit_id, msg)?;
+				}
+				Err(e) if e.code() == ErrorCode::UnbornBranch => {
+					let head = repo.find_reference("HEAD")?;
+					let branch = head.symbolic_target()?.ok_or(e)?;
+					repo.reference(branch, commit_id, false, msg)?;
+				}
+				Err(e) => return Err(e.into()),
 			}
 
 			commit_id
@@ -232,6 +229,36 @@ mod tests {
 		commit(repo_path, "commit msg").unwrap();
 
 		assert_eq!(get_statuses(repo_path), (0, 0));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_signed_first_commit_on_unborn_branch() -> Result<()> {
+		let (dir, repo) = repo_init_empty()?;
+		repo.set_head("refs/heads/experiment")?;
+		let key = dir.path().join("test_key");
+		assert!(std::process::Command::new("ssh-keygen")
+			.args(["-q", "-t", "ed25519", "-N", "", "-f"])
+			.arg(&key)
+			.status()?
+			.success());
+		let mut config = repo.config()?;
+		config.set_str("init.defaultBranch", "main")?;
+		config.set_bool("commit.gpgsign", true)?;
+		config.set_str("gpg.format", "ssh")?;
+		config.set_str("user.signingKey", key.to_str().unwrap())?;
+
+		let id =
+			commit(&dir.path().to_str().unwrap().into(), "initial")?;
+		let head = repo.head()?;
+		assert_eq!(head.name()?, "refs/heads/experiment");
+		assert_eq!(head.target(), Some(id.get_oid()));
+		assert_eq!(
+			repo.branches(Some(git2::BranchType::Local))?.count(),
+			1
+		);
+		repo.extract_signature(&id.get_oid(), None)?;
+		Ok(())
 	}
 
 	#[test]
